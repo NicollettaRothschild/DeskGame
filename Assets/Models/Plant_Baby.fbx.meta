@@ -2,16 +2,16 @@
   ImportedAssetIds:
     .hidden/Material: !<reference> bd5a007d-3c16-410a-a5ab-11e0d2311d0a
     .hidden/white: !<reference> 19ae4274-d7f4-4927-a5c3-b8f028ddf76a
-    022a0dd3e33e0de3: !<reference> 644c476f-3d5f-471f-a833-9ee248268090
-    51ad0a65ef1745db: !<reference> 4eb547d6-f80d-4cff-b2c4-5844b0997cee
-    6db1e531ed538561: !<reference> 87144e70-1df5-4406-89f3-95fabe859789
-    7a0dd5cd69df73fa: !<reference> 591da983-443f-418d-85a3-4ff5a8f9e51c
+    1b950330d48c4939: !<reference> 23d98e05-7e1a-40f2-af33-eabc956b7896
+    66780cf3a4dcb2b8: !<reference> 679d966d-62b3-451a-bf88-3289bcbe42c1
     Materials/Material: !<reference> 32700707-d013-4730-ad29-9f77aedded55
     Materials/Material|Material|GraphPassInfo: !<reference> b31868ec-7947-4c57-a1fa-dab149fa0c24
     Meshes/Leaf 1.014: !<reference> 82d6fab7-30f8-471c-9365-91a5d38989de
     Meshes/Leaf 1.015: !<reference> 0045198b-71ac-41bf-a7f2-fc64c759b9ad
     Scene: !<reference> 87fb210e-c70e-40a4-8771-ef400e4ec588
-    ebd379b5d00133e8: !<reference> b7315900-b924-4405-a992-02168889e85b
+    a117f2962119ab05: !<reference> 50f04f5a-c1fd-45be-bd4e-cf206c8b150e
+    cd4a48f3ecd7d217: !<reference> f57891d1-a928-4f55-8dda-b8899bfbcad4
+    de350d4c8fdb55bc: !<reference> 7aeaeb50-4bac-4761-8c87-49b6e2dbe07a
   ImporterName: FbxImporter
   PrimaryAsset: !<reference> 87fb210e-c70e-40a4-8771-ef400e4ec588
   PackageType: LegacyPackage
@@ -53,7 +53,27 @@
       jpg: Performance Compression
     Overrides:
       {}
-- !<RenderMeshVisual/4eb547d6-f80d-4cff-4d3b-a7bb4f668311>
+- !<SceneObject/23d98e05-7e1a-40f2-50cc-15436a948769>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.015
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 5.575181, y: -5.367477, z: -0.802124}
+    Rotation: {x: -90.000000, y: -79.407043, z: -0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 50f04f5a-c1fd-45be-42b1-30df9374eaf1
+- !<ObjectPrefabAssetData/4ecd5e98-518d-4f9d-a0a2-fb196e3c85e5>
+  Prototype: !<ObjectOwner/799a412f-bcfd-4128-962d-30ab937963c6>
+    PackagePath: ""
+    objects:
+      - !<own> 679d966d-62b3-451a-4077-cd764341bd3e
+- !<RenderMeshVisual/50f04f5a-c1fd-45be-42b1-30df9374eaf1>
   PrefabRemaps:
     []
   Name: component_1
@@ -73,12 +93,7 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<ObjectPrefabAssetData/4ecd5e98-518d-4f9d-a0a2-fb196e3c85e5>
-  Prototype: !<ObjectOwner/799a412f-bcfd-4128-962d-30ab937963c6>
-    PackagePath: ""
-    objects:
-      - !<own> 591da983-443f-418d-7a5c-b00a57061ae3
-- !<SceneObject/591da983-443f-418d-7a5c-b00a57061ae3>
+- !<SceneObject/679d966d-62b3-451a-4077-cd764341bd3e>
   PrefabRemaps:
     []
   Name: Plant_Baby
@@ -90,26 +105,11 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    - !<own> b7315900-b924-4405-566d-fde9777617a4
-    - !<own> 644c476f-3d5f-471f-57cc-611db7d97f6f
+    - !<own> f57891d1-a928-4f55-7225-47766404352b
+    - !<own> 23d98e05-7e1a-40f2-50cc-15436a948769
   Components:
     []
-- !<SceneObject/644c476f-3d5f-471f-57cc-611db7d97f6f>
-  PrefabRemaps:
-    []
-  Name: Leaf 1.015
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 5.575181, y: -5.367477, z: -0.802124}
-    Rotation: {x: -90.000000, y: -79.407043, z: -0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 4eb547d6-f80d-4cff-4d3b-a7bb4f668311
-- !<RenderMeshVisual/87144e70-1df5-4406-760c-6a05417a6876>
+- !<RenderMeshVisual/7aeaeb50-4bac-4761-7378-b6491d241f85>
   PrefabRemaps:
     []
   Name: component_0
@@ -129,7 +129,7 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/b7315900-b924-4405-566d-fde9777617a4>
+- !<SceneObject/f57891d1-a928-4f55-7225-47766404352b>
   PrefabRemaps:
     []
   Name: Leaf 1.014
@@ -143,4 +143,4 @@
   Children:
     []
   Components:
-    - !<own> 87144e70-1df5-4406-760c-6a05417a6876
+    - !<own> 7aeaeb50-4bac-4761-7378-b6491d241f85

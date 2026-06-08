@@ -20,12 +20,11 @@ metaInfo:
     - Front
     - Back
   lensClientCompatibilities:
-    - Mobile
-    - Web
+    - Spectacles
   platformBundlesEnabled: false
   iconHash: ""
   videoPreviewHash: ""
-  fromTemplateName: Default
+  fromTemplateName: Spectacles
   fromTemplateUrl: Lens Studio 5.15.1.25102815
   activationCamera: Front
   sourceMapEnabled: false

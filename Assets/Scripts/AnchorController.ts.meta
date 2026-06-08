@@ -1,0 +1,62 @@
+- !<AssetImportMetadata/10ed27c6-793e-410a-85aa-09cac7d299ca>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> c79e6707-a52a-4278-bf99-5e74a3f14ef8
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> c79e6707-a52a-4278-bf99-5e74a3f14ef8
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> dc343e75-c057-430b-b8a3-5179daeee44e
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/dc343e75-c057-430b-b8a3-5179daeee44e>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 5804491d-6937-48cc-b971-6c138e23831d
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    anchorComponent: false
+    anchorModule: false
+    camera: false
+    menuRoot: false
+    plantPrefab: false
+    textlog: false
+    widgetParent: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - anchorModule: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      widgetParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      anchorComponent: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      camera: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      menuRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      plantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      textlog: !<reference.Text> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input AssignableType anchorModule
+    - // @input SceneObject widgetParent
+    - // @input AssignableType_1 anchorComponent
+    - // @input SceneObject camera
+    - // @input SceneObject menuRoot
+    - // @input Asset.ObjectPrefab plantPrefab
+    - // @input Component.Text textlog
