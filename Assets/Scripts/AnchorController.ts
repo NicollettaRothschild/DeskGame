@@ -6,7 +6,12 @@ import { Anchor } from 'Spatial Anchors.lspkg/Anchor';
 import { AnchorModule } from 'Spatial Anchors.lspkg/AnchorModule';
 import { AnchorComponent } from 'Spatial Anchors.lspkg/AnchorComponent';
 
-const ANCHOR_CONTROLLER_VERSION = 'v4';
+const ANCHOR_CONTROLLER_VERSION = 'v6';
+const ANCHOR_SCAN_WAIT_SEC = 8;
+const WORLD_PREVIEW_FALLBACK_SEC = 4;
+// Plant collider is 300 units tall, centered on root, with 0.1 scale → 15 cm to desk contact.
+const PLANT_ANCHOR_Y_OFFSET = 15;
+const ANCHOR_RESTORE_STABLE_FRAMES = 3;
 
 @component
 export class AnchorController extends BaseScriptComponent {
@@ -33,6 +38,7 @@ export class AnchorController extends BaseScriptComponent {
   private anchorRestorePending = false;
   private anchorCreationInProgress = false;
   private skipStartupWorldFallback = false;
+  private pendingCreatedAnchorId?: string;
 
   onAwake() {
     this.createEvent('OnStartEvent').bind(() => this.onStart());
@@ -52,15 +58,11 @@ export class AnchorController extends BaseScriptComponent {
       this.textlog.text = usesAnchorSpace
         ? 'Scan desk slowly for saved anchor...'
         : 'Scanning for desk anchor...';
-      print(
-        usesAnchorSpace
-          ? 'Saved plants found, anchor-only restore'
-          : 'Saved plants found, waiting for anchor'
-      );
-      if (!usesAnchorSpace) {
-        this.scheduleWorldFallbackRestore(4);
-      } else {
-        this.scheduleAnchorScanReminder(20);
+      print('Saved plants found, waiting for anchor');
+      const fallbackSec = usesAnchorSpace ? ANCHOR_SCAN_WAIT_SEC : WORLD_PREVIEW_FALLBACK_SEC;
+      this.scheduleWorldFallbackRestore(fallbackSec);
+      if (usesAnchorSpace) {
+        this.scheduleAnchorScanReminder(4);
       }
     }
 
@@ -74,28 +76,30 @@ export class AnchorController extends BaseScriptComponent {
     const worldSnapshots = hadWorldFallback ? this.capturePlantWorldTransforms() : [];
 
     const isAlreadyTracking = this.currentAnchor?.id === anchor.id;
+    const isUnsavedSessionAnchor =
+      this.pendingCreatedAnchorId === anchor.id && !this.anchorPersisted;
     this.anchorComponent.enabled = true;
     this.anchorComponent.anchor = anchor;
     this.currentAnchor = anchor;
-    if (!isAlreadyTracking) {
+    if (!isAlreadyTracking && !isUnsavedSessionAnchor) {
       this.anchorPersisted = true;
+      print('Loaded previously saved anchor');
     }
 
     this.anchorRestorePending = true;
-    this.scheduleDelayed(() => {
+    this.scheduleAnchorStableRestore(() => {
       this.anchorRestorePending = false;
       this.usingWorldSpace = false;
-      this.restoredFromWorldFallback = false;
 
-      if (hadWorldFallback && worldSnapshots.length > 0) {
-        print('Upgrading world preview to anchor space');
-        this.reparentPlantsToAnchor();
-        this.reapplyPlantWorldTransforms(worldSnapshots);
-        this.hasRestored = true;
-        this.persistPlantTransforms();
-        this.textlog.text = `Restored ${this.objs.length} plant(s)`;
+      if (hadWorldFallback) {
+        print('Upgrading world preview to anchor-local restore');
+        this.hasRestored = false;
+        this.restoredFromWorldFallback = false;
+        this.restoreSavedObjects(true);
         return;
       }
+
+      this.restoredFromWorldFallback = false;
 
       if (this.objs.length > 0 && !this.hasRestored) {
         print('Attaching existing plants to anchor');
@@ -120,7 +124,7 @@ export class AnchorController extends BaseScriptComponent {
       if (!this.hasRestored) {
         this.restoreSavedObjects(true);
       }
-    }, 1);
+    });
   }
 
   async createAnchor() {
@@ -190,6 +194,54 @@ export class AnchorController extends BaseScriptComponent {
     delayedEvent.reset(delaySec);
   }
 
+  private scheduleAnchorStableRestore(callback: () => void) {
+    let stableFrames = 0;
+    let lastAnchorPos: vec3 | null = null;
+    let maxWaitSec = 3;
+    const settleEvent = this.createEvent('UpdateEvent');
+    settleEvent.bind(() => {
+      if (!this.currentAnchor || !this.anchorComponent.enabled) {
+        return;
+      }
+
+      maxWaitSec -= getDeltaTime();
+      const anchorPos = this.widgetParent.getTransform().getWorldPosition();
+      if (
+        lastAnchorPos &&
+        anchorPos.distance(lastAnchorPos) < 0.05
+      ) {
+        stableFrames++;
+      } else {
+        stableFrames = 0;
+      }
+      lastAnchorPos = anchorPos;
+
+      if (stableFrames >= ANCHOR_RESTORE_STABLE_FRAMES || maxWaitSec <= 0) {
+        settleEvent.enabled = false;
+        print(
+          stableFrames >= ANCHOR_RESTORE_STABLE_FRAMES
+            ? 'Anchor pose stable, restoring plants'
+            : 'Anchor restore timeout, applying saved offsets'
+        );
+        callback();
+      }
+    });
+    settleEvent.enabled = true;
+  }
+
+  private getPlantAnchorWorldPosition(): vec3 {
+    const worldPos = this.objs[0].getTransform().getWorldPosition();
+    return new vec3(
+      worldPos.x,
+      worldPos.y - PLANT_ANCHOR_Y_OFFSET,
+      worldPos.z
+    );
+  }
+
+  private getPlantAnchorWorldMatrix(): mat4 {
+    return mat4.fromTranslation(this.getPlantAnchorWorldPosition());
+  }
+
   private markSessionPlantsActive() {
     this.skipStartupWorldFallback = true;
   }
@@ -208,19 +260,20 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorSession!.createWorldAnchor(spawnWorldMat)
       .then((anchor) => {
         const worldSnapshots = this.capturePlantWorldTransforms();
+        this.pendingCreatedAnchorId = anchor.id;
         this.currentAnchor = anchor;
         this.anchorComponent.enabled = true;
         this.anchorComponent.anchor = anchor;
         this.anchorPersisted = false;
         this.anchorCreationInProgress = false;
         this.textlog.text = 'Mapping desk... look around slowly';
-        print('World anchor created, waiting to persist');
-        this.scheduleDelayed(() => {
+        print('World anchor created at desk contact, waiting to persist');
+        this.scheduleAnchorStableRestore(() => {
           this.reparentPlantsToAnchor();
           this.reapplyPlantWorldTransforms(worldSnapshots);
           this.persistPlantTransforms();
           this.trySaveAnchorOnce();
-        }, 1);
+        });
       })
       .catch((error) => {
         print('Error creating anchor: ' + error);
@@ -261,6 +314,7 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorSession!.saveAnchor(this.currentAnchor)
       .then(() => {
         this.anchorPersisted = true;
+        this.pendingCreatedAnchorId = undefined;
         global.persistentStorageSystem.store.putBool('uses_anchor_space', true);
         this.textlog.text = 'Anchor saved';
         print('Anchor saved successfully');
@@ -316,9 +370,8 @@ export class AnchorController extends BaseScriptComponent {
     if (this.currentAnchor || this.usingWorldSpace || this.objs.length === 0) {
       return;
     }
-    const anchorWorldPos = this.objs[0].getTransform().getWorldPosition();
-    print('Starting desk anchor from restored plant position');
-    this.startWorldAnchorCreation(mat4.fromTranslation(anchorWorldPos));
+    print('Starting desk anchor from restored plant desk contact');
+    this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
   }
 
   private spawnObjectAtWorld(worldPos: vec3): SceneObject | null {
@@ -366,11 +419,49 @@ export class AnchorController extends BaseScriptComponent {
 
   private worldToWidgetLocal(worldPos: vec3, worldRot: quat): { pos: vec3; rot: quat } {
     const worldToLocal = this.widgetParent.getTransform().getWorldTransform().inverse();
-    const worldMat = mat4.compose(worldPos, worldRot, new vec3(1, 1, 1));
-    const localMat = worldToLocal.mult(worldMat);
-    const pos = new vec3(localMat.column3.x, localMat.column3.y, localMat.column3.z);
-    const euler = localMat.extractEulerAngles();
-    const rot = quat.fromEulerAngles(euler.x, euler.y, euler.z);
+    const parentRot = this.widgetParent.getTransform().getWorldRotation();
+    return {
+      pos: worldToLocal.multiplyPoint(worldPos),
+      rot: parentRot.invert().multiply(worldRot),
+    };
+  }
+
+  private widgetLocalToWorld(localPos: vec3, localRot: quat): { pos: vec3; rot: quat } {
+    const parentWorld = this.widgetParent.getTransform().getWorldTransform();
+    const parentRot = this.widgetParent.getTransform().getWorldRotation();
+    return {
+      pos: parentWorld.multiplyPoint(localPos),
+      rot: parentRot.multiply(localRot),
+    };
+  }
+
+  private isNearZeroOffset(pos: vec3): boolean {
+    return Math.abs(pos.x) < 0.1 && Math.abs(pos.y) < 0.1 && Math.abs(pos.z) < 0.1;
+  }
+
+  private getStoredAnchorLocalOffset(
+    store: GeneralDataStore,
+    index: number
+  ): { pos: vec3; rot: quat } {
+    const pos = new vec3(
+      store.getFloat(`w${index}_x`),
+      store.getFloat(`w${index}_y`),
+      store.getFloat(`w${index}_z`)
+    );
+    const rot = new quat(
+      store.getFloat(`w${index}_rw`),
+      store.getFloat(`w${index}_rx`),
+      store.getFloat(`w${index}_ry`),
+      store.getFloat(`w${index}_rz`)
+    );
+    if (
+      this.isNearZeroOffset(pos) &&
+      store.has('uses_anchor_space') &&
+      store.getBool('uses_anchor_space')
+    ) {
+      print(`Migrating plant ${index} legacy zero offset to desk-contact offset`);
+      pos.y = PLANT_ANCHOR_Y_OFFSET;
+    }
     return { pos, rot };
   }
 
@@ -406,12 +497,11 @@ export class AnchorController extends BaseScriptComponent {
 
   saveObjectPosition() {
     print(
-      `pinch up v3 anchor=${!!this.currentAnchor} worldOnly=${this.usingWorldSpace} creating=${this.anchorCreationInProgress}`
+      `pinch up ${ANCHOR_CONTROLLER_VERSION} anchor=${!!this.currentAnchor} worldOnly=${this.usingWorldSpace} creating=${this.anchorCreationInProgress}`
     );
 
     if (!this.currentAnchor && !this.anchorCreationInProgress && this.objs.length > 0 && !this.usingWorldSpace) {
-      const anchorWorldPos = this.objs[0].getTransform().getWorldPosition();
-      this.startWorldAnchorCreation(mat4.fromTranslation(anchorWorldPos));
+      this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
       return;
     }
 
@@ -570,22 +660,15 @@ export class AnchorController extends BaseScriptComponent {
         obj.getTransform().setWorldRotation(worldRot);
         print(`Restored plant ${i} at world: ${worldPos.toString()}`);
       } else {
-        const pos = new vec3(
-          store.getFloat(`w${i}_x`),
-          store.getFloat(`w${i}_y`),
-          store.getFloat(`w${i}_z`)
-        );
-        const rot = new quat(
-          store.getFloat(`w${i}_rw`),
-          store.getFloat(`w${i}_rx`),
-          store.getFloat(`w${i}_ry`),
-          store.getFloat(`w${i}_rz`)
-        );
+        const stored = this.getStoredAnchorLocalOffset(store, i);
+        const world = this.widgetLocalToWorld(stored.pos, stored.rot);
         wrapper.getTransform().setLocalPosition(new vec3(0, 0, 0));
         wrapper.getTransform().setLocalRotation(new quat(1, 0, 0, 0));
-        obj.getTransform().setLocalPosition(pos);
-        obj.getTransform().setLocalRotation(rot);
-        print(`Restored plant ${i} at anchor-local: ${pos.toString()}`);
+        obj.getTransform().setWorldPosition(world.pos);
+        obj.getTransform().setWorldRotation(world.rot);
+        print(
+          `Restored plant ${i} anchor-local: ${stored.pos.toString()} world: ${world.pos.toString()}`
+        );
       }
 
       this.wrappers.push(wrapper);
@@ -653,6 +736,7 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorSaveInProgress = false;
     this.anchorCreationInProgress = false;
     this.skipStartupWorldFallback = false;
+    this.pendingCreatedAnchorId = undefined;
     this.currentAnchor = undefined;
     this.anchorComponent.enabled = true;
     await this.anchorSession!.reset();
