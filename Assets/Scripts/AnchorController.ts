@@ -5,6 +5,8 @@ import {
 import { Anchor } from 'Spatial Anchors.lspkg/Anchor';
 import { AnchorModule } from 'Spatial Anchors.lspkg/AnchorModule';
 import { AnchorComponent } from 'Spatial Anchors.lspkg/AnchorComponent';
+import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
+import { PlantSpawnConfig } from './PlantSpawnConfig';
 
 const ANCHOR_CONTROLLER_VERSION = 'v6';
 const ANCHOR_SCAN_WAIT_SEC = 8;
@@ -22,6 +24,8 @@ export class AnchorController extends BaseScriptComponent {
   @input menuRoot!: SceneObject;
   @input plantPrefab!: ObjectPrefab;
   @input textlog!: Text;
+  @input
+  plantConfigs: PlantSpawnConfig[] = [];
 
   private anchorSession?: AnchorSession;
   private wrappers: SceneObject[] = [];
@@ -130,6 +134,17 @@ export class AnchorController extends BaseScriptComponent {
   async createAnchor() {
     const spawnWorldPos = this.getSpawnWorldPosition();
     this.spawnObjectAtWorld(spawnWorldPos);
+  }
+
+  public createAnchorWithConfig(config: PlantSpawnConfig) {
+    const spawnWorldPos = this.getSpawnWorldPosition();
+    const obj = this.spawnObjectAtWorld(spawnWorldPos);
+    if (obj && !isNull(config)) {
+      const plant = this.findPlantLifecycle(obj);
+      if (!isNull(plant)) {
+        config.applyToPlant(plant);
+      }
+    }
   }
 
   private getSpawnWorldPosition(): vec3 {
@@ -542,6 +557,7 @@ export class AnchorController extends BaseScriptComponent {
       store.putFloat(`w${i}_wry`, worldRot.y);
       store.putFloat(`w${i}_wrz`, worldRot.z);
       store.putFloat(`w${i}_wrw`, worldRot.w);
+      this.persistPlantState(store, i, obj);
 
       print(`Saved plant ${i} local: ${pos.toString()} world: ${worldPos.toString()}`);
       this.textlog.text = `Saved ${this.objs.length} plant(s)`;
@@ -671,6 +687,8 @@ export class AnchorController extends BaseScriptComponent {
         );
       }
 
+      this.restorePlantState(store, i, obj);
+
       this.wrappers.push(wrapper);
       this.objs.push(obj);
       restoredCount++;
@@ -695,6 +713,7 @@ export class AnchorController extends BaseScriptComponent {
 
     ['x', 'y', 'z', 'rx', 'ry', 'rz', 'rw', 'wx', 'wy', 'wz', 'wrx', 'wry', 'wrz', 'wrw']
       .forEach(k => store.remove(`w${lastIndex}_${k}`));
+    this.removePlantState(store, lastIndex);
     store.remove(`w${lastIndex}_prefab`);
     store.putInt('widget_count', lastIndex);
 
@@ -718,6 +737,7 @@ export class AnchorController extends BaseScriptComponent {
     for (let i = 0; i < count; i++) {
       ['x', 'y', 'z', 'rx', 'ry', 'rz', 'rw', 'wx', 'wy', 'wz', 'wrx', 'wry', 'wrz', 'wrw']
         .forEach(k => store.remove(`w${i}_${k}`));
+      this.removePlantState(store, i);
       store.remove(`w${i}_prefab`);
     }
     store.remove('widget_count');
@@ -741,5 +761,95 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorComponent.enabled = true;
     await this.anchorSession!.reset();
     this.textlog.text = 'Desk reset';
+  }
+
+  private persistPlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
+    const plant = this.findPlantLifecycle(obj);
+    if (isNull(plant)) {
+      return;
+    }
+
+    const state = plant.getSaveState();
+    store.putString(`w${index}_plant_type`, state.plantTypeId);
+    store.putInt(`w${index}_plant_stage`, state.stage);
+    store.putFloat(`w${index}_plant_baby_remaining`, state.babyTimerRemaining);
+    store.putFloat(`w${index}_plant_growth_elapsed`, state.growthElapsed);
+    store.putBool(`w${index}_plant_watered`, state.hasBeenWatered);
+  }
+
+  private restorePlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
+    if (!store.has(`w${index}_plant_stage`)) {
+      return;
+    }
+
+    const plant = this.findPlantLifecycle(obj);
+    if (isNull(plant)) {
+      return;
+    }
+
+    const plantTypeId = store.has(`w${index}_plant_type`)
+      ? store.getString(`w${index}_plant_type`)
+      : 'default';
+    const config = this.findPlantConfig(plantTypeId);
+    if (!isNull(config)) {
+      config.applyToPlant(plant);
+    }
+
+    const state: PlantLifecycleSaveState = {
+      plantTypeId: plantTypeId,
+      stage: store.getInt(`w${index}_plant_stage`),
+      babyTimerRemaining: store.has(`w${index}_plant_baby_remaining`)
+        ? store.getFloat(`w${index}_plant_baby_remaining`)
+        : 0,
+      growthElapsed: store.has(`w${index}_plant_growth_elapsed`)
+        ? store.getFloat(`w${index}_plant_growth_elapsed`)
+        : 0,
+      hasBeenWatered:
+        store.has(`w${index}_plant_watered`) && store.getBool(`w${index}_plant_watered`),
+    };
+    plant.applySaveState(state);
+  }
+
+  private removePlantState(store: GeneralDataStore, index: number) {
+    store.remove(`w${index}_plant_type`);
+    store.remove(`w${index}_plant_stage`);
+    store.remove(`w${index}_plant_baby_remaining`);
+    store.remove(`w${index}_plant_growth_elapsed`);
+    store.remove(`w${index}_plant_watered`);
+  }
+
+  private findPlantConfig(plantTypeId: string): PlantSpawnConfig {
+    for (let i = 0; i < this.plantConfigs.length; i++) {
+      const config = this.plantConfigs[i];
+      if (!isNull(config) && config.plantTypeId === plantTypeId) {
+        return config;
+      }
+    }
+
+    return null as unknown as PlantSpawnConfig;
+  }
+
+  private findPlantLifecycle(root: SceneObject): PlantLifecycle {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const plant = scripts[i] as unknown as PlantLifecycle;
+        if (!isNull(plant) && typeof plant.getSaveState === 'function') {
+          return plant;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null as unknown as PlantLifecycle;
   }
 }

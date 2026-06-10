@@ -1,0 +1,62 @@
+- !<AssetImportMetadata/8511fb23-95ff-401a-b7ec-9bc4102735ea>
+  ImportedAssetIds:
+    ObjectPrefab: !<reference> 1b4e65f7-89b6-4a66-8b40-734a318bfc98
+  ImporterName: ObjectPrefabImporter
+  PrimaryAsset: !<reference> 1b4e65f7-89b6-4a66-8b40-734a318bfc98
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    ObjectPrefab: !<own> 4e58c1fa-2afa-4f4e-98e6-27556025ab0d
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ObjectPrefabAssetData/4e58c1fa-2afa-4f4e-98e6-27556025ab0d>
+  Prototype: !<ObjectOwner/9a3f9ad6-c9f9-4762-87b9-c7f24077985a>
+    PackagePath: ""
+    objects:
+      - !<own> 8a5b665f-690a-46f4-51de-d2a2ca43ac56
+- !<SceneObject/8a5b665f-690a-46f4-51de-d2a2ca43ac56>
+  PrefabRemaps:
+    []
+  Name: Plant Cycle Container
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 0.100000, y: 0.100000, z: 0.100000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> daa32eee-7ac4-4117-a1c6-99330bf2dbf5
+- !<ScriptComponent/daa32eee-7ac4-4117-a1c6-99330bf2dbf5>
+  PrefabRemaps:
+    []
+  Name: PlantLifecycle
+  Enabled: true
+  ScriptAsset: !<reference> cc8472ba-c631-4712-b55b-16b421254ae7
+  ScriptInputsDefault:
+    growthTime: true
+    hasBeenWatered: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      timeAsBaby: !<float> 10.000000
+      growthTime: !<float> 1.000000
+      scaleUpSize: !<float> 2.000000
+      hasBeenWatered: false
+      plantTypeId: Plant_1
+      babyPlantPrefab: !<reference.ObjectPrefab> 32925bf5-e2fb-463d-a546-8b4778ac7609
+      adultPlantPrefab: !<reference.ObjectPrefab> 9aad76a1-bc12-4240-98ba-24aaa567d629
+      plantTexture: !<reference.Texture> 5b09bf69-0b5e-4f75-9f6c-350ee111a495
+      babyMaterialTemplate: !<reference.Material> c3d4f762-6fb2-46f6-93b5-24789b07e20b
+      stageRoot: !<reference.SceneObject> 8a5b665f-690a-46f4-51de-d2a2ca43ac56
+  ScriptTypes:
+    "":
+      {}

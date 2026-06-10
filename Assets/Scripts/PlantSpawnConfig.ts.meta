@@ -1,0 +1,59 @@
+- !<AssetImportMetadata/cd5ce56f-b987-46e0-a95d-ef00ad440e50>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 5d6ef252-e265-49a9-8c59-9953112ed1c1
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/5d6ef252-e265-49a9-8c59-9953112ed1c1>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 32fc9cad-f2fa-408e-8722-7f749b7f636c
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    adultPlantPrefab: false
+    growthTime: false
+    plantTexture: false
+    plantTypeId: false
+    scaleUpSize: false
+    timeAsBaby: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - plantTypeId: default
+      adultPlantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      plantTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      timeAsBaby: !<float> 30.000000
+      growthTime: !<float> 1.000000
+      scaleUpSize: !<float> 1.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input string plantTypeId = "default"'
+    - // @input Asset.ObjectPrefab adultPlantPrefab
+    - // @input Asset.Texture plantTexture
+    - // @input float timeAsBaby = 30
+    - // @input float growthTime = 1
+    - // @input float scaleUpSize = 1

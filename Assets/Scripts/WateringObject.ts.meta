@@ -1,20 +1,20 @@
-- !<AssetImportMetadata/dfabda14-b0d9-4fef-83f4-9fe86013e3b6>
+- !<AssetImportMetadata/46c40208-8930-498c-8238-db3f032154c7>
   ImportedAssetIds:
-    TypeScriptAsset: !<reference> cd1e31ac-9c27-48f6-b651-d138f8646e58
+    TypeScriptAsset: !<reference> c5e121c7-2453-4b5e-bcd9-74bbb97f41ae
   ImporterName: TypeScriptAssetImporter
-  PrimaryAsset: !<reference> cd1e31ac-9c27-48f6-b651-d138f8646e58
+  PrimaryAsset: !<reference> c5e121c7-2453-4b5e-bcd9-74bbb97f41ae
   PackageType: NotAPackage
   LegacyPackagePolicy: ~
   ExtraData:
     {}
   AssetDataMap:
-    TypeScriptAsset: !<own> a02e2889-8578-4cdc-a4d8-aeb5f393d909
+    TypeScriptAsset: !<own> 3722bb22-6b96-4c83-a3c0-33d777f7489a
   DependentFiles:
     []
   ImporterSettings: !<AssetImporterSettings>
     {}
   CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
-- !<TypeScriptAssetData/a02e2889-8578-4cdc-a4d8-aeb5f393d909>
+- !<TypeScriptAssetData/3722bb22-6b96-4c83-a3c0-33d777f7489a>
   SvgIcon: ""
   SetupScript:
     code: ""
@@ -22,12 +22,12 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
-  ComponentUid: 594462e0-edef-4cbe-9d94-78d7e3516309
+  ComponentUid: 0f4d1683-51fc-45e2-a3eb-3964aa8eed31
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    anchorController: false
-    plantSpawnConfig: false
+    triggerCollider: false
+    waterCooldown: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -37,11 +37,11 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - anchorController: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
-      plantSpawnConfig: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+    - triggerCollider: !<reference.ColliderComponent> 00000000-0000-0000-0000-000000000000
+      waterCooldown: 0.250000
   ScriptTypes:
     -
       {}
   InputLines:
-    - // @input AssignableType anchorController
-    - // @input AssignableType_1 plantSpawnConfig
+    - // @input Component.ColliderComponent triggerCollider
+    - // @input float waterCooldown = 0.25
