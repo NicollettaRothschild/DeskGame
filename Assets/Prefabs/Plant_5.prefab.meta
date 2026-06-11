@@ -1,0 +1,594 @@
+- !<AssetImportMetadata/5c6fbaca-930c-4cbf-9d07-2fd73f3d7837>
+  ImportedAssetIds:
+    ObjectPrefab: !<reference> ecc145e3-0a58-44a3-a9b5-53b3d853e3b7
+  ImporterName: ObjectPrefabImporter
+  PrimaryAsset: !<reference> ecc145e3-0a58-44a3-a9b5-53b3d853e3b7
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    ObjectPrefab: !<own> c1c3834d-03a6-405a-aae1-30da289f2f49
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<SceneObject/14ba2262-58a6-4290-62c1-4a17ecae0e83>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.026
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -2.275721, y: -6.981808, z: 0.709401}
+    Rotation: {x: -107.676826, y: 47.751877, z: -48.354862}
+    Scale: {x: 94.903587, y: 94.903580, z: 94.903603}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> dcefd74e-adec-46ec-6e00-3ec2bebdda65
+- !<ScriptComponent/1ccb1ee2-4325-41ce-75c7-6a32d5fbfaed>
+  PrefabRemaps:
+    []
+  Name: InteractableHelper
+  Enabled: true
+  ScriptAsset: !<reference> 88517298-96b6-4393-a3ce-57aad29969df
+  ScriptInputsDefault:
+    onHoverEnter: true
+    onHoverExit: true
+    onPinchDown: true
+    enableLogging: true
+    enableLoggingLifecycle: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      onHoverEnter:
+        []
+      onHoverExit:
+        []
+      onPinchDown:
+        []
+      onPinchUp_Select:
+        - sceneObject: !<reference.SceneObject> a0bb6b83-6974-4f65-630b-61e7d3e8146c
+          eventResponseType: !<float> 7.000000
+          state: !<float> 0.000000
+          delay: !<float> 0.000000
+          animations:
+            []
+          customAnimationData:
+            iterateThroughAllClips: true
+            animationName: ""
+          materialProperyData:
+            propertyName: ""
+            valueType: !<float> 0.000000
+            startFloatValue: !<float> 0.000000
+            startVec3Value: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.000000}
+            startVec4Value: !<Vec4> {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
+            endFloatValue: !<float> 0.000000
+            endVec3Value: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.000000}
+            endVec4Value: !<Vec4> {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
+            animationDurationInSeconds: !<float> 1.000000
+            delay: !<float> 0.000000
+            easingData:
+              easing: !<float> 0.000000
+            doOnStart: false
+            onStartAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+            doOnComplete: false
+            onCompleteAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+          colorProperyData:
+            endColor: !<Vec4> {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
+            animationDurationInSeconds: !<float> 1.000000
+            delay: !<float> 0.000000
+            easingData:
+              easing: !<float> 0.000000
+            doOnStart: false
+            onStartAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+            doOnComplete: false
+            onCompleteAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+          script: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
+          functionName: saveObjectPosition
+          blendShapeData:
+            blenshapeName: ""
+            playOption: !<float> 0.000000
+            endVal: !<float> 0.000000
+            startValue: !<float> 0.000000
+            endValue: !<float> 0.000000
+            a: !<float> 0.000000
+            b: !<float> 0.000000
+            animationDurationInSeconds: !<float> 1.000000
+            delay: !<float> 0.000000
+            easingData:
+              easing: !<float> 0.000000
+            doOnStart: false
+            onStartAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+            doOnComplete: false
+            onCompleteAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+          audioControl:
+            audioControlBehavior: !<float> 0.000000
+            delay: !<float> 0.000000
+          videoTextureControl:
+            videoTextureControlBehavior: !<float> 0.000000
+            delay: !<float> 0.000000
+            doOnStart: false
+            onStartAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+            doOnComplete: false
+            onCompleteAction:
+              actionType: !<float> -1.000000
+              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+              functionName: ""
+              targetObjects:
+                []
+      enableLogging: false
+      enableLoggingLifecycle: false
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/574a3b24-5aba-4def-41d2-9c09f79031d0>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.031
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 1.215777, y: -19.270103, z: 2.046475}
+    Rotation: {x: -175.179581, y: 62.286430, z: -115.183533}
+    Scale: {x: 94.903603, y: 94.903587, z: 94.903603}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> f8b29966-7a4e-4bdd-65ee-06431137de48
+- !<RenderMeshVisual/5e826bfd-01c1-4092-75be-e633eb6dec0b>
+  PrefabRemaps:
+    []
+  Name: component_4
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> 6c28ed52-fd61-45aa-bf84-fd5c55c95503
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/6b41f34b-dcfa-4aa3-7e7e-39ce138db268>
+  PrefabRemaps:
+    []
+  Name: component_3
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> 5760c758-e037-440f-bc43-2f77507ab3fb
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/7a83f954-daec-4877-7f75-1699b7c016e8>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.022
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 17.464409, y: -28.225756, z: 2.277749}
+    Rotation: {x: -100.147186, y: 52.858139, z: -10.624551}
+    Scale: {x: 94.903587, y: 94.903587, z: 94.903603}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 6b41f34b-dcfa-4aa3-7e7e-39ce138db268
+- !<SceneObject/8a11882c-3ca7-4016-75b6-ba80a48ea875>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.025
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.136366, y: -19.270103, z: -26.348537}
+    Rotation: {x: 111.485794, y: -22.913942, z: -152.812607}
+    Scale: {x: 94.903587, y: 94.903587, z: 94.903587}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> ec581625-d1ad-4c6f-4b2e-9242a8fc52ff
+- !<RenderMeshVisual/969d5f97-ec8d-4041-671c-04b1991656d0>
+  PrefabRemaps:
+    []
+  Name: component_2
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> d18b56fd-5a25-4219-8248-9d29d1df0f06
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/9e79ca99-8e98-4463-7fe5-b163970eb292>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: true
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    enableRotation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    enableStretchZ: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    useFilter: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> a0bb6b83-6974-4f65-630b-61e7d3e8146c
+      enableTranslation: true
+      enableRotation: true
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: true
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: true
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/9f51689f-301f-4024-7a76-7ea4ddc43b77>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.019
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -6.098417, y: -34.949249, z: 12.676888}
+    Rotation: {x: -90.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 109.763252, y: 109.763252, z: 109.763252}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> b8ff4a4a-35b1-48ae-4877-77a160841b3d
+- !<SceneObject/a0bb6b83-6974-4f65-630b-61e7d3e8146c>
+  PrefabRemaps:
+    []
+  Name: Plant_5
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 0.100000, y: 0.100000, z: 0.100000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 9f51689f-301f-4024-7a76-7ea4ddc43b77
+    - !<own> d2a0900c-d353-4d1f-4263-72f83e4919c9
+    - !<own> d2901d58-b6eb-44bc-555a-1ff1235f895f
+    - !<own> 7a83f954-daec-4877-7f75-1699b7c016e8
+    - !<own> ba851870-ed33-4d19-5ec8-432937e07c63
+    - !<own> c1dd0fb3-20c6-4190-7b7c-a309e14df67b
+    - !<own> 8a11882c-3ca7-4016-75b6-ba80a48ea875
+    - !<own> 14ba2262-58a6-4290-62c1-4a17ecae0e83
+    - !<own> 574a3b24-5aba-4def-41d2-9c09f79031d0
+  Components:
+    - !<own> a9eb605b-15c3-47b9-695b-27c00f7a3825
+    - !<own> f24988fb-999b-4c50-46e7-39fe291ca39c
+    - !<own> 9e79ca99-8e98-4463-7fe5-b163970eb292
+    - !<own> 1ccb1ee2-4325-41ce-75c7-6a32d5fbfaed
+- !<ColliderComponent/a9eb605b-15c3-47b9-695b-27c00f7a3825>
+  PrefabRemaps:
+    []
+  Name: Physics Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 250.000000, y: 300.000000, z: 250.000000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<RenderMeshVisual/b8ff4a4a-35b1-48ae-4877-77a160841b3d>
+  PrefabRemaps:
+    []
+  Name: component_0
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> 2cb943b7-5b94-420b-a737-7353e5b5b137
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/ba851870-ed33-4d19-5ec8-432937e07c63>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.023
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 5.586745, y: -18.275238, z: 6.387321}
+    Rotation: {x: -87.779282, y: -31.025330, z: -7.464213}
+    Scale: {x: 94.903595, y: 94.903587, z: 94.903603}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 5e826bfd-01c1-4092-75be-e633eb6dec0b
+- !<ObjectPrefabAssetData/c1c3834d-03a6-405a-aae1-30da289f2f49>
+  Prototype: !<ObjectOwner/f44c1bc8-8008-48ba-9984-da29ac935787>
+    PackagePath: ""
+    objects:
+      - !<own> a0bb6b83-6974-4f65-630b-61e7d3e8146c
+- !<SceneObject/c1dd0fb3-20c6-4190-7b7c-a309e14df67b>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.024
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 5.586745, y: -18.275238, z: -40.261627}
+    Rotation: {x: 85.618103, y: -23.105829, z: -173.048370}
+    Scale: {x: 94.903587, y: 94.903580, z: 94.903603}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> eed74d0c-ec6d-4dd5-625a-26f4632303ef
+- !<RenderMeshVisual/c961004b-8991-402f-4d37-6b45ea0eaff4>
+  PrefabRemaps:
+    []
+  Name: component_1
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> 35e6d97e-e3c5-4586-90b5-0d7a6dffda3e
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/d2901d58-b6eb-44bc-555a-1ff1235f895f>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.021
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 3.291466, y: -34.949249, z: -29.577595}
+    Rotation: {x: 90.000000, y: 32.819958, z: 180.000000}
+    Scale: {x: 109.763260, y: 109.763260, z: 109.763252}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 969d5f97-ec8d-4041-671c-04b1991656d0
+- !<SceneObject/d2a0900c-d353-4d1f-4263-72f83e4919c9>
+  PrefabRemaps:
+    []
+  Name: Leaf 1.020
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -18.305265, y: -34.949249, z: 25.353230}
+    Rotation: {x: -90.000000, y: -75.786034, z: -0.000035}
+    Scale: {x: 109.763260, y: 109.763260, z: 109.763252}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> c961004b-8991-402f-4d37-6b45ea0eaff4
+- !<RenderMeshVisual/dcefd74e-adec-46ec-6e00-3ec2bebdda65>
+  PrefabRemaps:
+    []
+  Name: component_7
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> 5e5deb6e-5870-4134-af7b-1be8d4b3fed7
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/ec581625-d1ad-4c6f-4b2e-9242a8fc52ff>
+  PrefabRemaps:
+    []
+  Name: component_6
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> ef9bbdd3-78aa-4d9c-9fdd-0e5498ae565b
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/eed74d0c-ec6d-4dd5-625a-26f4632303ef>
+  PrefabRemaps:
+    []
+  Name: component_5
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> da26a2d7-b761-4f50-9f16-4de581d470b9
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/f24988fb-999b-4c50-46e7-39fe291ca39c>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    ignoreInteractionPlane: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: false
+      keepHoverOnTrigger: true
+      enableInstantDrag: true
+      isScrollable: false
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<RenderMeshVisual/f8b29966-7a4e-4bdd-65ee-06431137de48>
+  PrefabRemaps:
+    []
+  Name: component_8
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> cdaa9561-9636-4abe-b149-e4a4720239e1
+  Mesh: !<reference> bdcc9fb6-8a37-457a-a0f6-24a746ae8bd1
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
