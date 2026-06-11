@@ -51,6 +51,9 @@ export class PlantLifecycle extends BaseScriptComponent {
   babyMaterialTemplate!: Material;
 
   @input
+  debugPlantMaterials: boolean = false;
+
+  @input
   @allowUndefined
   stageRoot!: SceneObject;
 
@@ -69,6 +72,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private alignCenterZ = 0;
 
   onAwake(): void {
+    this.debugLog(`awake plantType=${this.plantTypeId}`);
     this.babyTimerRemaining = Math.max(0, this.timeAsBaby);
     this.currentStage = this.hasBeenWatered ? PlantStage.WateredBaby : PlantStage.Baby;
     this.ensureStageRoot();
@@ -98,6 +102,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.growthElapsed = 0;
     this.hasBeenWatered = false;
     this.currentStage = PlantStage.Baby;
+    this.debugLog(
+      `configurePlant type=${plantTypeId} babyTime=${this.timeAsBaby} growthTime=${this.growthTime} scale=${this.scaleUpSize} texture=${this.plantTexture ? this.plantTexture.name : 'null'}`
+    );
     this.showBaby();
   }
 
@@ -258,6 +265,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     this.babyInstance = this.babyPlantPrefab.instantiate(parent);
     this.babyInstance.name = 'BabyPlantModel';
+    this.debugLog(`spawn baby root=${this.babyInstance.name} parent=${parent.name}`);
     this.prepareStageModel(this.babyInstance);
     this.applyClonedBabyMaterial(this.babyInstance);
     this.captureModelMetrics(this.babyInstance);
@@ -283,6 +291,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private spawnAdultModel(parent: SceneObject): SceneObject {
     const adult = this.adultPlantPrefab.instantiate(parent);
     adult.name = 'AdultPlantModel';
+    this.debugLog(`spawn adult root=${adult.name} parent=${parent.name}`);
     this.prepareStageModel(adult);
     this.captureModelMetrics(adult);
     this.refreshAlignNodePosition(this.getCurrentGrowthScale());
@@ -308,7 +317,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     const stageRoot = this.ensureStageRoot();
     const stageRootWorldToLocal = stageRoot.getTransform().getWorldTransform().inverse();
-    const visuals = this.findMeshVisuals(current);
+    const visuals = this.findChildMeshVisuals(current);
     if (visuals.length === 0) {
       return;
     }
@@ -333,7 +342,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   private captureModelMetrics(model: SceneObject): void {
     const modelWorldToLocal = model.getTransform().getWorldTransform().inverse();
-    const visuals = this.findMeshVisuals(model);
+    const visuals = this.findChildMeshVisuals(model);
     let minY = Infinity;
 
     for (let i = 0; i < visuals.length; i++) {
@@ -434,17 +443,24 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   private applyClonedBabyMaterial(root: SceneObject): void {
     if (isNull(this.babyMaterialTemplate)) {
+      this.debugLog('applyBabyMaterial skipped: babyMaterialTemplate is null');
       return;
     }
 
+    this.debugLog(`applyBabyMaterial root=${root.name}`);
     this.clonedBabyMaterial = this.babyMaterialTemplate.clone();
     if (!isNull(this.plantTexture)) {
-      this.clonedBabyMaterial.mainPass.baseTex = this.plantTexture;
+      this.clonedBabyMaterial.mainPass.Tweak_N0 = this.plantTexture;
+      this.debugLog(`clone assigned texture=${this.plantTexture.name} to mainPass.Tweak_N0`);
+    } else {
+      this.debugLog('clone has no plantTexture assigned');
     }
 
-    const visuals = this.findMeshVisuals(root);
+    const visuals = this.findChildMeshVisuals(root);
+    this.debugLog(`applyBabyMaterial found ${visuals.length} child render visuals`);
     for (let i = 0; i < visuals.length; i++) {
       visuals[i].mainMaterial = this.clonedBabyMaterial;
+      this.debugLog(`applied cloned material to child visual ${visuals[i].getSceneObject().name}`);
     }
   }
 
@@ -485,9 +501,13 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
   }
 
-  private findMeshVisuals(root: SceneObject): MaterialMeshVisual[] {
-    const results: MaterialMeshVisual[] = [];
-    const stack: SceneObject[] = [root];
+  private findChildMeshVisuals(root: SceneObject): RenderMeshVisual[] {
+    const results: RenderMeshVisual[] = [];
+    const stack: SceneObject[] = [];
+
+    for (let i = 0; i < root.getChildrenCount(); i++) {
+      stack.push(root.getChild(i));
+    }
 
     while (stack.length > 0) {
       const current = stack.pop();
@@ -495,9 +515,10 @@ export class PlantLifecycle extends BaseScriptComponent {
         continue;
       }
 
-      const visuals = current.getComponents('Component.MaterialMeshVisual');
+      const visuals = current.getComponents('Component.RenderMeshVisual');
       for (let i = 0; i < visuals.length; i++) {
         results.push(visuals[i]);
+        this.debugLog(`found render visual on ${current.name}`);
       }
 
       for (let i = 0; i < current.getChildrenCount(); i++) {
@@ -506,6 +527,13 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     return results;
+  }
+
+  private debugLog(message: string): void {
+    if (!this.debugPlantMaterials) {
+      return;
+    }
+    print(`[PlantLifecycle] ${this.getSceneObject().name}: ${message}`);
   }
 
   private clampStage(stage: number): PlantStage {

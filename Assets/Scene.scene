@@ -979,13 +979,13 @@
   Enabled: true
   ScriptAsset: !<reference> cd1e31ac-9c27-48f6-b651-d138f8646e58
   ScriptInputsDefault:
-    plantSpawnConfig: true
+    {}
   ScriptTypesDefault:
     {}
   ScriptInputs:
     "":
       anchorController: !<MappingBased.AssignableType> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
-      plantSpawnConfig: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      plantSpawnConfig: !<MappingBased.AssignableType_1> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
   ScriptTypes:
     "":
       {}
@@ -1220,6 +1220,28 @@
     - !<own> cc542eac-9d3b-4a09-ad06-8b4e24b28764
   Components:
     []
+- !<ScriptComponent/3d54ed6d-d16c-4b26-aae6-4e875a56001e>
+  PrefabRemaps:
+    []
+  Name: PlantSpawnConfig
+  Enabled: true
+  ScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ScriptInputsDefault:
+    timeAsBaby: true
+    growthTime: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantTypeId: plant_2
+      adultPlantPrefab: !<reference.ObjectPrefab> 3cfb6405-f9f3-4833-8fad-9cae640edbac
+      plantTexture: !<reference.Texture> 757b9441-2b6e-46d2-aad3-5352d1541bae
+      timeAsBaby: !<float> 30.000000
+      growthTime: !<float> 1.000000
+      scaleUpSize: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
 - !<RenderMeshVisual/402be5cc-dbb7-4fe2-9ef8-47833d85ad0e>
   PrefabRemaps:
     []
@@ -1782,7 +1804,7 @@
   PrefabRemaps:
     []
   Name: Btn Anemone
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 12.000000, y: -4.609230, z: 0.000000}
@@ -1800,6 +1822,7 @@
     - !<own> 0197c883-307c-47d9-93b7-c9d66cd87f2b
     - !<own> 1947cd73-d682-41c3-bb92-f7e343fa14bf
     - !<own> 2cbcfdfc-3e27-4493-a540-b6d621dfa24b
+    - !<own> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
 - !<SceneObject/5da3eb1d-5ae6-4554-84f5-9d3ac6251167>
   PrefabRemaps:
     []
@@ -1849,7 +1872,7 @@
   Enabled: true
   ScriptAsset: !<reference> c79e6707-a52a-4278-bf99-5e74a3f14ef8
   ScriptInputsDefault:
-    plantConfigs: true
+    {}
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -1862,7 +1885,7 @@
       plantPrefab: !<reference.ObjectPrefab> 1b4e65f7-89b6-4a66-8b40-734a318bfc98
       textlog: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
       plantConfigs: !<MappingBased.AssignableType_2[]>
-        []
+        - !<reference> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
   ScriptTypes:
     "":
       {}

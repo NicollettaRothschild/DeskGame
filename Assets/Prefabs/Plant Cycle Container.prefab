@@ -29,6 +29,7 @@
   ScriptInputsDefault:
     growthTime: true
     hasBeenWatered: true
+    debugPlantMaterials: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -42,6 +43,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 9aad76a1-bc12-4240-98ba-24aaa567d629
       plantTexture: !<reference.Texture> 5b09bf69-0b5e-4f75-9f6c-350ee111a495
       babyMaterialTemplate: !<reference.Material> c3d4f762-6fb2-46f6-93b5-24789b07e20b
+      debugPlantMaterials: false
       stageRoot: !<reference.SceneObject> 8a5b665f-690a-46f4-ae21-2d5d35bc53a9
   ScriptTypes:
     "":

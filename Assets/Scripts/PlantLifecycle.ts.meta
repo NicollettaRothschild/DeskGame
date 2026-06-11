@@ -29,6 +29,7 @@
     adultPlantPrefab: false
     babyMaterialTemplate: false
     babyPlantPrefab: false
+    debugPlantMaterials: false
     growthTime: false
     hasBeenWatered: false
     plantTexture: false
@@ -54,6 +55,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
       plantTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
       babyMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      debugPlantMaterials: false
       stageRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
@@ -68,4 +70,5 @@
     - // @input Asset.ObjectPrefab adultPlantPrefab
     - // @input Asset.Texture plantTexture
     - // @input Asset.Material babyMaterialTemplate
+    - // @input bool debugPlantMaterials
     - // @input SceneObject stageRoot
