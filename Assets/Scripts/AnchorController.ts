@@ -503,11 +503,22 @@ export class AnchorController extends BaseScriptComponent {
 
     this.wrappers.push(wrapper);
     this.objs.push(obj);
+    this.wirePlantLifecycle(obj);
 
     if (updateStoredCount) {
       global.persistentStorageSystem.store.putInt('widget_count', this.wrappers.length);
     }
     return obj;
+  }
+
+  public persistPlantLifecycleState(plantContainer: SceneObject): void {
+    const index = this.objs.findIndex((obj) => !isNull(obj) && obj === plantContainer);
+    if (index < 0) {
+      return;
+    }
+
+    const store = global.persistentStorageSystem.store;
+    this.persistPlantState(store, index, plantContainer);
   }
 
   saveObjectPosition() {
@@ -688,6 +699,7 @@ export class AnchorController extends BaseScriptComponent {
       }
 
       this.restorePlantState(store, i, obj);
+      this.wirePlantLifecycle(obj);
 
       this.wrappers.push(wrapper);
       this.objs.push(obj);
@@ -827,6 +839,15 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     return null as unknown as PlantSpawnConfig;
+  }
+
+  private wirePlantLifecycle(obj: SceneObject): void {
+    const plant = this.findPlantLifecycle(obj);
+    if (isNull(plant)) {
+      return;
+    }
+
+    plant.setAnchorPersistence(this);
   }
 
   private findPlantLifecycle(root: SceneObject): PlantLifecycle {
