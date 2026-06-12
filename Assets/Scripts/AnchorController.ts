@@ -9,7 +9,7 @@ import { WorldAnchor } from 'Spatial Anchors.lspkg/WorldAnchor';
 import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 
-const ANCHOR_CONTROLLER_VERSION = 'v8';
+const ANCHOR_CONTROLLER_VERSION = 'v9';
 const WORLD_PREVIEW_FALLBACK_SEC = 1;
 const ANCHOR_SCAN_REMINDER_SEC = 3;
 // Plant collider is 300 units tall, centered on root, with 0.1 scale → 15 cm to desk contact.
@@ -48,6 +48,7 @@ export class AnchorController extends BaseScriptComponent {
   private isResetting = false;
   private sessionEpoch = 0;
   private anchorSettleEvent?: UpdateEvent;
+  private nextPlantSpawnIndex = 0;
 
   onAwake() {
     this.createEvent('OnStartEvent').bind(() => this.onStart());
@@ -138,18 +139,15 @@ export class AnchorController extends BaseScriptComponent {
 
   async createAnchor() {
     const spawnWorldPos = this.getSpawnWorldPosition();
-    this.spawnObjectAtWorld(spawnWorldPos);
+    const config = this.getNextPlantConfig();
+    const obj = this.spawnObjectAtWorld(spawnWorldPos);
+    this.applyPlantConfig(obj, config);
   }
 
   public createAnchorWithConfig(config: PlantSpawnConfig) {
     const spawnWorldPos = this.getSpawnWorldPosition();
     const obj = this.spawnObjectAtWorld(spawnWorldPos);
-    if (obj && !isNull(config)) {
-      const plant = this.findPlantLifecycle(obj);
-      if (!isNull(plant)) {
-        config.applyToPlant(plant);
-      }
-    }
+    this.applyPlantConfig(obj, config);
   }
 
   private getSpawnWorldPosition(): vec3 {
@@ -755,6 +753,7 @@ export class AnchorController extends BaseScriptComponent {
 
     store.putInt('widget_count', this.wrappers.length);
     this.hasRestored = true;
+    this.syncPlantCycleFromCount();
     this.textlog.text = restoredCount > 0
       ? `Restored ${restoredCount} plant(s)`
       : 'Could not restore saved plants';
@@ -852,6 +851,7 @@ export class AnchorController extends BaseScriptComponent {
     this.currentAnchor = undefined;
     this.anchorComponent.anchor = null as unknown as Anchor;
     this.anchorComponent.enabled = true;
+    this.nextPlantSpawnIndex = 0;
     this.isResetting = false;
     this.anchorSaveInProgress = false;
     this.textlog.text = 'Desk reset';
@@ -912,15 +912,75 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_watered`);
   }
 
-  private findPlantConfig(plantTypeId: string): PlantSpawnConfig {
+  private getActivePlantConfigs(): PlantSpawnConfig[] {
+    const configs: PlantSpawnConfig[] = [];
     for (let i = 0; i < this.plantConfigs.length; i++) {
       const config = this.plantConfigs[i];
-      if (!isNull(config) && config.plantTypeId === plantTypeId) {
+      if (!isNull(config)) {
+        configs.push(config);
+      }
+    }
+    return configs;
+  }
+
+  private normalizePlantTypeId(plantTypeId: string): string {
+    if (!plantTypeId || plantTypeId === 'default' || plantTypeId === 'Plant_1') {
+      return 'plant_1';
+    }
+
+    return plantTypeId.toLowerCase().replace(/\s+/g, '_');
+  }
+
+  private getNextPlantConfig(): PlantSpawnConfig | null {
+    const configs = this.getActivePlantConfigs();
+    if (configs.length === 0) {
+      return null;
+    }
+
+    const config = configs[this.nextPlantSpawnIndex % configs.length];
+    this.nextPlantSpawnIndex = (this.nextPlantSpawnIndex + 1) % configs.length;
+    return config;
+  }
+
+  private syncPlantCycleFromCount(): void {
+    const configs = this.getActivePlantConfigs();
+    if (configs.length === 0) {
+      return;
+    }
+
+    this.nextPlantSpawnIndex = this.objs.length % configs.length;
+  }
+
+  private applyPlantConfig(obj: SceneObject | null, config: PlantSpawnConfig | null): void {
+    if (isNull(obj) || isNull(config)) {
+      return;
+    }
+
+    const plant = this.findPlantLifecycle(obj);
+    if (isNull(plant)) {
+      return;
+    }
+
+    config.applyToPlant(plant);
+    const index = this.objs.findIndex((entry) => !isNull(entry) && entry === obj);
+    if (index >= 0) {
+      this.persistPlantState(global.persistentStorageSystem.store, index, obj);
+    }
+
+    print(`Spawned ${config.plantTypeId} (next cycle index ${this.nextPlantSpawnIndex})`);
+    this.textlog.text = `Placed ${config.plantTypeId}`;
+  }
+
+  private findPlantConfig(plantTypeId: string): PlantSpawnConfig | null {
+    const normalized = this.normalizePlantTypeId(plantTypeId);
+    for (let i = 0; i < this.plantConfigs.length; i++) {
+      const config = this.plantConfigs[i];
+      if (!isNull(config) && this.normalizePlantTypeId(config.plantTypeId) === normalized) {
         return config;
       }
     }
 
-    return null as unknown as PlantSpawnConfig;
+    return null;
   }
 
   private wirePlantLifecycle(obj: SceneObject): void {

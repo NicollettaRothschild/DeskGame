@@ -979,13 +979,13 @@
   Enabled: true
   ScriptAsset: !<reference> cd1e31ac-9c27-48f6-b651-d138f8646e58
   ScriptInputsDefault:
-    {}
+    plantSpawnConfig: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
     "":
       anchorController: !<MappingBased.AssignableType> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
-      plantSpawnConfig: !<MappingBased.AssignableType_1> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
+      plantSpawnConfig: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":
       {}
@@ -1220,6 +1220,28 @@
     - !<own> cc542eac-9d3b-4a09-ad06-8b4e24b28764
   Components:
     []
+- !<ScriptComponent/034e88c3-d236-477b-81f3-05ccebbdf9a8>
+  PrefabRemaps:
+    []
+  Name: PlantSpawnConfig
+  Enabled: true
+  ScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ScriptInputsDefault:
+    timeAsBaby: true
+    growthTime: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantTypeId: plant_1
+      adultPlantPrefab: !<reference.ObjectPrefab> 9aad76a1-bc12-4240-98ba-24aaa567d629
+      plantTexture: !<reference.Texture> 5b09bf69-0b5e-4f75-9f6c-350ee111a495
+      timeAsBaby: !<float> 10.000000
+      growthTime: !<float> 30.000000
+      scaleUpSize: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
 - !<ScriptComponent/3d54ed6d-d16c-4b26-aae6-4e875a56001e>
   PrefabRemaps:
     []
@@ -1236,12 +1258,143 @@
       plantTypeId: plant_2
       adultPlantPrefab: !<reference.ObjectPrefab> 3cfb6405-f9f3-4833-8fad-9cae640edbac
       plantTexture: !<reference.Texture> 757b9441-2b6e-46d2-aad3-5352d1541bae
-      timeAsBaby: !<float> 30.000000
+      timeAsBaby: !<float> 10.000000
       growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
       {}
+- !<ScriptComponent/9c149ea5-09c6-460e-bd27-0a1c160bd37e>
+  PrefabRemaps:
+    []
+  Name: PlantSpawnConfig
+  Enabled: true
+  ScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ScriptInputsDefault:
+    timeAsBaby: true
+    growthTime: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantTypeId: plant_3
+      adultPlantPrefab: !<reference.ObjectPrefab> 39298147-23b1-42c2-a41b-68d2d4da86aa
+      plantTexture: !<reference.Texture> d0cf4b09-f60f-47da-9e92-2be2930bde55
+      timeAsBaby: !<float> 10.000000
+      growthTime: !<float> 30.000000
+      scaleUpSize: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/a572bd4e-d10b-4cac-83b9-7278744d5417>
+  PrefabRemaps:
+    []
+  Name: PlantSpawnConfig
+  Enabled: true
+  ScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ScriptInputsDefault:
+    timeAsBaby: true
+    growthTime: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantTypeId: plant_4
+      adultPlantPrefab: !<reference.ObjectPrefab> 46f60114-a93d-4950-a76a-bc581144e956
+      plantTexture: !<reference.Texture> f57092a3-8a9a-4f70-8d8a-e11183c6509b
+      timeAsBaby: !<float> 10.000000
+      growthTime: !<float> 30.000000
+      scaleUpSize: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/d8530748-4910-4ceb-afa4-40d3eeec328d>
+  PrefabRemaps:
+    []
+  Name: PlantSpawnConfig
+  Enabled: true
+  ScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ScriptInputsDefault:
+    timeAsBaby: true
+    growthTime: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantTypeId: plant_5
+      adultPlantPrefab: !<reference.ObjectPrefab> ecc145e3-0a58-44a3-a9b5-53b3d853e3b7
+      plantTexture: !<reference.Texture> dd73e477-2c2b-45e0-9d1b-02540660cd70
+      timeAsBaby: !<float> 10.000000
+      growthTime: !<float> 30.000000
+      scaleUpSize: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/254db73f-25bd-4bad-b900-861a7d7115da>
+  PrefabRemaps:
+    []
+  Name: PlantSpawnConfig
+  Enabled: true
+  ScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ScriptInputsDefault:
+    timeAsBaby: true
+    growthTime: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantTypeId: plant_6
+      adultPlantPrefab: !<reference.ObjectPrefab> 1d4c82fa-cdcf-46f6-896d-91981b6348be
+      plantTexture: !<reference.Texture> 50d8cd6c-8232-45d5-9170-426767a74e54
+      timeAsBaby: !<float> 10.000000
+      growthTime: !<float> 30.000000
+      scaleUpSize: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/8bfe1920-359f-449a-b002-027b3e46e7cd>
+  PrefabRemaps:
+    []
+  Name: PlantSpawnConfig
+  Enabled: true
+  ScriptAsset: !<reference> 752cd2d0-6b73-4d7a-943a-e579937e78a0
+  ScriptInputsDefault:
+    timeAsBaby: true
+    growthTime: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantTypeId: plant_7
+      adultPlantPrefab: !<reference.ObjectPrefab> afea2046-cab2-41de-96f0-d77ad0b2727c
+      plantTexture: !<reference.Texture> 25eee41e-c6cb-4446-8b39-b7d750393681
+      timeAsBaby: !<float> 10.000000
+      growthTime: !<float> 30.000000
+      scaleUpSize: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/a127d50f-e78f-48b8-82d0-3874cce131c9>
+  PrefabRemaps:
+    []
+  Name: PlantConfigs
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 034e88c3-d236-477b-81f3-05ccebbdf9a8
+    - !<own> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
+    - !<own> 9c149ea5-09c6-460e-bd27-0a1c160bd37e
+    - !<own> a572bd4e-d10b-4cac-83b9-7278744d5417
+    - !<own> d8530748-4910-4ceb-afa4-40d3eeec328d
+    - !<own> 254db73f-25bd-4bad-b900-861a7d7115da
+    - !<own> 8bfe1920-359f-449a-b002-027b3e46e7cd
 - !<RenderMeshVisual/402be5cc-dbb7-4fe2-9ef8-47833d85ad0e>
   PrefabRemaps:
     []
@@ -1822,7 +1975,6 @@
     - !<own> 0197c883-307c-47d9-93b7-c9d66cd87f2b
     - !<own> 1947cd73-d682-41c3-bb92-f7e343fa14bf
     - !<own> 2cbcfdfc-3e27-4493-a540-b6d621dfa24b
-    - !<own> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
 - !<SceneObject/5da3eb1d-5ae6-4554-84f5-9d3ac6251167>
   PrefabRemaps:
     []
@@ -1885,7 +2037,13 @@
       plantPrefab: !<reference.ObjectPrefab> 1b4e65f7-89b6-4a66-8b40-734a318bfc98
       textlog: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
       plantConfigs: !<MappingBased.AssignableType_2[]>
+        - !<reference> 034e88c3-d236-477b-81f3-05ccebbdf9a8
         - !<reference> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
+        - !<reference> 9c149ea5-09c6-460e-bd27-0a1c160bd37e
+        - !<reference> a572bd4e-d10b-4cac-83b9-7278744d5417
+        - !<reference> d8530748-4910-4ceb-afa4-40d3eeec328d
+        - !<reference> 254db73f-25bd-4bad-b900-861a7d7115da
+        - !<reference> 8bfe1920-359f-449a-b002-027b3e46e7cd
   ScriptTypes:
     "":
       {}
@@ -4353,7 +4511,7 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    []
+    - !<own> a127d50f-e78f-48b8-82d0-3874cce131c9
   Components:
     - !<own> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
 - !<ScreenTransform/d36216bd-792a-43a6-be71-1656039955f0>
