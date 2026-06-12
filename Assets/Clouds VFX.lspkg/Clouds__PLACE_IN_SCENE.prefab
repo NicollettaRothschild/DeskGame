@@ -1,0 +1,51 @@
+- !<ObjectPrefab/57c6cab6-401a-4ced-aa4b-fbc4a06ef042>
+  PackagePath: ""
+  objects:
+    - !<own> 8f9b1a96-4c91-4bcd-9876-f8f24d51ad5f
+  LazyLoading: false
+  RetainAssets: true
+- !<VFXComponent/71683b72-447c-4dbc-8b34-0cbc15de79af>
+  PrefabRemaps:
+    []
+  Name: VFX Component
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  VFXAsset: !<reference> b45d1984-5dbb-401d-8f31-3bf6b491db6e
+- !<SceneObject/8f9b1a96-4c91-4bcd-9876-f8f24d51ad5f>
+  PrefabRemaps:
+    - 71683b72-447c-4dbc-8b34-0cbc15de79af: 71683b72-447c-4dbc-74cb-f343ea218650
+    - 8f9b1a96-4c91-4bcd-9876-f8f24d51ad5f: 8f9b1a96-4c91-4bcd-6789-070db2ae52a0
+    - d9c24341-64b8-45a6-9f74-0e507d61a924: d9c24341-64b8-45a6-608b-f1af829e56db
+  Name: Clouds__PLACE_IN_SCENE
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> d9c24341-64b8-45a6-9f74-0e507d61a924
+  Components:
+    []
+- !<SceneObject/d9c24341-64b8-45a6-9f74-0e507d61a924>
+  PrefabRemaps:
+    []
+  Name: Clouds VFX
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 20.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 71683b72-447c-4dbc-8b34-0cbc15de79af

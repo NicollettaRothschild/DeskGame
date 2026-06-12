@@ -55,5 +55,5 @@
     - // @input Asset.ObjectPrefab adultPlantPrefab
     - // @input Asset.Texture plantTexture
     - // @input float timeAsBaby = 30
-    - // @input float growthTime = 8
+    - // @input float growthTime = 30
     - // @input float scaleUpSize = 1

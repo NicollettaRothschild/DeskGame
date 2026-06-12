@@ -49,7 +49,7 @@
   ScriptInputs:
     "":
       timeAsBaby: !<float> 10.000000
-      growthTime: !<float> 30.000000
+      growthTime: !<float> 1.000000
       scaleUpSize: !<float> 2.000000
       hasBeenWatered: false
       plantTypeId: Plant_1
