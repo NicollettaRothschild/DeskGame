@@ -1,0 +1,42 @@
+- !<ObjectPrefab/c95efccf-cdac-4a8d-9794-bdf3aa150b67>
+  PackagePath: ""
+  objects:
+    - !<own> 4ca2932b-da3e-46a4-a760-188db129d24b
+  LazyLoading: false
+  RetainAssets: true
+- !<SceneObject/4ca2932b-da3e-46a4-a760-188db129d24b>
+  PrefabRemaps:
+    - 4ca2932b-da3e-46a4-a760-188db129d24b: 4ca2932b-da3e-46a4-589f-e7724ed62db4
+    - 6c14ef40-0972-4a6d-8d3e-64ffd0adcd97: 6c14ef40-0972-4a6d-72c1-9b002f523268
+  Name: Flowmap Deformation Example__PLACE_IN_SCENE
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -10.000000, z: 10.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 9.338304, y: 9.338304, z: 9.338304}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 6c14ef40-0972-4a6d-8d3e-64ffd0adcd97
+- !<RenderMeshVisual/6c14ef40-0972-4a6d-8d3e-64ffd0adcd97>
+  PrefabRemaps:
+    []
+  Name: Render Mesh Visual
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: Receiver
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 34b95b52-885f-4540-a321-180ebe016d0c
+  Mesh: !<reference> ae671da2-3b83-4c61-a18b-811f1f067a03
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}

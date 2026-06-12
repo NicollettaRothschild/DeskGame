@@ -1,0 +1,37 @@
+- !<NativePackageDescriptor/4c8e4bc7-5d64-4bb9-86f6-d6bf00fe31d6>
+  PackagePath: ""
+  StudioVersion:
+    major: 5
+    minor: 15
+    patch: 0
+    build: 25101318
+    type: Unset
+    buildFlavor: ""
+    timestamp: 0
+    commit: ""
+  Description: "Dynamic Water Waves shader a versatile material featuring customizable options: Wave Speed, Scale, Strength, Map Texture, Color Palette, and Gradient Color. Elevate your visuals with this dynamic shader for stunning water effects."
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  UpdateCheckpoint: 76
+  ExportUid: 2e14ee08-e122-4259-8b83-84244fb6ccf2
+  ComponentUid: ed8b3f82-de8b-4362-a7c5-63a42b361f3b
+  PackagePolicy: CanBeUnpackedTransparent
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  Instantiable: !<reference> 00000000-0000-0000-0000-000000000000
+  AssetLibraryDependencyStructure: !<AssetLibraryDependencyStructure>
+    Name: ""
+    AssetId: ""
+    Hash: ""
+    Version:
+      major: 0
+      minor: 0
+      patch: 0
+      build: 0
