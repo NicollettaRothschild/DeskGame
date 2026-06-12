@@ -8,12 +8,13 @@ import { AnchorComponent } from 'Spatial Anchors.lspkg/AnchorComponent';
 import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 
-const ANCHOR_CONTROLLER_VERSION = 'v6';
-const ANCHOR_SCAN_WAIT_SEC = 8;
-const WORLD_PREVIEW_FALLBACK_SEC = 4;
+const ANCHOR_CONTROLLER_VERSION = 'v7';
+const WORLD_PREVIEW_FALLBACK_SEC = 1;
+const ANCHOR_SCAN_REMINDER_SEC = 3;
 // Plant collider is 300 units tall, centered on root, with 0.1 scale → 15 cm to desk contact.
 const PLANT_ANCHOR_Y_OFFSET = 15;
-const ANCHOR_RESTORE_STABLE_FRAMES = 3;
+const ANCHOR_RESTORE_STABLE_FRAMES = 2;
+const ANCHOR_RESTORE_MAX_WAIT_SEC = 1.5;
 
 @component
 export class AnchorController extends BaseScriptComponent {
@@ -57,16 +58,12 @@ export class AnchorController extends BaseScriptComponent {
 
     const store = global.persistentStorageSystem.store;
     if (store.has('widget_count') && store.getInt('widget_count') > 0) {
+      print('Saved plants found, starting fast restore');
+      this.runFastStartupRestore();
       const usesAnchorSpace =
         store.has('uses_anchor_space') && store.getBool('uses_anchor_space');
-      this.textlog.text = usesAnchorSpace
-        ? 'Scan desk slowly for saved anchor...'
-        : 'Scanning for desk anchor...';
-      print('Saved plants found, waiting for anchor');
-      const fallbackSec = usesAnchorSpace ? ANCHOR_SCAN_WAIT_SEC : WORLD_PREVIEW_FALLBACK_SEC;
-      this.scheduleWorldFallbackRestore(fallbackSec);
-      if (usesAnchorSpace) {
-        this.scheduleAnchorScanReminder(4);
+      if (usesAnchorSpace && !this.currentAnchor) {
+        this.scheduleAnchorScanReminder(ANCHOR_SCAN_REMINDER_SEC);
       }
     }
 
@@ -212,7 +209,7 @@ export class AnchorController extends BaseScriptComponent {
   private scheduleAnchorStableRestore(callback: () => void) {
     let stableFrames = 0;
     let lastAnchorPos: vec3 | null = null;
-    let maxWaitSec = 3;
+    let maxWaitSec = ANCHOR_RESTORE_MAX_WAIT_SEC;
     const settleEvent = this.createEvent('UpdateEvent');
     settleEvent.bind(() => {
       if (!this.currentAnchor || !this.anchorComponent.enabled) {
@@ -343,25 +340,56 @@ export class AnchorController extends BaseScriptComponent {
       });
   }
 
+  private runFastStartupRestore(): void {
+    if (this.shouldSkipStartupWorldFallback()) {
+      print('Skipping startup restore: session already has anchor or plants');
+      return;
+    }
+
+    const store = global.persistentStorageSystem.store;
+    const hasWorldData = store.has('has_world_data') && store.getBool('has_world_data');
+    if (!hasWorldData) {
+      print('No world preview data yet, deferring restore');
+      this.textlog.text = 'Scanning for desk anchor...';
+      this.scheduleWorldFallbackRestore(WORLD_PREVIEW_FALLBACK_SEC);
+      return;
+    }
+
+    print('Fast restore: world preview while Snap anchor scans in background');
+    this.textlog.text = 'Restoring saved plants...';
+    this.restoreSavedObjects(false);
+    if (this.objs.length > 0) {
+      this.ensureDeskAnchorForRestoredPlants();
+    } else {
+      this.textlog.text = 'Could not restore saved plants';
+    }
+  }
+
   private scheduleWorldFallbackRestore(delaySec: number) {
     this.scheduleDelayed(() => {
       if (this.shouldSkipStartupWorldFallback()) {
         print('Skipping world preview: session already has anchor or plants');
         return;
       }
-      print('No saved anchor yet, using world preview');
+      print('No saved Snap anchor nearby, restoring plants from world preview');
       this.restoreSavedObjects(false);
-      this.ensureDeskAnchorForRestoredPlants();
+      if (this.objs.length > 0) {
+        this.ensureDeskAnchorForRestoredPlants();
+      } else {
+        this.textlog.text = 'Could not restore saved plants';
+      }
     }, delaySec);
   }
 
   private scheduleAnchorScanReminder(delaySec: number) {
     this.scheduleDelayed(() => {
-      if (this.hasRestored || this.currentAnchor || this.objs.length > 0) {
+      if (this.currentAnchor && this.anchorPersisted) {
         return;
       }
       print('Still scanning for saved desk anchor');
-      this.textlog.text = 'Look at your desk slowly to find saved anchor';
+      this.textlog.text = this.hasRestored
+        ? 'Look at your desk slowly to lock saved anchor'
+        : 'Look at your desk slowly to find saved anchor';
     }, delaySec);
   }
 
@@ -377,15 +405,12 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private ensureDeskAnchorForRestoredPlants() {
-    const store = global.persistentStorageSystem.store;
-    if (store.has('uses_anchor_space') && store.getBool('uses_anchor_space')) {
-      print('Not creating new anchor; waiting for saved anchor');
+    if (this.currentAnchor || this.anchorCreationInProgress || this.objs.length === 0) {
       return;
     }
-    if (this.currentAnchor || this.usingWorldSpace || this.objs.length === 0) {
-      return;
-    }
-    print('Starting desk anchor from restored plant desk contact');
+
+    print('Saved Snap anchor not loaded yet; creating session anchor at restored plants');
+    this.textlog.text = `Anchoring ${this.objs.length} restored plant(s) to desk...`;
     this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
   }
 
@@ -607,16 +632,9 @@ export class AnchorController extends BaseScriptComponent {
       this.anchorComponent.enabled = true;
       const restoredCount = this.restoreAllObjects(false);
       if (restoredCount === 0 && hasWorldData) {
-        const usesAnchorSpace =
-          store.has('uses_anchor_space') && store.getBool('uses_anchor_space');
-        if (usesAnchorSpace) {
-          print('Anchor-local restore empty, keep scanning for saved anchor');
-          this.textlog.text = 'Scan desk slowly for saved anchor';
-          this.hasRestored = false;
-          return;
-        }
         print('Anchor-local restore empty, falling back to world preview');
         this.hasRestored = false;
+        this.usingWorldSpace = true;
         this.restoredFromWorldFallback = true;
         this.restoreAllObjects(true);
         this.ensureDeskAnchorForRestoredPlants();
@@ -624,6 +642,7 @@ export class AnchorController extends BaseScriptComponent {
         this.reparentPlantsToAnchor();
       }
     } else {
+      this.usingWorldSpace = true;
       this.restoredFromWorldFallback = true;
       this.anchorComponent.enabled = true;
       this.restoreAllObjects(true);
