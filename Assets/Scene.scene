@@ -1237,7 +1237,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 3cfb6405-f9f3-4833-8fad-9cae640edbac
       plantTexture: !<reference.Texture> 757b9441-2b6e-46d2-aad3-5352d1541bae
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":

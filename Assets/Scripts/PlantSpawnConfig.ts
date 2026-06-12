@@ -15,7 +15,7 @@ export class PlantSpawnConfig extends BaseScriptComponent {
   timeAsBaby: number = 30;
 
   @input('float')
-  growthTime: number = 1;
+  growthTime: number = 30;
 
   @input('float')
   scaleUpSize: number = 1;

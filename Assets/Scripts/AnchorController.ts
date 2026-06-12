@@ -5,10 +5,11 @@ import {
 import { Anchor } from 'Spatial Anchors.lspkg/Anchor';
 import { AnchorModule } from 'Spatial Anchors.lspkg/AnchorModule';
 import { AnchorComponent } from 'Spatial Anchors.lspkg/AnchorComponent';
+import { WorldAnchor } from 'Spatial Anchors.lspkg/WorldAnchor';
 import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 
-const ANCHOR_CONTROLLER_VERSION = 'v7';
+const ANCHOR_CONTROLLER_VERSION = 'v8';
 const WORLD_PREVIEW_FALLBACK_SEC = 1;
 const ANCHOR_SCAN_REMINDER_SEC = 3;
 // Plant collider is 300 units tall, centered on root, with 0.1 scale → 15 cm to desk contact.
@@ -44,6 +45,9 @@ export class AnchorController extends BaseScriptComponent {
   private anchorCreationInProgress = false;
   private skipStartupWorldFallback = false;
   private pendingCreatedAnchorId?: string;
+  private isResetting = false;
+  private sessionEpoch = 0;
+  private anchorSettleEvent?: UpdateEvent;
 
   onAwake() {
     this.createEvent('OnStartEvent').bind(() => this.onStart());
@@ -71,6 +75,10 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   public onAnchorNearby(anchor: Anchor) {
+    if (this.isResetting) {
+      print('Ignoring nearby anchor during reset');
+      return;
+    }
     print(`Anchor found: ${anchor.id}`);
     this.textlog.text = 'Anchor found';
     const hadWorldFallback = this.hasRestored && this.restoredFromWorldFallback;
@@ -201,17 +209,33 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private scheduleDelayed(callback: () => void, delaySec: number) {
+    const epoch = this.sessionEpoch;
     const delayedEvent = this.createEvent('DelayedCallbackEvent');
-    delayedEvent.bind(callback);
+    delayedEvent.bind(() => {
+      if (epoch !== this.sessionEpoch || this.isResetting) {
+        return;
+      }
+      callback();
+    });
     delayedEvent.reset(delaySec);
   }
 
   private scheduleAnchorStableRestore(callback: () => void) {
+    if (this.anchorSettleEvent) {
+      this.anchorSettleEvent.enabled = false;
+    }
+
+    const epoch = this.sessionEpoch;
     let stableFrames = 0;
     let lastAnchorPos: vec3 | null = null;
     let maxWaitSec = ANCHOR_RESTORE_MAX_WAIT_SEC;
     const settleEvent = this.createEvent('UpdateEvent');
+    this.anchorSettleEvent = settleEvent;
     settleEvent.bind(() => {
+      if (epoch !== this.sessionEpoch || this.isResetting) {
+        settleEvent.enabled = false;
+        return;
+      }
       if (!this.currentAnchor || !this.anchorComponent.enabled) {
         return;
       }
@@ -303,7 +327,7 @@ export class AnchorController extends BaseScriptComponent {
 
     this.saveRetryEvent = this.createEvent('UpdateEvent');
     this.saveRetryEvent.bind(() => {
-      if (!this.currentAnchor || this.anchorPersisted || this.usingWorldSpace || this.anchorCreationInProgress) {
+      if (this.isResetting || !this.currentAnchor || this.anchorPersisted || this.usingWorldSpace || this.anchorCreationInProgress) {
         return;
       }
       this.saveRetryCooldown -= getDeltaTime();
@@ -547,6 +571,10 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   saveObjectPosition() {
+    if (this.isResetting) {
+      return;
+    }
+
     print(
       `pinch up ${ANCHOR_CONTROLLER_VERSION} anchor=${!!this.currentAnchor} worldOnly=${this.usingWorldSpace} creating=${this.anchorCreationInProgress}`
     );
@@ -762,9 +790,23 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   async resetAnchor() {
+    print('Reset: deleting all anchors and clearing saved plants');
+    this.isResetting = true;
+    this.sessionEpoch++;
+    this.anchorRestorePending = false;
+    this.anchorSaveInProgress = true;
+    this.anchorCreationInProgress = false;
+
+    if (this.anchorSettleEvent) {
+      this.anchorSettleEvent.enabled = false;
+      this.anchorSettleEvent = undefined;
+    }
+
+    this.anchorComponent.enabled = false;
+    const anchorToDelete = this.currentAnchor;
+
     const store = global.persistentStorageSystem.store;
     const count = store.has('widget_count') ? store.getInt('widget_count') : 0;
-
     for (let i = 0; i < count; i++) {
       ['x', 'y', 'z', 'rx', 'ry', 'rz', 'rw', 'wx', 'wy', 'wz', 'wrx', 'wry', 'wrz', 'wrw']
         .forEach(k => store.remove(`w${i}_${k}`));
@@ -780,17 +822,38 @@ export class AnchorController extends BaseScriptComponent {
       this.floatingRoot.destroy();
       this.floatingRoot = undefined;
     }
+
+    if (this.anchorSession) {
+      const worldAnchor = anchorToDelete as WorldAnchor | undefined;
+      if (worldAnchor?._sceneObject) {
+        try {
+          await this.anchorSession.deleteAnchor(worldAnchor);
+          print('Deleted active session anchor');
+        } catch (e) {
+          print('Could not delete active anchor: ' + e);
+        }
+        worldAnchor._sceneObject.destroy();
+      }
+
+      try {
+        await this.anchorSession.reset();
+        print('Deleted all spatial anchors in area');
+      } catch (e) {
+        print('Anchor session reset failed: ' + e);
+      }
+    }
+
     this.hasRestored = false;
     this.anchorPersisted = false;
     this.usingWorldSpace = false;
     this.restoredFromWorldFallback = false;
-    this.anchorSaveInProgress = false;
-    this.anchorCreationInProgress = false;
     this.skipStartupWorldFallback = false;
     this.pendingCreatedAnchorId = undefined;
     this.currentAnchor = undefined;
+    this.anchorComponent.anchor = null as unknown as Anchor;
     this.anchorComponent.enabled = true;
-    await this.anchorSession!.reset();
+    this.isResetting = false;
+    this.anchorSaveInProgress = false;
     this.textlog.text = 'Desk reset';
   }
 
