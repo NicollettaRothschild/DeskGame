@@ -1,0 +1,37 @@
+- !<NativePackageDescriptor/7fad8e23-66fc-4d47-b9c4-619904afde03>
+  PackagePath: ""
+  StudioVersion:
+    major: 5
+    minor: 15
+    patch: 1
+    build: 25102815
+    type: Unset
+    buildFlavor: ""
+    timestamp: 0
+    commit: ""
+  Description: "Gardening Pack Bitmoji Gardening Pack includes 4 different 3D models with Bitmoji's unique style: • watering can • scoop • rake • bucket sand Click here to learn on Place Your Object in World Click here to learn more about Tracking Modes"
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  UpdateCheckpoint: 76
+  ExportUid: dda48809-a323-4c8e-a768-49b53b0a037d
+  ComponentUid: 9313b9c5-408e-4bfb-8fa0-2937aa4118a9
+  PackagePolicy: CanBeUnpackedTransparent
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  Instantiable: !<reference> 00000000-0000-0000-0000-000000000000
+  AssetLibraryDependencyStructure: !<AssetLibraryDependencyStructure>
+    Name: ""
+    AssetId: ""
+    Hash: ""
+    Version:
+      major: 0
+      minor: 0
+      patch: 0
+      build: 0
