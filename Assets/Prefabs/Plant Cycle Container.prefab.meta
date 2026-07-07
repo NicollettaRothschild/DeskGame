@@ -43,6 +43,8 @@
   ScriptInputsDefault:
     growthTime: true
     hasBeenWatered: true
+    seedPlantPrefab: true
+    seedScale: true
     debugPlantMaterials: true
   ScriptTypesDefault:
     {}
@@ -53,8 +55,8 @@
       scaleUpSize: !<float> 2.000000
       hasBeenWatered: false
       plantTypeId: Plant_1
-      seedPlantPrefab: !<reference.ObjectPrefab> 1af87ec7-df90-435f-8df5-555c467dd9b9
-      seedScale: 0.200000
+      seedPlantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      seedScale: 0.020000
       babyPlantPrefab: !<reference.ObjectPrefab> 32925bf5-e2fb-463d-a546-8b4778ac7609
       adultPlantPrefab: !<reference.ObjectPrefab> 9aad76a1-bc12-4240-98ba-24aaa567d629
       plantTexture: !<reference.Texture> 5b09bf69-0b5e-4f75-9f6c-350ee111a495

@@ -2008,6 +2008,8 @@
   ScriptInputsDefault:
     growthTime: true
     hasBeenWatered: true
+    seedPlantPrefab: true
+    seedScale: true
     debugPlantMaterials: true
   ScriptTypesDefault:
     {}
@@ -2018,8 +2020,8 @@
       scaleUpSize: !<float> 2.000000
       hasBeenWatered: false
       plantTypeId: Plant_1
-      seedPlantPrefab: !<reference.ObjectPrefab> 1af87ec7-df90-435f-8df5-555c467dd9b9
-      seedScale: 0.200000
+      seedPlantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      seedScale: 0.020000
       babyPlantPrefab: !<reference.ObjectPrefab> 32925bf5-e2fb-463d-a546-8b4778ac7609
       adultPlantPrefab: !<reference.ObjectPrefab> 9aad76a1-bc12-4240-98ba-24aaa567d629
       plantTexture: !<reference.Texture> 5b09bf69-0b5e-4f75-9f6c-350ee111a495
@@ -2146,9 +2148,9 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 12.000000, y: -4.609230, z: 0.000000}
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 8.000000, y: 8.000000, z: 1.000000}
+    Scale: {x: 1.500000, y: 0.800000, z: 0.100000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -2396,7 +2398,7 @@
   PrefabRemaps:
     []
   Name: Watering Can Temp 1
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 76.703995, y: 0.000000, z: -70.704659}
@@ -3257,7 +3259,7 @@
   PrefabRemaps:
     []
   Name: Btn Undo
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: -13.164118, y: 5.029995, z: 0.000000}
@@ -3438,10 +3440,10 @@
   PrefabRemaps:
     []
   Name: Btn Place Plant
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 5.023820, z: 0.000000}
+    Position: {x: -0.035048, y: 5.288482, z: -0.143944}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 8.000000, y: 8.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -3691,7 +3693,7 @@
   PrefabRemaps:
     []
   Name: Btn Reset
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 11.326793, y: 5.029995, z: 0.000000}
@@ -4023,7 +4025,7 @@
   PrefabRemaps:
     []
   Name: PlantContainer
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: -10.000000, z: -80.000000}
@@ -4626,6 +4628,7 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 58d2316d-9a17-4418-999a-1318830e1d8b
+    - !<own> 5c5ebea3-1bcd-4da4-bdd5-d7b058280bb7
   Components:
     - !<own> e01d9e2d-cca4-4ac0-811c-739fc74c7413
     - !<own> 968bf506-88d4-496a-921c-3c46b46d6f83
@@ -4661,7 +4664,6 @@
   Children:
     - !<own> 9f8f18b8-733d-490e-8ba2-b7e7806b48b4
     - !<own> 8942ae59-00dd-499b-a2bf-0cbf5dda3564
-    - !<own> 5c5ebea3-1bcd-4da4-bdd5-d7b058280bb7
     - !<own> 06acd950-99a1-4ee0-a669-c728280f108a
     - !<own> 21b4b879-f66c-4c4a-96f4-58e4f6fce3ea
     - !<own> 33897585-2d79-438d-8758-092a87bf8e09
@@ -5504,7 +5506,7 @@
   PrefabRemaps:
     []
   Name: InteractableAudioFeedback
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 1ad7da86-2c32-418c-bdf1-b7150c07c912
   ScriptInputsDefault:
     _playAudioOnHover: true
@@ -5552,7 +5554,7 @@
   PrefabRemaps:
     []
   Name: Interactable
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
   ScriptInputsDefault:
     targetingMode: true
@@ -5612,6 +5614,7 @@
     useSnapping: true
     itemSnapping: true
     worldSnapping: true
+    _showFollowButton: true
     _following: true
     _showCloseButton: true
     _enableInteractionPlane: true
@@ -5645,7 +5648,7 @@
       useSnapping: false
       itemSnapping: false
       worldSnapping: false
-      _showFollowButton: true
+      _showFollowButton: false
       useFollowBehavior: true
       _following: false
       _showCloseButton: false
@@ -5771,7 +5774,7 @@
   PrefabRemaps:
     []
   Name: Render Mesh Visual
-  Enabled: true
+  Enabled: false
   RenderOrder: 0
   StretchMode: Stretch
   VerticalAlignment: Center
