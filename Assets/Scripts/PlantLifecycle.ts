@@ -42,6 +42,9 @@ export class PlantLifecycle extends BaseScriptComponent {
   @input
   seedPlantPrefab!: ObjectPrefab;
 
+  @input('float')
+  seedScale: number = 0.02;
+
   @input
   babyPlantPrefab!: ObjectPrefab;
 
@@ -304,6 +307,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.seedInstance.name = 'SeedPlantModel';
     this.debugLog(`spawn seed root=${this.seedInstance.name} parent=${parent.name}`);
     this.prepareStageModel(this.seedInstance);
+    this.seedInstance.getTransform().setLocalScale(
+      new vec3(this.seedScale, this.seedScale, this.seedScale)
+    );
     this.captureModelMetrics(this.seedInstance);
     this.refreshAlignNodePosition(1);
   }

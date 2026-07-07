@@ -36,6 +36,7 @@
     plantTypeId: false
     scaleUpSize: false
     seedPlantPrefab: false
+    seedScale: false
     stageRoot: false
     timeAsBaby: false
   ScriptTypesHidden:
@@ -53,6 +54,7 @@
       hasBeenWatered: false
       plantTypeId: default
       seedPlantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      seedScale: 0.020000
       babyPlantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
       adultPlantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
       plantTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
@@ -69,6 +71,7 @@
     - // @input bool hasBeenWatered
     - '// @input string plantTypeId = "default"'
     - // @input Asset.ObjectPrefab seedPlantPrefab
+    - // @input float seedScale = 0.02
     - // @input Asset.ObjectPrefab babyPlantPrefab
     - // @input Asset.ObjectPrefab adultPlantPrefab
     - // @input Asset.Texture plantTexture
