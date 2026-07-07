@@ -1,7 +1,7 @@
-- !<AssetImportMetadata/7cbdf0c3-7f52-4ecd-a31a-254c125dcd1a>
+- !<AssetImportMetadata/8926e212-1025-4a29-960a-f27300c6fea8>
   ImportedAssetIds:
-    Diffuse: !<reference> 2013a19b-93c1-4f21-b7ea-876a33550c7b
-    Specular: !<reference> d795fd46-e16b-4cb9-8dfb-4ef227298f7a
+    Diffuse: !<reference> 37891c02-c7e5-4c39-9178-e0dc6376bc6d
+    Specular: !<reference> e71c27ca-fc27-4991-96a6-5d3e3c2d1c36
   ImporterName: EnvmapTextureImporter
   PrimaryAsset: !<reference> 00000000-0000-0000-0000-000000000000
   PackageType: LegacyPackage

@@ -1,8 +1,9 @@
 export enum PlantStage {
-  Baby = 0,
-  WateredBaby = 1,
-  Growing = 2,
-  Adult = 3,
+  Seed = 0,
+  Baby = 1,
+  WateredBaby = 2,
+  Growing = 3,
+  Adult = 4,
 }
 
 export type PlantLifecycleSaveState = {
@@ -39,6 +40,9 @@ export class PlantLifecycle extends BaseScriptComponent {
   plantTypeId: string = 'default';
 
   @input
+  seedPlantPrefab!: ObjectPrefab;
+
+  @input
   babyPlantPrefab!: ObjectPrefab;
 
   @input
@@ -57,9 +61,10 @@ export class PlantLifecycle extends BaseScriptComponent {
   @allowUndefined
   stageRoot!: SceneObject;
 
-  private currentStage: PlantStage = PlantStage.Baby;
+  private currentStage: PlantStage = PlantStage.Seed;
   private babyTimerRemaining = 0;
   private growthElapsed = 0;
+  private seedInstance: SceneObject | null = null;
   private babyInstance: SceneObject | null = null;
   private adultInstance: SceneObject | null = null;
   private clonedBabyMaterial: Material | null = null;
@@ -74,9 +79,9 @@ export class PlantLifecycle extends BaseScriptComponent {
   onAwake(): void {
     this.debugLog(`awake plantType=${this.plantTypeId}`);
     this.babyTimerRemaining = Math.max(0, this.timeAsBaby);
-    this.currentStage = this.hasBeenWatered ? PlantStage.WateredBaby : PlantStage.Baby;
+    this.currentStage = this.hasBeenWatered ? PlantStage.WateredBaby : PlantStage.Seed;
     this.ensureStageRoot();
-    this.showBaby();
+    this.showSeed();
     this.createUpdateLoop();
   }
 
@@ -101,11 +106,11 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.babyTimerRemaining = this.timeAsBaby;
     this.growthElapsed = 0;
     this.hasBeenWatered = false;
-    this.currentStage = PlantStage.Baby;
+    this.currentStage = PlantStage.Seed;
     this.debugLog(
       `configurePlant type=${plantTypeId} babyTime=${this.timeAsBaby} growthTime=${this.growthTime} scale=${this.scaleUpSize} texture=${this.plantTexture ? this.plantTexture.name : 'null'}`
     );
-    this.showBaby();
+    this.showSeed();
   }
 
   public water(): void {
@@ -140,7 +145,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.growthElapsed = Math.max(0, state.growthElapsed);
     this.currentStage = this.clampStage(state.stage);
 
-    if (this.currentStage === PlantStage.Growing) {
+    if (this.currentStage === PlantStage.Seed) {
+      this.showSeed();
+    } else if (this.currentStage === PlantStage.Growing) {
       this.showAdultAtGrowthScale();
     } else if (this.currentStage === PlantStage.Adult) {
       this.showAdult();
@@ -166,6 +173,13 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     if (this.currentStage === PlantStage.WateredBaby && this.babyTimerRemaining <= 0) {
       this.startGrowth();
+      return;
+    }
+
+    if (this.currentStage === PlantStage.Seed && this.babyTimerRemaining <= 0) {
+      this.currentStage = PlantStage.Baby;
+      this.showBaby();
+      this.notifyAnchorStateChanged();
       return;
     }
 
@@ -214,14 +228,14 @@ export class PlantLifecycle extends BaseScriptComponent {
   private ensureAlignNode(): SceneObject {
     const stageRoot = this.ensureStageRoot();
     if (!isNull(this.alignNode)) {
-      return this.alignNode;
+      return this.alignNode as SceneObject;
     }
 
     for (let i = 0; i < stageRoot.getChildrenCount(); i++) {
       const child = stageRoot.getChild(i);
       if (!isNull(child) && child.name === 'PlantAlignNode') {
         this.alignNode = child;
-        return child;
+        return child as SceneObject;
       }
     }
 
@@ -230,20 +244,20 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.alignNode.getTransform().setLocalPosition(vec3.zero());
     this.alignNode.getTransform().setLocalRotation(quat.quatIdentity());
     this.alignNode.getTransform().setLocalScale(vec3.one());
-    return this.alignNode;
+    return this.alignNode as SceneObject;
   }
 
   private ensureGrowthScaleNode(): SceneObject {
     const alignNode = this.ensureAlignNode();
     if (!isNull(this.growthScaleNode)) {
-      return this.growthScaleNode;
+      return this.growthScaleNode as SceneObject;
     }
 
     for (let i = 0; i < alignNode.getChildrenCount(); i++) {
       const child = alignNode.getChild(i);
       if (!isNull(child) && child.name === 'PlantGrowthScale') {
         this.growthScaleNode = child;
-        return child;
+        return child as SceneObject;
       }
     }
 
@@ -252,7 +266,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.growthScaleNode.getTransform().setLocalPosition(vec3.zero());
     this.growthScaleNode.getTransform().setLocalRotation(quat.quatIdentity());
     this.growthScaleNode.getTransform().setLocalScale(vec3.one());
-    return this.growthScaleNode;
+    return this.growthScaleNode as SceneObject;
   }
 
   private showBaby(): void {
@@ -269,6 +283,28 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.prepareStageModel(this.babyInstance);
     this.applyClonedBabyMaterial(this.babyInstance);
     this.captureModelMetrics(this.babyInstance);
+    this.refreshAlignNodePosition(1);
+  }
+
+  private showSeed(): void {
+    this.destroyCurrentInstances();
+    this.alignCenterX = 0;
+    this.alignCenterZ = 0;
+
+    const parent = this.ensureGrowthScaleNode();
+    parent.getTransform().setLocalScale(vec3.one());
+
+    if (isNull(this.seedPlantPrefab)) {
+      this.debugLog('showSeed skipped: seedPlantPrefab is null, falling back to baby');
+      this.showBaby();
+      return;
+    }
+
+    this.seedInstance = this.seedPlantPrefab.instantiate(parent);
+    this.seedInstance.name = 'SeedPlantModel';
+    this.debugLog(`spawn seed root=${this.seedInstance.name} parent=${parent.name}`);
+    this.prepareStageModel(this.seedInstance);
+    this.captureModelMetrics(this.seedInstance);
     this.refreshAlignNodePosition(1);
   }
 
@@ -306,11 +342,14 @@ export class PlantLifecycle extends BaseScriptComponent {
   }
 
   private captureAlignCenterFromCurrentModel(): void {
-    const current = !isNull(this.babyInstance)
-      ? this.babyInstance
-      : !isNull(this.adultInstance)
-        ? this.adultInstance
-        : null;
+    let current: SceneObject | null = null;
+    if (!isNull(this.babyInstance)) {
+      current = this.babyInstance;
+    } else if (!isNull(this.seedInstance)) {
+      current = this.seedInstance;
+    } else if (!isNull(this.adultInstance)) {
+      current = this.adultInstance;
+    }
     if (isNull(current)) {
       return;
     }
@@ -438,7 +477,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
-    this.anchorPersistence.persistPlantLifecycleState(this.getSceneObject());
+    this.anchorPersistence.persistPlantLifecycleState(this.getSceneObject() as SceneObject);
   }
 
   private applyClonedBabyMaterial(root: SceneObject): void {
@@ -471,7 +510,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     const scale = this.getCurrentGrowthScale();
-    growthScaleNode.getTransform().setLocalScale(new vec3(scale, scale, scale));
+    (growthScaleNode as SceneObject).getTransform().setLocalScale(new vec3(scale, scale, scale));
     this.refreshAlignNodePosition(scale);
   }
 
@@ -481,13 +520,19 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
-    growthScaleNode.getTransform().setLocalScale(
+    (growthScaleNode as SceneObject).getTransform().setLocalScale(
       new vec3(this.scaleUpSize, this.scaleUpSize, this.scaleUpSize)
     );
     this.refreshAlignNodePosition(this.scaleUpSize);
   }
 
   private destroyCurrentInstances(): void {
+    if (!isNull(this.seedInstance)) {
+      this.disableManipulationOnHierarchy(this.seedInstance);
+      this.seedInstance.destroy();
+      this.seedInstance = null;
+    }
+
     if (!isNull(this.babyInstance)) {
       this.disableManipulationOnHierarchy(this.babyInstance);
       this.babyInstance.destroy();
@@ -537,8 +582,8 @@ export class PlantLifecycle extends BaseScriptComponent {
   }
 
   private clampStage(stage: number): PlantStage {
-    if (stage <= PlantStage.Baby) {
-      return PlantStage.Baby;
+    if (stage <= PlantStage.Seed) {
+      return PlantStage.Seed;
     }
     if (stage >= PlantStage.Adult) {
       return PlantStage.Adult;

@@ -9,7 +9,8 @@ import { WorldAnchor } from 'Spatial Anchors.lspkg/WorldAnchor';
 import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 
-const ANCHOR_CONTROLLER_VERSION = 'v9';
+const ANCHOR_CONTROLLER_VERSION = 'v10';
+const PLANT_LIFECYCLE_SAVE_VERSION = 2;
 const WORLD_PREVIEW_FALLBACK_SEC = 1;
 const ANCHOR_SCAN_REMINDER_SEC = 3;
 // Plant collider is 300 units tall, centered on root, with 0.1 scale → 15 cm to desk contact.
@@ -864,6 +865,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     const state = plant.getSaveState();
+    store.putInt(`w${index}_plant_lifecycle_version`, PLANT_LIFECYCLE_SAVE_VERSION);
     store.putString(`w${index}_plant_type`, state.plantTypeId);
     store.putInt(`w${index}_plant_stage`, state.stage);
     store.putFloat(`w${index}_plant_baby_remaining`, state.babyTimerRemaining);
@@ -889,9 +891,15 @@ export class AnchorController extends BaseScriptComponent {
       config.applyToPlant(plant);
     }
 
+    const saveVersion = store.has(`w${index}_plant_lifecycle_version`)
+      ? store.getInt(`w${index}_plant_lifecycle_version`)
+      : 1;
+    const storedStage = store.getInt(`w${index}_plant_stage`);
+    const stage = saveVersion >= PLANT_LIFECYCLE_SAVE_VERSION ? storedStage : storedStage + 1;
+
     const state: PlantLifecycleSaveState = {
       plantTypeId: plantTypeId,
-      stage: store.getInt(`w${index}_plant_stage`),
+      stage: stage,
       babyTimerRemaining: store.has(`w${index}_plant_baby_remaining`)
         ? store.getFloat(`w${index}_plant_baby_remaining`)
         : 0,
@@ -905,6 +913,7 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private removePlantState(store: GeneralDataStore, index: number) {
+    store.remove(`w${index}_plant_lifecycle_version`);
     store.remove(`w${index}_plant_type`);
     store.remove(`w${index}_plant_stage`);
     store.remove(`w${index}_plant_baby_remaining`);
