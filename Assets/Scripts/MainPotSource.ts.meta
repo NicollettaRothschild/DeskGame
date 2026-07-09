@@ -1,0 +1,69 @@
+- !<AssetImportMetadata/f237c06b-50ef-42c6-b31f-7819040ce24b>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> c78c6170-552d-456e-ae72-52a87ec2aed5
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> c78c6170-552d-456e-ae72-52a87ec2aed5
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 4ec84660-5441-4e91-b1d3-c9f1411f642f
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/4ec84660-5441-4e91-b1d3-c9f1411f642f>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 9ba77a82-da86-4fac-9013-962ed202a615
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    allowMultipleActivePots: false
+    anchorController: false
+    debugLogging: false
+    fallbackRayDistance: false
+    followInteractorWhileHeld: false
+    potPrefabs: false
+    sourceInteractable: false
+    spawnForwardOffset: false
+    spawnParent: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - potPrefabs: !<reference.ObjectPrefab[]>
+        []
+      anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      sourceInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      spawnParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnForwardOffset: !<float> 0.000000
+      fallbackRayDistance: !<float> 35.000000
+      followInteractorWhileHeld: true
+      allowMultipleActivePots: false
+      debugLogging: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - "// @input Asset.ObjectPrefab[] potPrefabs = {}"
+    - // @input Component.ScriptComponent anchorController
+    - // @input Component.ScriptComponent sourceInteractable
+    - // @input SceneObject spawnParent
+    - // @input float spawnForwardOffset
+    - // @input float fallbackRayDistance = 35
+    - // @input bool followInteractorWhileHeld = true
+    - // @input bool allowMultipleActivePots
+    - // @input bool debugLogging

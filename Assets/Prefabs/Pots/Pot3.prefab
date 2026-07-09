@@ -1,0 +1,193 @@
+- !<ObjectPrefab/14937b4f-761b-4750-997d-29538f5c296d>
+  PackagePath: ""
+  objects:
+    - !<own> c2d7ba05-73b5-4305-9750-e66ff7e8f7af
+  LazyLoading: false
+  RetainAssets: true
+- !<SceneObject/2c194ede-7fff-43f5-9b4d-b3dfb6238d43>
+  PrefabRemaps:
+    []
+  Name: Anchor
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 1.492068}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<ScriptComponent/45c069ae-ccf0-4bf9-906c-63708b710295>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    ignoreInteractionPlane: true
+    keepHoverOnTrigger: true
+    enableInstantDrag: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: false
+      keepHoverOnTrigger: false
+      enableInstantDrag: false
+      isScrollable: false
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/7838a3f3-f001-4e54-9ab3-15845b3728f1>
+  PrefabRemaps:
+    []
+  Name: PlantPot
+  Enabled: true
+  ScriptAsset: !<reference> 234c4442-35ea-4685-a173-aeca51563df1
+  ScriptInputsDefault:
+    onlyAcceptSeeds: true
+    disablePlantInteractionWhenPlanted: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      plantAttachPoint: !<reference.SceneObject> 2c194ede-7fff-43f5-9b4d-b3dfb6238d43
+      triggerCollider: !<reference.ColliderComponent> dd32ebf8-808b-463f-b945-9c0e51f758c1
+      anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
+      onlyAcceptSeeds: true
+      disablePlantInteractionWhenPlanted: true
+      debugLogging: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/9085b052-272e-4548-8b55-53c341e1df40>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: true
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    manipulateRootSceneObject: true
+    enableTranslation: true
+    enableRotation: true
+    enableScale: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    enableStretchZ: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    useFilter: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      enableTranslation: true
+      enableRotation: true
+      enableScale: true
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: true
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: true
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/c2d7ba05-73b5-4305-9750-e66ff7e8f7af>
+  PrefabRemaps:
+    - 2c194ede-7fff-43f5-9b4d-b3dfb6238d43: 2c194ede-7fff-43f5-64b2-4c2049dc72bc
+    - 45c069ae-ccf0-4bf9-906c-63708b710295: 45c069ae-ccf0-4bf9-6f93-9c8f748efd6a
+    - 7838a3f3-f001-4e54-9ab3-15845b3728f1: 7838a3f3-f001-4e54-654c-ea7ba4c8d70e
+    - 9085b052-272e-4548-8b55-53c341e1df40: b676bd80-a430-422d-bac7-b1bfb16209e8
+    - c2d7ba05-73b5-4305-9750-e66ff7e8f7af: c2d7ba05-73b5-4305-68af-199008170850
+    - c2edb5d4-7391-4823-b353-3a86e3606f1a: c2edb5d4-7391-4823-4cac-c5791c9f90e5
+    - dd32ebf8-808b-463f-b945-9c0e51f758c1: dd32ebf8-808b-463f-46ba-63f1ae08a73e
+  Name: Pot3
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 1.818182, y: 1.818182, z: 1.818182}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 2c194ede-7fff-43f5-9b4d-b3dfb6238d43
+  Components:
+    - !<own> c2edb5d4-7391-4823-b353-3a86e3606f1a
+    - !<own> 45c069ae-ccf0-4bf9-906c-63708b710295
+    - !<own> dd32ebf8-808b-463f-b945-9c0e51f758c1
+    - !<own> 7838a3f3-f001-4e54-9ab3-15845b3728f1
+    - !<own> 9085b052-272e-4548-8b55-53c341e1df40
+- !<RenderMeshVisual/c2edb5d4-7391-4823-b353-3a86e3606f1a>
+  PrefabRemaps:
+    []
+  Name: component_2
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> c2a0b5c5-2625-4cfe-b3d7-df9b7b674eaf
+  Mesh: !<reference> 0b85d222-c34b-46f0-a79b-b59c1276f651
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ColliderComponent/dd32ebf8-808b-463f-b945-9c0e51f758c1>
+  PrefabRemaps:
+    []
+  Name: Physics Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 3.000000, y: 3.000000, z: 6.000000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false

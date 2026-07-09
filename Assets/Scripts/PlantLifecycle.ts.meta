@@ -34,6 +34,7 @@
     hasBeenWatered: false
     plantTexture: false
     plantTypeId: false
+    requiresPlanting: false
     scaleUpSize: false
     seedPlantPrefab: false
     seedScale: false
@@ -60,6 +61,7 @@
       plantTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
       babyMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
       debugPlantMaterials: false
+      requiresPlanting: true
       stageRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
@@ -77,4 +79,5 @@
     - // @input Asset.Texture plantTexture
     - // @input Asset.Material babyMaterialTemplate
     - // @input bool debugPlantMaterials
+    - // @input bool requiresPlanting = true
     - // @input SceneObject stageRoot

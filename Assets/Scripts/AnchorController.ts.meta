@@ -32,6 +32,7 @@
     menuRoot: false
     plantConfigs: false
     plantPrefab: false
+    potPrefabs: false
     textlog: false
     widgetParent: false
   ScriptTypesHidden:
@@ -49,6 +50,8 @@
       camera: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       menuRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       plantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      potPrefabs: !<reference.ObjectPrefab[]>
+        []
       textlog: !<reference.Text> 00000000-0000-0000-0000-000000000000
       plantConfigs: !<MappingBased.AssignableType_2[]>
         []
@@ -62,5 +65,6 @@
     - // @input SceneObject camera
     - // @input SceneObject menuRoot
     - // @input Asset.ObjectPrefab plantPrefab
+    - "// @input Asset.ObjectPrefab[] potPrefabs = {}"
     - // @input Component.Text textlog
     - "// @input AssignableType_2[] plantConfigs = {}"

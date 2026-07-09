@@ -39,8 +39,9 @@ export class WateringObject extends BaseScriptComponent {
     if (isNull(plant) || this.consumed) {
       return;
     }
-    plant.water();
-    this.consume();
+    if (plant.water()) {
+      this.consume();
+    }
   }
 
   private getTriggerCollider(): ColliderComponent {
@@ -62,8 +63,9 @@ export class WateringObject extends BaseScriptComponent {
     }
 
     this.lastWaterTime = now;
-    plant.water();
-    this.consume();
+    if (plant.water()) {
+      this.consume();
+    }
   }
 
   private consume(): void {

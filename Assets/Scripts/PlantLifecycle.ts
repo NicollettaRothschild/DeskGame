@@ -12,6 +12,7 @@ export type PlantLifecycleSaveState = {
   babyTimerRemaining: number;
   growthElapsed: number;
   hasBeenWatered: boolean;
+  isPlanted: boolean;
 };
 
 type AnchorPersistence = {
@@ -61,6 +62,9 @@ export class PlantLifecycle extends BaseScriptComponent {
   debugPlantMaterials: boolean = false;
 
   @input
+  requiresPlanting: boolean = true;
+
+  @input
   @allowUndefined
   stageRoot!: SceneObject;
 
@@ -78,6 +82,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private modelLocalBaseY = 0;
   private alignCenterX = 0;
   private alignCenterZ = 0;
+  private isPlanted = false;
 
   onAwake(): void {
     this.debugLog(`awake plantType=${this.plantTypeId}`);
@@ -90,6 +95,16 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   public setAnchorPersistence(persistence: AnchorPersistence): void {
     this.anchorPersistence = persistence;
+  }
+
+  public setPlanted(planted: boolean): void {
+    this.isPlanted = planted;
+    this.updateManipulationForPlantedState();
+    this.notifyAnchorStateChanged();
+  }
+
+  public getIsPlanted(): boolean {
+    return this.isPlanted;
   }
 
   public configurePlant(
@@ -116,9 +131,14 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.showSeed();
   }
 
-  public water(): void {
+  public water(): boolean {
+    if (this.requiresPlanting && !this.isPlanted) {
+      this.debugLog('water ignored: plant is not planted in a pot');
+      return false;
+    }
+
     if (this.currentStage === PlantStage.Adult || this.currentStage === PlantStage.Growing) {
-      return;
+      return false;
     }
 
     this.hasBeenWatered = true;
@@ -130,16 +150,17 @@ export class PlantLifecycle extends BaseScriptComponent {
       this.currentStage = PlantStage.WateredBaby;
       this.showBaby();
       this.notifyAnchorStateChanged();
-      return;
+      return true;
     }
 
     if (this.babyTimerRemaining <= 0) {
       this.startGrowth();
-      return;
+      return true;
     }
 
     this.currentStage = PlantStage.WateredBaby;
     this.notifyAnchorStateChanged();
+    return true;
   }
 
   public getSaveState(): PlantLifecycleSaveState {
@@ -149,6 +170,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       babyTimerRemaining: this.babyTimerRemaining,
       growthElapsed: this.growthElapsed,
       hasBeenWatered: this.hasBeenWatered,
+      isPlanted: this.isPlanted,
     };
   }
 
@@ -158,6 +180,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.babyTimerRemaining = Math.max(0, state.babyTimerRemaining);
     this.growthElapsed = Math.max(0, state.growthElapsed);
     this.currentStage = this.clampStage(state.stage);
+    this.isPlanted = state.isPlanted;
 
     if (this.currentStage === PlantStage.Seed) {
       this.showSeed();
@@ -366,7 +389,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     const stageRoot = this.ensureStageRoot();
     const stageRootWorldToLocal = stageRoot.getTransform().getWorldTransform().inverse();
-    const visuals = this.findChildMeshVisuals(current);
+    const visuals = this.findChildMeshVisuals(current as SceneObject);
     if (visuals.length === 0) {
       return;
     }
@@ -443,7 +466,7 @@ export class PlantLifecycle extends BaseScriptComponent {
         if (isNull(script) || !this.isManipulationScript(script)) {
           continue;
         }
-        script.enabled = true;
+        script.enabled = !this.isPlanted;
         (script as unknown as InteractableManipulationLike).manipulateRootSceneObject = container;
       }
 
@@ -487,7 +510,16 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
-    this.anchorPersistence.persistPlantLifecycleState(this.getSceneObject() as SceneObject);
+    (this.anchorPersistence as AnchorPersistence).persistPlantLifecycleState(this.getSceneObject() as SceneObject);
+  }
+
+  private updateManipulationForPlantedState(): void {
+    const root = this.getSceneObject();
+    if (this.isPlanted) {
+      this.disableManipulationOnHierarchy(root as SceneObject);
+    } else {
+      this.wireManipulationToContainer(root as SceneObject);
+    }
   }
 
   private applyClonedBabyMaterial(root: SceneObject): void {
@@ -538,20 +570,23 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   private destroyCurrentInstances(): void {
     if (!isNull(this.seedInstance)) {
-      this.disableManipulationOnHierarchy(this.seedInstance);
-      this.seedInstance.destroy();
+      const seedInstance = this.seedInstance as SceneObject;
+      this.disableManipulationOnHierarchy(seedInstance);
+      seedInstance.destroy();
       this.seedInstance = null;
     }
 
     if (!isNull(this.babyInstance)) {
-      this.disableManipulationOnHierarchy(this.babyInstance);
-      this.babyInstance.destroy();
+      const babyInstance = this.babyInstance as SceneObject;
+      this.disableManipulationOnHierarchy(babyInstance);
+      babyInstance.destroy();
       this.babyInstance = null;
     }
 
     if (!isNull(this.adultInstance)) {
-      this.disableManipulationOnHierarchy(this.adultInstance);
-      this.adultInstance.destroy();
+      const adultInstance = this.adultInstance as SceneObject;
+      this.disableManipulationOnHierarchy(adultInstance);
+      adultInstance.destroy();
       this.adultInstance = null;
     }
   }

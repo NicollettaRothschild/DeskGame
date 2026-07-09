@@ -1,0 +1,59 @@
+- !<AssetImportMetadata/af89440d-6e82-4e45-9b03-492cd8b2e85b>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 234c4442-35ea-4685-a173-aeca51563df1
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 234c4442-35ea-4685-a173-aeca51563df1
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 7593442c-2870-40fe-b61e-0176a200184d
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/7593442c-2870-40fe-b61e-0176a200184d>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 8c210105-e973-4708-96a9-e9a4dd2aafdd
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    anchorController: false
+    debugLogging: false
+    disablePlantInteractionWhenPlanted: false
+    onlyAcceptSeeds: false
+    plantAttachPoint: false
+    triggerCollider: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - plantAttachPoint: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      triggerCollider: !<reference.ColliderComponent> 00000000-0000-0000-0000-000000000000
+      anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      onlyAcceptSeeds: true
+      disablePlantInteractionWhenPlanted: true
+      debugLogging: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input SceneObject plantAttachPoint
+    - // @input Component.ColliderComponent triggerCollider
+    - // @input Component.ScriptComponent anchorController
+    - // @input bool onlyAcceptSeeds = true
+    - // @input bool disablePlantInteractionWhenPlanted = true
+    - // @input bool debugLogging

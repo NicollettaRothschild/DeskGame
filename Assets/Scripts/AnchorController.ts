@@ -9,8 +9,10 @@ import { WorldAnchor } from 'Spatial Anchors.lspkg/WorldAnchor';
 import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 
-const ANCHOR_CONTROLLER_VERSION = 'v10';
+const ANCHOR_CONTROLLER_VERSION = 'v11';
 const PLANT_LIFECYCLE_SAVE_VERSION = 2;
+const OBJECT_KIND_PLANT = 'plant';
+const OBJECT_KIND_POT = 'pot';
 const WORLD_PREVIEW_FALLBACK_SEC = 1;
 const ANCHOR_SCAN_REMINDER_SEC = 3;
 // Plant collider is 300 units tall, centered on root, with 0.1 scale → 15 cm to desk contact.
@@ -26,6 +28,8 @@ export class AnchorController extends BaseScriptComponent {
   @input camera!: SceneObject;
   @input menuRoot!: SceneObject;
   @input plantPrefab!: ObjectPrefab;
+  @input
+  potPrefabs: ObjectPrefab[] = [];
   @input textlog!: Text;
   @input
   plantConfigs: PlantSpawnConfig[] = [];
@@ -33,6 +37,8 @@ export class AnchorController extends BaseScriptComponent {
   private anchorSession?: AnchorSession;
   private wrappers: SceneObject[] = [];
   private objs: SceneObject[] = [];
+  private objectKinds: string[] = [];
+  private objectPrefabIndices: number[] = [];
   private currentAnchor?: Anchor;
   private floatingRoot?: SceneObject;
   private hasRestored = false;
@@ -446,6 +452,59 @@ export class AnchorController extends BaseScriptComponent {
     return obj;
   }
 
+  public createPotAtWorldPosition(
+    potPrefab: ObjectPrefab,
+    potPrefabIndex: number,
+    worldPos: vec3
+  ): SceneObject | null {
+    const obj = this.spawnTrackedObject(
+      potPrefab,
+      OBJECT_KIND_POT,
+      potPrefabIndex,
+      undefined,
+      true
+    );
+    if (!obj) {
+      return null;
+    }
+
+    obj.getTransform().setWorldPosition(worldPos);
+    this.wirePotPersistence(obj);
+    this.persistPlantTransforms();
+    return obj;
+  }
+
+  public registerPlantedObject(objectRoot: SceneObject): void {
+    const index = this.findTrackedObjectIndex(objectRoot);
+    if (index < 0) {
+      return;
+    }
+
+    this.wirePlantLifecycle(this.objs[index]);
+    this.persistPlantState(global.persistentStorageSystem.store, index, this.objs[index]);
+    this.persistPlantTransforms();
+  }
+
+  public releaseTrackedContentObject(contentRoot: SceneObject): void {
+    const index = this.objs.findIndex((obj) => !isNull(obj) && obj === contentRoot);
+    if (index < 0) {
+      return;
+    }
+
+    const wrapper = this.wrappers[index];
+    this.wrappers.splice(index, 1);
+    this.objs.splice(index, 1);
+    this.objectKinds.splice(index, 1);
+    this.objectPrefabIndices.splice(index, 1);
+
+    if (!isNull(wrapper)) {
+      wrapper.destroy();
+    }
+
+    global.persistentStorageSystem.store.putInt('widget_count', this.wrappers.length);
+    this.persistPlantTransforms();
+  }
+
   private getFloatingRoot(): SceneObject {
     if (!this.floatingRoot) {
       this.floatingRoot = global.scene.createSceneObject('PlantFloatingRoot');
@@ -529,21 +588,39 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   spawnObject(localSpawnPos?: vec3, updateStoredCount = true): SceneObject | null {
+    return this.spawnTrackedObject(
+      this.plantPrefab,
+      OBJECT_KIND_PLANT,
+      -1,
+      localSpawnPos,
+      updateStoredCount
+    );
+  }
+
+  private spawnTrackedObject(
+    prefab: ObjectPrefab,
+    objectKind: string,
+    prefabIndex: number,
+    localSpawnPos?: vec3,
+    updateStoredCount = true
+  ): SceneObject | null {
     this.markSessionPlantsActive();
     const index = this.wrappers.length;
-    const wrapper = global.scene.createSceneObject(`Plant_${index}`);
+    const wrapper = global.scene.createSceneObject(
+      objectKind === OBJECT_KIND_POT ? `Pot_${index}` : `Plant_${index}`
+    );
     wrapper.setParent(this.getSpawnParent());
 
     let obj: SceneObject;
     try {
-      obj = this.plantPrefab.instantiate(wrapper);
+      obj = prefab.instantiate(wrapper);
     } catch (e) {
       print('spawnObject failed: ' + e);
       this.textlog.text = 'Spawn error';
       wrapper.destroy();
       return null;
     }
-    obj.name = `PlantContent_${index}`;
+    obj.name = objectKind === OBJECT_KIND_POT ? `PotContent_${index}` : `PlantContent_${index}`;
 
     if (localSpawnPos) {
       obj.getTransform().setLocalPosition(localSpawnPos);
@@ -551,7 +628,10 @@ export class AnchorController extends BaseScriptComponent {
 
     this.wrappers.push(wrapper);
     this.objs.push(obj);
+    this.objectKinds.push(objectKind);
+    this.objectPrefabIndices.push(prefabIndex);
     this.wirePlantLifecycle(obj);
+    this.wirePotPersistence(obj);
 
     if (updateStoredCount) {
       global.persistentStorageSystem.store.putInt('widget_count', this.wrappers.length);
@@ -560,13 +640,13 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   public persistPlantLifecycleState(plantContainer: SceneObject): void {
-    const index = this.objs.findIndex((obj) => !isNull(obj) && obj === plantContainer);
+    const index = this.findTrackedObjectIndex(plantContainer);
     if (index < 0) {
       return;
     }
 
     const store = global.persistentStorageSystem.store;
-    this.persistPlantState(store, index, plantContainer);
+    this.persistPlantState(store, index, this.objs[index]);
   }
 
   saveObjectPosition() {
@@ -620,10 +700,12 @@ export class AnchorController extends BaseScriptComponent {
       store.putFloat(`w${i}_wry`, worldRot.y);
       store.putFloat(`w${i}_wrz`, worldRot.z);
       store.putFloat(`w${i}_wrw`, worldRot.w);
+      store.putString(`w${i}_object_kind`, this.objectKinds[i] || OBJECT_KIND_PLANT);
+      store.putInt(`w${i}_prefab`, this.objectPrefabIndices[i]);
       this.persistPlantState(store, i, obj);
 
-      print(`Saved plant ${i} local: ${pos.toString()} world: ${worldPos.toString()}`);
-      this.textlog.text = `Saved ${this.objs.length} plant(s)`;
+      print(`Saved ${this.objectKinds[i] || OBJECT_KIND_PLANT} ${i} local: ${pos.toString()} world: ${worldPos.toString()}`);
+      this.textlog.text = `Saved ${this.objs.length} object(s)`;
     }
 
     store.putBool('has_world_data', true);
@@ -680,6 +762,8 @@ export class AnchorController extends BaseScriptComponent {
     this.wrappers.forEach((wrapper) => wrapper.destroy());
     this.wrappers = [];
     this.objs = [];
+    this.objectKinds = [];
+    this.objectPrefabIndices = [];
   }
 
   private restoreAllObjects(useWorldSpace: boolean): number {
@@ -694,7 +778,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     this.clearSpawnedObjects();
-    print(`Restoring ${count} plants (${useWorldSpace ? 'world preview' : 'anchor'} space)`);
+    print(`Restoring ${count} objects (${useWorldSpace ? 'world preview' : 'anchor'} space)`);
 
     let restoredCount = 0;
     for (let i = 0; i < count; i++) {
@@ -704,18 +788,30 @@ export class AnchorController extends BaseScriptComponent {
         continue;
       }
 
-      const wrapper = global.scene.createSceneObject(`Plant_${i}`);
+      const objectKind = store.has(`w${i}_object_kind`)
+        ? store.getString(`w${i}_object_kind`)
+        : OBJECT_KIND_PLANT;
+      const prefabIndex = store.has(`w${i}_prefab`) ? store.getInt(`w${i}_prefab`) : -1;
+      const prefab = this.getPrefabForStoredObject(objectKind, prefabIndex);
+      if (isNull(prefab)) {
+        print(`Skipping object ${i}: missing prefab for kind=${objectKind} index=${prefabIndex}`);
+        continue;
+      }
+
+      const wrapper = global.scene.createSceneObject(
+        objectKind === OBJECT_KIND_POT ? `Pot_${i}` : `Plant_${i}`
+      );
       wrapper.setParent(this.getSpawnParent());
 
       let obj: SceneObject;
       try {
-        obj = this.plantPrefab.instantiate(wrapper);
+        obj = prefab.instantiate(wrapper);
       } catch (e) {
         print('Restore spawn failed: ' + e);
         wrapper.destroy();
         continue;
       }
-      obj.name = `PlantContent_${i}`;
+      obj.name = objectKind === OBJECT_KIND_POT ? `PotContent_${i}` : `PlantContent_${i}`;
 
       if (useWorldSpace) {
         const worldPos = new vec3(
@@ -744,11 +840,14 @@ export class AnchorController extends BaseScriptComponent {
         );
       }
 
-      this.restorePlantState(store, i, obj);
-      this.wirePlantLifecycle(obj);
-
       this.wrappers.push(wrapper);
       this.objs.push(obj);
+      this.objectKinds.push(objectKind);
+      this.objectPrefabIndices.push(prefabIndex);
+
+      this.wirePotPersistence(obj);
+      this.restorePlantState(store, i, obj);
+      this.wirePlantLifecycle(obj);
       restoredCount++;
     }
 
@@ -756,8 +855,8 @@ export class AnchorController extends BaseScriptComponent {
     this.hasRestored = true;
     this.syncPlantCycleFromCount();
     this.textlog.text = restoredCount > 0
-      ? `Restored ${restoredCount} plant(s)`
-      : 'Could not restore saved plants';
+      ? `Restored ${restoredCount} object(s)`
+      : 'Could not restore saved objects';
     return restoredCount;
   }
 
@@ -774,11 +873,14 @@ export class AnchorController extends BaseScriptComponent {
       .forEach(k => store.remove(`w${lastIndex}_${k}`));
     this.removePlantState(store, lastIndex);
     store.remove(`w${lastIndex}_prefab`);
+    store.remove(`w${lastIndex}_object_kind`);
     store.putInt('widget_count', lastIndex);
 
     this.wrappers[lastIndex].destroy();
     this.wrappers.pop();
     this.objs.pop();
+    this.objectKinds.pop();
+    this.objectPrefabIndices.pop();
 
     if (this.objs.length === 0) {
       store.remove('has_world_data');
@@ -812,6 +914,7 @@ export class AnchorController extends BaseScriptComponent {
         .forEach(k => store.remove(`w${i}_${k}`));
       this.removePlantState(store, i);
       store.remove(`w${i}_prefab`);
+      store.remove(`w${i}_object_kind`);
     }
     store.remove('widget_count');
     store.remove('has_world_data');
@@ -871,6 +974,7 @@ export class AnchorController extends BaseScriptComponent {
     store.putFloat(`w${index}_plant_baby_remaining`, state.babyTimerRemaining);
     store.putFloat(`w${index}_plant_growth_elapsed`, state.growthElapsed);
     store.putBool(`w${index}_plant_watered`, state.hasBeenWatered);
+    store.putBool(`w${index}_plant_planted`, state.isPlanted);
   }
 
   private restorePlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
@@ -878,7 +982,7 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
-    const plant = this.findPlantLifecycle(obj);
+    const plant = this.getOrCreateRestoredPlantLifecycle(store, index, obj);
     if (isNull(plant)) {
       return;
     }
@@ -888,7 +992,7 @@ export class AnchorController extends BaseScriptComponent {
       : 'default';
     const config = this.findPlantConfig(plantTypeId);
     if (!isNull(config)) {
-      config.applyToPlant(plant);
+      (config as PlantSpawnConfig).applyToPlant(plant);
     }
 
     const saveVersion = store.has(`w${index}_plant_lifecycle_version`)
@@ -908,8 +1012,41 @@ export class AnchorController extends BaseScriptComponent {
         : 0,
       hasBeenWatered:
         store.has(`w${index}_plant_watered`) && store.getBool(`w${index}_plant_watered`),
+      isPlanted:
+        (store.has(`w${index}_plant_planted`) && store.getBool(`w${index}_plant_planted`)) ||
+        (store.has(`w${index}_object_kind`) && store.getString(`w${index}_object_kind`) === OBJECT_KIND_POT),
     };
     plant.applySaveState(state);
+  }
+
+  private getOrCreateRestoredPlantLifecycle(
+    store: GeneralDataStore,
+    index: number,
+    obj: SceneObject
+  ): PlantLifecycle {
+    const existingPlant = this.findPlantLifecycle(obj);
+    if (!isNull(existingPlant)) {
+      return existingPlant;
+    }
+
+    const isPot = store.has(`w${index}_object_kind`) &&
+      store.getString(`w${index}_object_kind`) === OBJECT_KIND_POT;
+    if (!isPot) {
+      return null as unknown as PlantLifecycle;
+    }
+
+    const pot = this.findPotScript(obj);
+    if (isNull(pot) || typeof pot.createRestoredPlant !== 'function') {
+      print(`Saved pot ${index} has plant state, but its prefab has no PlantPot restore script.`);
+      return null as unknown as PlantLifecycle;
+    }
+
+    const restoredPlant = pot.createRestoredPlant(this.plantPrefab);
+    if (!isNull(restoredPlant)) {
+      restoredPlant.setAnchorPersistence(this);
+    }
+
+    return restoredPlant;
   }
 
   private removePlantState(store: GeneralDataStore, index: number) {
@@ -919,6 +1056,7 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_baby_remaining`);
     store.remove(`w${index}_plant_growth_elapsed`);
     store.remove(`w${index}_plant_watered`);
+    store.remove(`w${index}_plant_planted`);
   }
 
   private getActivePlantConfigs(): PlantSpawnConfig[] {
@@ -965,19 +1103,21 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
-    const plant = this.findPlantLifecycle(obj);
+    const resolvedObj = obj as SceneObject;
+    const resolvedConfig = config as PlantSpawnConfig;
+    const plant = this.findPlantLifecycle(resolvedObj);
     if (isNull(plant)) {
       return;
     }
 
-    config.applyToPlant(plant);
-    const index = this.objs.findIndex((entry) => !isNull(entry) && entry === obj);
+    resolvedConfig.applyToPlant(plant);
+    const index = this.objs.findIndex((entry) => !isNull(entry) && entry === resolvedObj);
     if (index >= 0) {
-      this.persistPlantState(global.persistentStorageSystem.store, index, obj);
+      this.persistPlantState(global.persistentStorageSystem.store, index, resolvedObj);
     }
 
-    print(`Spawned ${config.plantTypeId} (next cycle index ${this.nextPlantSpawnIndex})`);
-    this.textlog.text = `Placed ${config.plantTypeId}`;
+    print(`Spawned ${resolvedConfig.plantTypeId} (next cycle index ${this.nextPlantSpawnIndex})`);
+    this.textlog.text = `Placed ${resolvedConfig.plantTypeId}`;
   }
 
   private findPlantConfig(plantTypeId: string): PlantSpawnConfig | null {
@@ -999,6 +1139,94 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     plant.setAnchorPersistence(this);
+    if (this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT) {
+      plant.setPlanted(true);
+    }
+  }
+
+  private wirePotPersistence(obj: SceneObject): void {
+    const pot = this.findPotScript(obj);
+    if (isNull(pot)) {
+      return;
+    }
+
+    if (typeof pot.setAnchorPersistence === 'function') {
+      pot.setAnchorPersistence(this);
+    }
+  }
+
+  private getPrefabForStoredObject(objectKind: string, prefabIndex: number): ObjectPrefab {
+    if (objectKind === OBJECT_KIND_POT) {
+      if (prefabIndex >= 0 && prefabIndex < this.potPrefabs.length && !isNull(this.potPrefabs[prefabIndex])) {
+        return this.potPrefabs[prefabIndex];
+      }
+      return null as unknown as ObjectPrefab;
+    }
+
+    return this.plantPrefab;
+  }
+
+  private findTrackedObjectIndex(sceneObject: SceneObject): number {
+    for (let i = 0; i < this.objs.length; i++) {
+      const obj = this.objs[i];
+      if (isNull(obj)) {
+        continue;
+      }
+      if (obj === sceneObject || this.isDescendantOf(sceneObject, obj)) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private isDescendantOf(candidate: SceneObject, ancestor: SceneObject): boolean {
+    let current = candidate;
+    while (!isNull(current)) {
+      if (current === ancestor) {
+        return true;
+      }
+      current = current.getParent();
+    }
+    return false;
+  }
+
+  private findPotScript(root: SceneObject): {
+    setAnchorPersistence?: (persistence: AnchorController) => void;
+    createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
+  } {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as {
+          setAnchorPersistence?: (persistence: AnchorController) => void;
+          createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
+        };
+        if (
+          !isNull(candidate) &&
+          (
+            typeof candidate.setAnchorPersistence === 'function' ||
+            typeof candidate.createRestoredPlant === 'function'
+          )
+        ) {
+          return candidate;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null as unknown as {
+      setAnchorPersistence?: (persistence: AnchorController) => void;
+      createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
+    };
   }
 
   private findPlantLifecycle(root: SceneObject): PlantLifecycle {
