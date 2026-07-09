@@ -9,7 +9,11 @@ export class WateringObject extends BaseScriptComponent {
   @input('float')
   waterCooldown: number = 0.25;
 
+  @input
+  destroyAfterWatering: boolean = true;
+
   private lastWaterTime = -999;
+  private consumed = false;
 
   onAwake(): void {
     const collider = this.getTriggerCollider();
@@ -28,10 +32,11 @@ export class WateringObject extends BaseScriptComponent {
   }
 
   public waterPlant(plant: PlantLifecycle): void {
-    if (isNull(plant)) {
+    if (isNull(plant) || this.consumed) {
       return;
     }
     plant.water();
+    this.consume();
   }
 
   private getTriggerCollider(): ColliderComponent {
@@ -43,7 +48,7 @@ export class WateringObject extends BaseScriptComponent {
 
   private tryWaterFromCollider(otherCollider: ColliderComponent): void {
     const now = getTime();
-    if (now - this.lastWaterTime < this.waterCooldown || isNull(otherCollider)) {
+    if (this.consumed || now - this.lastWaterTime < this.waterCooldown || isNull(otherCollider)) {
       return;
     }
 
@@ -54,6 +59,16 @@ export class WateringObject extends BaseScriptComponent {
 
     this.lastWaterTime = now;
     plant.water();
+    this.consume();
+  }
+
+  private consume(): void {
+    if (!this.destroyAfterWatering || this.consumed) {
+      return;
+    }
+
+    this.consumed = true;
+    this.getSceneObject().destroy();
   }
 
   private findPlantInAncestors(sceneObject: SceneObject): PlantLifecycle {

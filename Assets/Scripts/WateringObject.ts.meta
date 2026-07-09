@@ -26,6 +26,7 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    destroyAfterWatering: false
     triggerCollider: false
     waterCooldown: false
   ScriptTypesHidden:
@@ -39,9 +40,11 @@
   DefaultScriptInputs:
     - triggerCollider: !<reference.ColliderComponent> 00000000-0000-0000-0000-000000000000
       waterCooldown: 0.250000
+      destroyAfterWatering: true
   ScriptTypes:
     -
       {}
   InputLines:
     - // @input Component.ColliderComponent triggerCollider
     - // @input float waterCooldown = 0.25
+    - // @input bool destroyAfterWatering = true

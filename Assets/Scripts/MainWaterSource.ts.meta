@@ -1,0 +1,65 @@
+- !<AssetImportMetadata/e8743854-e260-4682-a56d-92377dfa8ccc>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 7f0ed935-3809-4cc5-9e37-5b7124c1a9a7
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 7f0ed935-3809-4cc5-9e37-5b7124c1a9a7
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 1f579bbb-648c-4ae9-be30-2fd5a4411d42
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/1f579bbb-648c-4ae9-be30-2fd5a4411d42>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: bc744732-aa58-4ec6-8642-373d9c589a32
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    allowMultipleActiveWaterObjects: false
+    debugLogging: false
+    fallbackRayDistance: false
+    followInteractorWhileHeld: false
+    sourceInteractable: false
+    spawnForwardOffset: false
+    spawnParent: false
+    wateringObjectPrefab: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - wateringObjectPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      sourceInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      spawnParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnForwardOffset: !<float> 0.000000
+      fallbackRayDistance: !<float> 35.000000
+      followInteractorWhileHeld: true
+      allowMultipleActiveWaterObjects: false
+      debugLogging: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Asset.ObjectPrefab wateringObjectPrefab
+    - // @input Component.ScriptComponent sourceInteractable
+    - // @input SceneObject spawnParent
+    - // @input float spawnForwardOffset
+    - // @input float fallbackRayDistance = 35
+    - // @input bool followInteractorWhileHeld = true
+    - // @input bool allowMultipleActiveWaterObjects
+    - // @input bool debugLogging

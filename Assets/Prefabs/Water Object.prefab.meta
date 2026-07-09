@@ -1,0 +1,216 @@
+- !<AssetImportMetadata/8c5bede6-0b68-4819-a05d-8f5082683eff>
+  ImportedAssetIds:
+    ObjectPrefab: !<reference> b7f179a2-3c43-4257-be7e-15515cfe2138
+  ImporterName: ObjectPrefabImporter
+  PrimaryAsset: !<reference> b7f179a2-3c43-4257-be7e-15515cfe2138
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    ObjectPrefab: !<own> 73bbd30d-be9e-4976-a5ed-55205df4cc6a
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<SceneObject/21a7ab5f-e5ab-4b30-4cb5-b9bccddd437d>
+  PrefabRemaps:
+    []
+  Name: WaterMaterial_Example
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -0.554426, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 7eaaa839-2605-4ce2-6182-bfd99c6cf10f
+- !<ScriptComponent/42ea3728-49a6-45b0-72bb-e53d74aa55fc>
+  PrefabRemaps:
+    []
+  Name: WateringObject
+  Enabled: true
+  ScriptAsset: !<reference> c5e121c7-2453-4b5e-bcd9-74bbb97f41ae
+  ScriptInputsDefault:
+    waterCooldown: true
+    destroyAfterWatering: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      triggerCollider: !<reference.ColliderComponent> 66987a9e-dc16-4bde-41ea-9daa68d701ce
+      waterCooldown: 0.250000
+      destroyAfterWatering: true
+  ScriptTypes:
+    "":
+      {}
+- !<ColliderComponent/66987a9e-dc16-4bde-41ea-9daa68d701ce>
+  PrefabRemaps:
+    []
+  Name: Physics Collider
+  Enabled: true
+  Shape: !<Sphere>
+    FitVisual: true
+    Radius: 6.000000
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<ObjectPrefabAssetData/73bbd30d-be9e-4976-a5ed-55205df4cc6a>
+  Prototype: !<ObjectOwner/01be0c26-4bfb-449e-9c34-c82e4833ab20>
+    PackagePath: ""
+    objects:
+      - !<own> acf61eb3-63d2-4e78-7f16-e8f1fc0d5fc3
+- !<RenderMeshVisual/7eaaa839-2605-4ce2-6182-bfd99c6cf10f>
+  PrefabRemaps:
+    []
+  Name: Render Mesh Visual
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 845da6ca-6433-4848-be46-3d6803c44c5d
+  Mesh: !<reference> f3cc8afc-cb20-4193-bb1a-39f896f0cd9a
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/8cbf58f2-e130-46cd-7611-271ff2ed8dd9>
+  PrefabRemaps:
+    []
+  Name: Render Mesh Visual
+  Enabled: false
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> a57de9e0-4245-4f88-840f-0f1e4189da6a
+  Mesh: !<reference> f3cc8afc-cb20-4193-bb1a-39f896f0cd9a
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/96333f3a-1201-4036-5f14-80f4aca7378d>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: true
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    enableRotation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    enableStretchZ: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    useFilter: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> acf61eb3-63d2-4e78-7f16-e8f1fc0d5fc3
+      enableTranslation: true
+      enableRotation: true
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: true
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: true
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/9c204bde-588a-46a7-6647-43659555a16f>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    ignoreInteractionPlane: true
+    keepHoverOnTrigger: true
+    enableInstantDrag: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: false
+      keepHoverOnTrigger: false
+      enableInstantDrag: false
+      isScrollable: false
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/acf61eb3-63d2-4e78-7f16-e8f1fc0d5fc3>
+  PrefabRemaps:
+    []
+  Name: Water Object
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 51.877960, y: 0.000000, z: -70.704659}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 4.000000, y: 4.000000, z: 4.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 21a7ab5f-e5ab-4b30-4cb5-b9bccddd437d
+  Components:
+    - !<own> 8cbf58f2-e130-46cd-7611-271ff2ed8dd9
+    - !<own> 66987a9e-dc16-4bde-41ea-9daa68d701ce
+    - !<own> 42ea3728-49a6-45b0-72bb-e53d74aa55fc
+    - !<own> 9c204bde-588a-46a7-6647-43659555a16f
+    - !<own> 96333f3a-1201-4036-5f14-80f4aca7378d
