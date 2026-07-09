@@ -122,6 +122,17 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     this.hasBeenWatered = true;
+
+    if (this.currentStage === PlantStage.Seed) {
+      if (this.babyTimerRemaining <= 0) {
+        this.babyTimerRemaining = Math.max(0, this.timeAsBaby);
+      }
+      this.currentStage = PlantStage.WateredBaby;
+      this.showBaby();
+      this.notifyAnchorStateChanged();
+      return;
+    }
+
     if (this.babyTimerRemaining <= 0) {
       this.startGrowth();
       return;
@@ -170,19 +181,12 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
-    if (this.babyTimerRemaining > 0) {
+    if (this.currentStage !== PlantStage.Seed && this.babyTimerRemaining > 0) {
       this.babyTimerRemaining = Math.max(0, this.babyTimerRemaining - getDeltaTime());
     }
 
     if (this.currentStage === PlantStage.WateredBaby && this.babyTimerRemaining <= 0) {
       this.startGrowth();
-      return;
-    }
-
-    if (this.currentStage === PlantStage.Seed && this.babyTimerRemaining <= 0) {
-      this.currentStage = PlantStage.Baby;
-      this.showBaby();
-      this.notifyAnchorStateChanged();
       return;
     }
 

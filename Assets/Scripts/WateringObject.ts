@@ -1,5 +1,9 @@
 import { PlantLifecycle } from './PlantLifecycle';
 
+type InteractableLike = ScriptComponent & {
+  enabled: boolean;
+};
+
 @component
 export class WateringObject extends BaseScriptComponent {
   @input
@@ -68,7 +72,43 @@ export class WateringObject extends BaseScriptComponent {
     }
 
     this.consumed = true;
-    this.getSceneObject().destroy();
+    this.hideDisableAndPark();
+  }
+
+  private hideDisableAndPark(): void {
+    const root = this.getSceneObject();
+    const stack: SceneObject[] = [root];
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      const visuals = current.getComponents('Component.RenderMeshVisual');
+      for (let i = 0; i < visuals.length; i++) {
+        visuals[i].enabled = false;
+      }
+
+      const colliders = current.getComponents('Component.ColliderComponent');
+      for (let i = 0; i < colliders.length; i++) {
+        colliders[i].enabled = false;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i] as unknown as InteractableLike;
+        if (!isNull(script) && script !== this) {
+          script.enabled = false;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    root.getTransform().setWorldPosition(new vec3(0, -10000, 0));
   }
 
   private findPlantInAncestors(sceneObject: SceneObject): PlantLifecycle {

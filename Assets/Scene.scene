@@ -4449,7 +4449,7 @@
   RotationTension: 30.000000
   ForceCompound: false
   Intangible: false
-  ShowCollider: true
+  ShowCollider: false
 - !<Text/d18b537d-65d7-4855-a57f-5c8662614e99>
   PrefabRemaps:
     []
