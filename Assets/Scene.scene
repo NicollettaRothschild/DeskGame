@@ -2082,6 +2082,16 @@
         - !<reference> d8530748-4910-4ceb-afa4-40d3eeec328d
         - !<reference> 254db73f-25bd-4bad-b900-861a7d7115da
         - !<reference> 8bfe1920-359f-449a-b002-027b3e46e7cd
+      soundVolume: 1.250000
+      soundDebugLogging: true
+      wateringTrack: !<reference.AudioTrackAsset> d0f9a159-80c5-43d0-98fe-d1aafff3e650
+      plantSeedTrack: !<reference.AudioTrackAsset> 5bd75a56-eecd-4a33-95e7-953fffdfa61e
+      growthStartTrack: !<reference.AudioTrackAsset> 16ae53ef-15b4-4762-9863-70aaaa1ba6c0
+      growthCompleteTrack: !<reference.AudioTrackAsset> eac8c7ee-a110-49fc-be16-5869ff32a35d
+      spawnSeedTrack: !<reference.AudioTrackAsset> 8fbd17f5-a9d9-4dd0-8964-8d022df254ab
+      spawnPotTrack: !<reference.AudioTrackAsset> c3a74a51-d7e1-4567-99fe-569fec255ed6
+      spawnWaterTrack: !<reference.AudioTrackAsset> 18682cb4-7f4d-41cb-a3b4-c8074ca2def9
+      placeObjectTrack: !<reference.AudioTrackAsset> 0c246528-b9e9-4db2-97d5-46649ae9f36b
   ScriptTypes:
     "":
       {}
@@ -4851,6 +4861,30 @@
     - !<own> a127d50f-e78f-48b8-82d0-3874cce131c9
   Components:
     - !<own> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
+    - !<own> fb55e56a-01ac-4275-8f61-affd345e061a
+    - !<own> 86a97912-cfb2-430c-a999-629b0d721ce3
+    - !<own> 8fbe2c3f-c08b-4a38-8050-a65b3d859369
+    - !<own> c8b7a6cd-d7ba-493f-9f09-ad5c0d46ad65
+- !<AudioComponent/fb55e56a-01ac-4275-8f61-affd345e061a>
+  PrefabRemaps:
+    []
+  Name: Audio
+  Enabled: true
+- !<AudioComponent/86a97912-cfb2-430c-a999-629b0d721ce3>
+  PrefabRemaps:
+    []
+  Name: Audio
+  Enabled: true
+- !<AudioComponent/8fbe2c3f-c08b-4a38-8050-a65b3d859369>
+  PrefabRemaps:
+    []
+  Name: Audio
+  Enabled: true
+- !<AudioComponent/c8b7a6cd-d7ba-493f-9f09-ad5c0d46ad65>
+  PrefabRemaps:
+    []
+  Name: Audio
+  Enabled: true
 - !<ScreenTransform/d36216bd-792a-43a6-be71-1656039955f0>
   PrefabRemaps:
     []

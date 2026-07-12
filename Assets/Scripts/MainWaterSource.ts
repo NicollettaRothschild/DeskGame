@@ -1,3 +1,5 @@
+import { playInteractionSound } from './InteractionSoundRegistry';
+
 type PublicEventLike<T> = {
   add(callback: (event: T) => void): void;
 };
@@ -189,6 +191,7 @@ export class MainWaterSource extends BaseScriptComponent {
     const waterObject = this.wateringObjectPrefab.instantiate(parent);
     waterObject.name = 'WateringObject';
     waterObject.getTransform().setWorldPosition(this.applySpawnOffset(worldPosition, interactor));
+    playInteractionSound((sounds) => sounds.playSpawnWater());
     this.debugLog(`spawned ${waterObject.name}.`);
     return waterObject;
   }

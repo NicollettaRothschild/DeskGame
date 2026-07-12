@@ -1,3 +1,5 @@
+import { playInteractionSound } from './InteractionSoundRegistry';
+
 export enum PlantStage {
   Seed = 0,
   Baby = 1,
@@ -245,6 +247,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     if (this.currentStage === PlantStage.Seed) {
       this.startGrowth();
+      playInteractionSound((sounds) => sounds.playWatering());
       print(
         `[PlantLifecycle] ${this.getSceneObject().name}: watered seed -> growing (${this.growthTime.toFixed(1)}s to adult)`
       );
@@ -256,6 +259,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       this.currentStage === PlantStage.WateredBaby
     ) {
       this.startGrowth();
+      playInteractionSound((sounds) => sounds.playWatering());
       print(`[PlantLifecycle] ${this.getSceneObject().name}: legacy baby stage skipped -> growing`);
       return true;
     }
@@ -371,6 +375,7 @@ export class PlantLifecycle extends BaseScriptComponent {
         this.applyAdultScale();
         this.updateInteractionForPlantedState();
         this.notifyAnchorStateChanged();
+        playInteractionSound((sounds) => sounds.playGrowthComplete());
         print(`[PlantLifecycle] ${this.getSceneObject().name}: growth complete -> adult`);
       }
     }
@@ -381,6 +386,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.growthElapsed = 0;
     this.showAdultAtGrowthScale();
     this.notifyAnchorStateChanged();
+    playInteractionSound((sounds) => sounds.playGrowthStart());
     print(
       `[PlantLifecycle] ${this.getSceneObject().name}: started growing (${this.growthTime.toFixed(1)}s to adult)`
     );

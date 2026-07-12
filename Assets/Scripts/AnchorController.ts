@@ -8,6 +8,7 @@ import { AnchorComponent } from 'Spatial Anchors.lspkg/AnchorComponent';
 import { WorldAnchor } from 'Spatial Anchors.lspkg/WorldAnchor';
 import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
+import { InteractionSoundRegistry, playInteractionSound } from './InteractionSoundRegistry';
 
 const ANCHOR_CONTROLLER_VERSION = 'v11';
 const PLANT_LIFECYCLE_SAVE_VERSION = 4;
@@ -34,6 +35,44 @@ export class AnchorController extends BaseScriptComponent {
   @input
   plantConfigs: PlantSpawnConfig[] = [];
 
+  @input('float')
+  soundVolume: number = 1.25;
+
+  @input
+  soundDebugLogging: boolean = true;
+
+  @input
+  @allowUndefined
+  wateringTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  plantSeedTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  growthStartTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  growthCompleteTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  spawnSeedTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  spawnPotTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  spawnWaterTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  placeObjectTrack!: AudioTrackAsset;
+
   private anchorSession?: AnchorSession;
   private wrappers: SceneObject[] = [];
   private objs: SceneObject[] = [];
@@ -58,10 +97,30 @@ export class AnchorController extends BaseScriptComponent {
   private nextPlantSpawnIndex = 0;
 
   onAwake() {
+    this.setupInteractionSounds();
     this.createEvent('OnStartEvent').bind(() => this.onStart());
   }
 
+  private setupInteractionSounds(): void {
+    InteractionSoundRegistry.configure(
+      this.getSceneObject(),
+      {
+        watering: this.wateringTrack,
+        plantSeed: this.plantSeedTrack,
+        growthStart: this.growthStartTrack,
+        growthComplete: this.growthCompleteTrack,
+        spawnSeed: this.spawnSeedTrack,
+        spawnPot: this.spawnPotTrack,
+        spawnWater: this.spawnWaterTrack,
+        placeObject: this.placeObjectTrack,
+      },
+      this.soundVolume,
+      this.soundDebugLogging
+    );
+  }
+
   async onStart() {
+    this.setupInteractionSounds();
     print(`AnchorController ${ANCHOR_CONTROLLER_VERSION} starting`);
     const anchorSessionOptions = new AnchorSessionOptions();
     anchorSessionOptions.scanForWorldAnchors = true;
@@ -474,6 +533,7 @@ export class AnchorController extends BaseScriptComponent {
     obj.getTransform().setWorldPosition(worldPos);
     this.wirePotPersistence(obj);
     this.persistPlantTransforms();
+    playInteractionSound((sounds) => sounds.playSpawnPot());
     return obj;
   }
 
@@ -666,6 +726,9 @@ export class AnchorController extends BaseScriptComponent {
     if (updateStoredCount) {
       global.persistentStorageSystem.store.putInt('widget_count', this.wrappers.length);
     }
+    if (objectKind === OBJECT_KIND_PLANT) {
+      playInteractionSound((sounds) => sounds.playSpawnSeed());
+    }
     return obj;
   }
 
@@ -695,6 +758,9 @@ export class AnchorController extends BaseScriptComponent {
 
     this.restoredFromWorldFallback = false;
     this.persistPlantTransforms();
+    if (!this.anchorCreationInProgress) {
+      playInteractionSound((sounds) => sounds.playPlaceObject());
+    }
     this.trySaveAnchorOnce();
   }
 

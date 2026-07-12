@@ -1,0 +1,77 @@
+- !<AssetImportMetadata/a99f77f1-d96e-4022-9f5d-0838627d36b1>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> f3fae02d-d3b4-42c8-a053-a2b72f0b45b7
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> f3fae02d-d3b4-42c8-a053-a2b72f0b45b7
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> b7a57a10-fecf-4b46-9f6f-d4d87475c52b
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/b7a57a10-fecf-4b46-9f6f-d4d87475c52b>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 55262f22-0c7b-4f6f-bbce-a855cba7e870
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    audioPlayer: false
+    debugLogging: false
+    growthCompleteTrack: false
+    growthStartTrack: false
+    minReplayInterval: false
+    placeObjectTrack: false
+    plantSeedTrack: false
+    spawnPotTrack: false
+    spawnSeedTrack: false
+    spawnWaterTrack: false
+    volume: false
+    wateringTrack: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - audioPlayer: !<reference.AudioComponent> 00000000-0000-0000-0000-000000000000
+      volume: !<float> 1.000000
+      minReplayInterval: 0.080000
+      debugLogging: true
+      wateringTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      plantSeedTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      growthStartTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      growthCompleteTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      spawnSeedTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      spawnPotTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      spawnWaterTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      placeObjectTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Component.AudioComponent audioPlayer
+    - // @input float volume = 1.25
+    - // @input float minReplayInterval = 0.05
+    - // @input bool debugLogging = true
+    - // @input Asset.AudioTrackAsset wateringTrack
+    - // @input Asset.AudioTrackAsset plantSeedTrack
+    - // @input Asset.AudioTrackAsset growthStartTrack
+    - // @input Asset.AudioTrackAsset growthCompleteTrack
+    - // @input Asset.AudioTrackAsset spawnSeedTrack
+    - // @input Asset.AudioTrackAsset spawnPotTrack
+    - // @input Asset.AudioTrackAsset spawnWaterTrack
+    - // @input Asset.AudioTrackAsset placeObjectTrack

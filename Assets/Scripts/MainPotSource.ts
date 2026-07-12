@@ -1,3 +1,5 @@
+import { playInteractionSound } from './InteractionSoundRegistry';
+
 type PublicEventLike<T> = {
   add(callback: (event: T) => void): void;
 };
@@ -219,6 +221,7 @@ export class MainPotSource extends BaseScriptComponent {
 
     const spawnedPot = potObject as SceneObject;
     spawnedPot.name = `Pot_${prefabIndex}`;
+    playInteractionSound((sounds) => sounds.playSpawnPot());
     this.debugLog(`spawned ${spawnedPot.name}.`);
     return spawnedPot;
   }

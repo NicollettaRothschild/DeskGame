@@ -1,4 +1,5 @@
 import { PlantLifecycle, PlantStage } from './PlantLifecycle';
+import { playInteractionSound } from './InteractionSoundRegistry';
 
 type AnchorPersistence = {
   registerPlantedObject(objectRoot: SceneObject): void;
@@ -159,6 +160,7 @@ export class PlantPot extends BaseScriptComponent {
       (this.anchorPersistence as AnchorPersistence).registerPlantedObject(this.getSceneObject() as SceneObject);
     }
 
+    playInteractionSound((sounds) => sounds.playPlantSeed());
     this.debugLog(`planted ${plantRoot.name}`);
   }
 

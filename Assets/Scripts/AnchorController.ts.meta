@@ -29,11 +29,21 @@
     anchorComponent: false
     anchorModule: false
     camera: false
+    growthCompleteTrack: false
+    growthStartTrack: false
     menuRoot: false
+    placeObjectTrack: false
     plantConfigs: false
     plantPrefab: false
+    plantSeedTrack: false
     potPrefabs: false
+    soundDebugLogging: false
+    soundVolume: false
+    spawnPotTrack: false
+    spawnSeedTrack: false
+    spawnWaterTrack: false
     textlog: false
+    wateringTrack: false
     widgetParent: false
   ScriptTypesHidden:
     {}
