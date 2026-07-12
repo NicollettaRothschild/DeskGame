@@ -1,4 +1,5 @@
 import { PlantLifecycle } from './PlantLifecycle';
+import { PlantPot } from './PlantPot';
 
 type InteractableLike = ScriptComponent & {
   enabled: boolean;
@@ -57,7 +58,7 @@ export class WateringObject extends BaseScriptComponent {
       return;
     }
 
-    const plant = this.findPlantInAncestors(otherCollider.getSceneObject());
+    const plant = this.findPlantFromCollider(otherCollider.getSceneObject());
     if (isNull(plant)) {
       return;
     }
@@ -66,6 +67,36 @@ export class WateringObject extends BaseScriptComponent {
     if (plant.water()) {
       this.consume();
     }
+  }
+
+  private findPlantFromCollider(sceneObject: SceneObject): PlantLifecycle {
+    const fromAncestors = this.findPlantInAncestors(sceneObject);
+    if (!isNull(fromAncestors)) {
+      return fromAncestors;
+    }
+
+    return this.findPlantFromPot(sceneObject);
+  }
+
+  private findPlantFromPot(sceneObject: SceneObject): PlantLifecycle {
+    let current = sceneObject;
+    while (!isNull(current)) {
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const pot = scripts[i] as unknown as PlantPot;
+        if (
+          !isNull(pot) &&
+          typeof pot.tryWaterPlantedPlant === 'function' &&
+          typeof pot.getPlantedLifecycle === 'function' &&
+          !isNull(pot.getPlantedLifecycle())
+        ) {
+          return pot.getPlantedLifecycle() as PlantLifecycle;
+        }
+      }
+      current = current.getParent();
+    }
+
+    return null as unknown as PlantLifecycle;
   }
 
   private consume(): void {

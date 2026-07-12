@@ -115,6 +115,18 @@ export class PlantPot extends BaseScriptComponent {
     this.attachPlant(plant);
   }
 
+  public getPlantedLifecycle(): PlantLifecycle | null {
+    return this.plantedPlant;
+  }
+
+  public tryWaterPlantedPlant(): boolean {
+    if (isNull(this.plantedPlant)) {
+      return false;
+    }
+
+    return (this.plantedPlant as PlantLifecycle).water();
+  }
+
   private attachPlant(plant: PlantLifecycle): void {
     const plantRoot = plant.getSceneObject();
     const attachPoint = this.getAttachPoint();

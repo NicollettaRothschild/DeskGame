@@ -140,11 +140,12 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   public water(): boolean {
     if (this.requiresPlanting && !this.isPlanted) {
-      this.debugLog('water ignored: plant is not planted in a pot');
+      print(`[PlantLifecycle] ${this.getSceneObject().name}: water ignored (seed must be planted in a pot)`);
       return false;
     }
 
     if (this.currentStage === PlantStage.Adult || this.currentStage === PlantStage.Growing) {
+      print(`[PlantLifecycle] ${this.getSceneObject().name}: water ignored (stage=${this.currentStage})`);
       return false;
     }
 
@@ -157,16 +158,21 @@ export class PlantLifecycle extends BaseScriptComponent {
       this.currentStage = PlantStage.WateredBaby;
       this.showBaby();
       this.notifyAnchorStateChanged();
+      print(
+        `[PlantLifecycle] ${this.getSceneObject().name}: watered seed -> baby (${this.babyTimerRemaining.toFixed(1)}s until growth)`
+      );
       return true;
     }
 
     if (this.babyTimerRemaining <= 0) {
       this.startGrowth();
+      print(`[PlantLifecycle] ${this.getSceneObject().name}: watered baby -> growing`);
       return true;
     }
 
     this.currentStage = PlantStage.WateredBaby;
     this.notifyAnchorStateChanged();
+    print(`[PlantLifecycle] ${this.getSceneObject().name}: re-watered baby (${this.babyTimerRemaining.toFixed(1)}s remaining)`);
     return true;
   }
 
@@ -221,6 +227,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     if (this.currentStage === PlantStage.WateredBaby && this.babyTimerRemaining <= 0) {
+      print(`[PlantLifecycle] ${this.getSceneObject().name}: baby stage complete -> growing`);
       this.startGrowth();
       return;
     }
@@ -238,6 +245,7 @@ export class PlantLifecycle extends BaseScriptComponent {
         }
         this.updateInteractionForPlantedState();
         this.notifyAnchorStateChanged();
+        print(`[PlantLifecycle] ${this.getSceneObject().name}: growth complete -> adult`);
       }
     }
   }
@@ -247,6 +255,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.growthElapsed = 0;
     this.showAdultAtGrowthScale();
     this.notifyAnchorStateChanged();
+    print(
+      `[PlantLifecycle] ${this.getSceneObject().name}: started growing (${this.growthTime.toFixed(1)}s to adult)`
+    );
   }
 
   private ensureStageRoot(): SceneObject {
@@ -616,19 +627,6 @@ export class PlantLifecycle extends BaseScriptComponent {
     return null;
   }
 
-  private flattenMeshChildRotations(model: SceneObject): void {
-    for (let i = 0; i < model.getChildrenCount(); i++) {
-      const child = model.getChild(i);
-      child.getTransform().setLocalRotation(quat.quatIdentity());
-    }
-  }
-
-  private getPlantedModelRotation(): quat {
-    const degToRad = Math.PI / 180;
-    // Baby/adult meshes need the export -90° X correction when potted.
-    return quat.angleAxis(90 * degToRad, new vec3(1, 0, 0));
-  }
-
   private applyPlantedModelOrientation(): void {
     const model = this.getActiveStageModel();
     if (isNull(model)) {
@@ -639,15 +637,6 @@ export class PlantLifecycle extends BaseScriptComponent {
     const modelTransform = modelObject.getTransform();
     const modelScale = modelTransform.getLocalScale();
     modelTransform.setLocalPosition(vec3.zero());
-
-    if (this.currentStage === PlantStage.Seed) {
-      // Keep existing mesh child rotations from the prefab; only re-center position.
-      modelTransform.setLocalScale(modelScale);
-      return;
-    }
-
-    this.flattenMeshChildRotations(modelObject);
-    modelTransform.setLocalRotation(this.getPlantedModelRotation());
     modelTransform.setLocalScale(modelScale);
   }
 

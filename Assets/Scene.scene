@@ -300,7 +300,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 9aad76a1-bc12-4240-98ba-24aaa567d629
       plantTexture: !<reference.Texture> 5b09bf69-0b5e-4f75-9f6c-350ee111a495
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
@@ -981,7 +981,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 1d4c82fa-cdcf-46f6-896d-91981b6348be
       plantTexture: !<reference.Texture> 50d8cd6c-8232-45d5-9170-426767a74e54
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
@@ -1379,7 +1379,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 3cfb6405-f9f3-4833-8fad-9cae640edbac
       plantTexture: !<reference.Texture> 757b9441-2b6e-46d2-aad3-5352d1541bae
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
@@ -3262,7 +3262,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> afea2046-cab2-41de-96f0-d77ad0b2727c
       plantTexture: !<reference.Texture> 25eee41e-c6cb-4446-8b39-b7d750393681
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
@@ -3599,7 +3599,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 39298147-23b1-42c2-a41b-68d2d4da86aa
       plantTexture: !<reference.Texture> d0cf4b09-f60f-47da-9e92-2be2930bde55
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
@@ -3773,7 +3773,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> 46f60114-a93d-4950-a76a-bc581144e956
       plantTexture: !<reference.Texture> f57092a3-8a9a-4f70-8d8a-e11183c6509b
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
@@ -5429,7 +5429,7 @@
       adultPlantPrefab: !<reference.ObjectPrefab> ecc145e3-0a58-44a3-a9b5-53b3d853e3b7
       plantTexture: !<reference.Texture> dd73e477-2c2b-45e0-9d1b-02540660cd70
       timeAsBaby: !<float> 30.000000
-      growthTime: !<float> 1.000000
+      growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
   ScriptTypes:
     "":
