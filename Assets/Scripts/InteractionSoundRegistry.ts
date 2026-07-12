@@ -76,6 +76,10 @@ export class InteractionSoundRegistry {
     InteractionSoundRegistry.play('placeObject', InteractionSoundRegistry.tracks.placeObject);
   }
 
+  public static playWaterSplash(): void {
+    InteractionSoundRegistry.play('waterSplash', InteractionSoundRegistry.tracks.watering);
+  }
+
   private static collectPlayers(host: SceneObject): void {
     const players: AudioComponent[] = [];
     const components = host.getComponents('Component.AudioComponent') as AudioComponent[];

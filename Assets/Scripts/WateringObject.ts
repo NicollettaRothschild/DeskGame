@@ -1,6 +1,8 @@
 import { PlantLifecycle } from './PlantLifecycle';
 import { PlantPot } from './PlantPot';
 
+import { playInteractionSound } from './InteractionSoundRegistry';
+
 type InteractableLike = ScriptComponent & {
   enabled: boolean;
 };
@@ -17,8 +19,15 @@ export class WateringObject extends BaseScriptComponent {
   @input
   destroyAfterWatering: boolean = true;
 
+  @input
+  expireIfUnused: boolean = true;
+
+  @input('float')
+  unusedLifetime: number = 15;
+
   private lastWaterTime = -999;
   private consumed = false;
+  private expireEvent: DelayedCallbackEvent | null = null;
 
   onAwake(): void {
     const collider = this.getTriggerCollider();
@@ -42,6 +51,24 @@ export class WateringObject extends BaseScriptComponent {
     }
     if (plant.water()) {
       this.consume();
+    }
+  }
+
+  public beginUnusedLifetime(): void {
+    if (this.consumed || !this.expireIfUnused || this.unusedLifetime <= 0) {
+      return;
+    }
+
+    this.cancelUnusedLifetime();
+    this.expireEvent = this.createEvent('DelayedCallbackEvent');
+    this.expireEvent.bind(() => this.expireUnusedWater());
+    this.expireEvent.reset(this.unusedLifetime);
+  }
+
+  public cancelUnusedLifetime(): void {
+    if (!isNull(this.expireEvent)) {
+      this.expireEvent.enabled = false;
+      this.expireEvent = null;
     }
   }
 
@@ -100,12 +127,29 @@ export class WateringObject extends BaseScriptComponent {
   }
 
   private consume(): void {
-    if (!this.destroyAfterWatering || this.consumed) {
+    if (this.consumed) {
       return;
     }
 
     this.consumed = true;
+    this.cancelUnusedLifetime();
+
+    if (!this.destroyAfterWatering) {
+      return;
+    }
+
     this.hideDisableAndPark();
+  }
+
+  private expireUnusedWater(): void {
+    if (this.consumed) {
+      return;
+    }
+
+    this.consumed = true;
+    this.cancelUnusedLifetime();
+    playInteractionSound((sounds) => sounds.playWaterSplash());
+    this.getSceneObject().destroy();
   }
 
   private hideDisableAndPark(): void {

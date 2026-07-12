@@ -1,4 +1,5 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
+import { WateringObject } from './WateringObject';
 
 type PublicEventLike<T> = {
   add(callback: (event: T) => void): void;
@@ -75,11 +76,19 @@ export class MainWaterSource extends BaseScriptComponent {
   }
 
   public spawnWaterAtSource(): SceneObject | null {
-    return this.spawnWater(this.getSceneObject().getTransform().getWorldPosition(), null);
+    const waterObject = this.spawnWater(this.getSceneObject().getTransform().getWorldPosition(), null);
+    if (!isNull(waterObject)) {
+      this.beginUnusedLifetime(waterObject);
+    }
+    return waterObject;
   }
 
   public spawnWaterAtWorldPosition(worldPosition: vec3): SceneObject | null {
-    return this.spawnWater(worldPosition, null);
+    const waterObject = this.spawnWater(worldPosition, null);
+    if (!isNull(waterObject)) {
+      this.beginUnusedLifetime(waterObject);
+    }
+    return waterObject;
   }
 
   private bindInteractable(interactable: InteractableLike): void {
@@ -300,13 +309,32 @@ export class MainWaterSource extends BaseScriptComponent {
   }
 
   private releaseActivePull(): void {
-    if (!isNull(this.activePull)) {
+    if (!isNull(this.activePull) && !isNull(this.activePull.waterObject)) {
+      this.beginUnusedLifetime(this.activePull.waterObject);
       this.debugLog('released active water pull.');
     }
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
       this.updateEvent.enabled = false;
     }
+  }
+
+  private beginUnusedLifetime(waterObject: SceneObject): void {
+    const wateringObject = this.findWateringObject(waterObject);
+    if (!isNull(wateringObject)) {
+      wateringObject.beginUnusedLifetime();
+    }
+  }
+
+  private findWateringObject(sceneObject: SceneObject): WateringObject | null {
+    const scripts = sceneObject.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as unknown as WateringObject;
+      if (!isNull(candidate) && typeof candidate.beginUnusedLifetime === 'function') {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   private debugLog(message: string): void {
