@@ -28,6 +28,8 @@
   ScriptInputsDefault:
     waterCooldown: true
     destroyAfterWatering: true
+    expireIfUnused: true
+    unusedLifetime: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -35,6 +37,8 @@
       triggerCollider: !<reference.ColliderComponent> 66987a9e-dc16-4bde-be15-62559728fe31
       waterCooldown: 0.250000
       destroyAfterWatering: true
+      expireIfUnused: true
+      unusedLifetime: !<float> 15.000000
   ScriptTypes:
     "":
       {}

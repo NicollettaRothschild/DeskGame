@@ -65,6 +65,16 @@
       textlog: !<reference.Text> 00000000-0000-0000-0000-000000000000
       plantConfigs: !<MappingBased.AssignableType_2[]>
         []
+      soundVolume: 1.250000
+      soundDebugLogging: true
+      wateringTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      plantSeedTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      growthStartTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      growthCompleteTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      spawnSeedTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      spawnPotTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      spawnWaterTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      placeObjectTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
@@ -78,3 +88,13 @@
     - "// @input Asset.ObjectPrefab[] potPrefabs = {}"
     - // @input Component.Text textlog
     - "// @input AssignableType_2[] plantConfigs = {}"
+    - // @input float soundVolume = 1.25
+    - // @input bool soundDebugLogging = true
+    - // @input Asset.AudioTrackAsset wateringTrack
+    - // @input Asset.AudioTrackAsset plantSeedTrack
+    - // @input Asset.AudioTrackAsset growthStartTrack
+    - // @input Asset.AudioTrackAsset growthCompleteTrack
+    - // @input Asset.AudioTrackAsset spawnSeedTrack
+    - // @input Asset.AudioTrackAsset spawnPotTrack
+    - // @input Asset.AudioTrackAsset spawnWaterTrack
+    - // @input Asset.AudioTrackAsset placeObjectTrack

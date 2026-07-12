@@ -27,7 +27,7 @@
   Enabled: true
   ScriptAsset: !<reference> cc8472ba-c631-4712-b55b-16b421254ae7
   ScriptInputsDefault:
-    growthTime: true
+    timeAsBaby: true
     hasBeenWatered: true
     debugPlantMaterials: true
     requiresPlanting: true

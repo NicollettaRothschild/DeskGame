@@ -30,7 +30,6 @@
     debugLogging: false
     growthCompleteTrack: false
     growthStartTrack: false
-    minReplayInterval: false
     placeObjectTrack: false
     plantSeedTrack: false
     spawnPotTrack: false
@@ -49,7 +48,6 @@
   DefaultScriptInputs:
     - audioPlayer: !<reference.AudioComponent> 00000000-0000-0000-0000-000000000000
       volume: !<float> 1.000000
-      minReplayInterval: 0.080000
       debugLogging: true
       wateringTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       plantSeedTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -65,7 +63,6 @@
   InputLines:
     - // @input Component.AudioComponent audioPlayer
     - // @input float volume = 1.25
-    - // @input float minReplayInterval = 0.05
     - // @input bool debugLogging = true
     - // @input Asset.AudioTrackAsset wateringTrack
     - // @input Asset.AudioTrackAsset plantSeedTrack

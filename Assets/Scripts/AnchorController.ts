@@ -537,6 +537,25 @@ export class AnchorController extends BaseScriptComponent {
     return obj;
   }
 
+  public createSeedAtWorldPosition(worldPos: vec3): SceneObject | null {
+    const config = this.getNextPlantConfig();
+    const obj = this.spawnTrackedObject(
+      this.plantPrefab,
+      OBJECT_KIND_PLANT,
+      -1,
+      undefined,
+      true
+    );
+    if (!obj) {
+      return null;
+    }
+
+    obj.getTransform().setWorldPosition(worldPos);
+    this.applyPlantConfig(obj, config);
+    this.persistPlantTransforms();
+    return obj;
+  }
+
   public registerPlantedObject(objectRoot: SceneObject): void {
     const index = this.findTrackedObjectIndex(objectRoot);
     if (index < 0) {

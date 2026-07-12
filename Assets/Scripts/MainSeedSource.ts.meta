@@ -1,0 +1,72 @@
+- !<AssetImportMetadata/f5a10af5-f13d-41f0-a97e-bf1beea944ac>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 5ebcbd7e-859e-4c10-b5ff-79c541179c59
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 5ebcbd7e-859e-4c10-b5ff-79c541179c59
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> f0ec1090-bf72-4135-8e31-0471cc534133
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/f0ec1090-bf72-4135-8e31-0471cc534133>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 0bfcd9c9-5aa6-45d6-ac9c-1d3c3fc3422e
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    allowMultipleActiveSeeds: false
+    anchorController: false
+    debugLogging: false
+    fallbackRayDistance: false
+    followInteractorWhileHeld: false
+    plantSpawnConfigs: false
+    seedPrefab: false
+    sourceInteractable: false
+    spawnForwardOffset: false
+    spawnParent: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - seedPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      plantSpawnConfigs: !<MappingBased.AssignableType[]>
+        []
+      anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      sourceInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      spawnParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnForwardOffset: !<float> 0.000000
+      fallbackRayDistance: !<float> 35.000000
+      followInteractorWhileHeld: true
+      allowMultipleActiveSeeds: false
+      debugLogging: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Asset.ObjectPrefab seedPrefab
+    - "// @input AssignableType[] plantSpawnConfigs = {}"
+    - // @input Component.ScriptComponent anchorController
+    - // @input Component.ScriptComponent sourceInteractable
+    - // @input SceneObject spawnParent
+    - // @input float spawnForwardOffset
+    - // @input float fallbackRayDistance = 35
+    - // @input bool followInteractorWhileHeld = true
+    - // @input bool allowMultipleActiveSeeds
+    - // @input bool debugLogging

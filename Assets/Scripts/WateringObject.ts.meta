@@ -27,7 +27,9 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     destroyAfterWatering: false
+    expireIfUnused: false
     triggerCollider: false
+    unusedLifetime: false
     waterCooldown: false
   ScriptTypesHidden:
     {}
@@ -41,6 +43,8 @@
     - triggerCollider: !<reference.ColliderComponent> 00000000-0000-0000-0000-000000000000
       waterCooldown: 0.250000
       destroyAfterWatering: true
+      expireIfUnused: true
+      unusedLifetime: !<float> 15.000000
   ScriptTypes:
     -
       {}
@@ -48,3 +52,5 @@
     - // @input Component.ColliderComponent triggerCollider
     - // @input float waterCooldown = 0.25
     - // @input bool destroyAfterWatering = true
+    - // @input bool expireIfUnused = true
+    - // @input float unusedLifetime = 15
