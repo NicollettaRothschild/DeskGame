@@ -1,0 +1,37 @@
+- !<NativePackageDescriptor/802dc43a-cd49-4987-8fe8-a66289893f1f>
+  PackagePath: ""
+  StudioVersion:
+    major: 5
+    minor: 15
+    patch: 1
+    build: 25102815
+    type: Unset
+    buildFlavor: ""
+    timestamp: 0
+    commit: ""
+  Description: "Office Pack Bitmoji Office Pack includes 10 different 3D models with Bitmoji's unique style: • speech podium • pen • paperwork • monitor • cd case • cd • wall calendar • calculator • trash bin • open bin Click here to learn on Place Your Object in World Click here to learn more about Tracking Modes"
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  UpdateCheckpoint: 76
+  ExportUid: b09cd77c-8f72-4c2b-856c-270179c3dc24
+  ComponentUid: e2747132-fbb6-4dc2-bf65-f2d439669282
+  PackagePolicy: CanBeUnpackedTransparent
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  Instantiable: !<reference> 00000000-0000-0000-0000-000000000000
+  AssetLibraryDependencyStructure: !<AssetLibraryDependencyStructure>
+    Name: ""
+    AssetId: ""
+    Hash: ""
+    Version:
+      major: 0
+      minor: 0
+      patch: 0
+      build: 0

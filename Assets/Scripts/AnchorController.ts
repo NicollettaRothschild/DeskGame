@@ -573,7 +573,46 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
+    this.removeTrackedObjectAt(index);
+  }
+
+  public getTrackedContentRoot(candidate: SceneObject): SceneObject | null {
+    const index = this.findTrackedObjectIndex(candidate);
+    if (index < 0) {
+      return null;
+    }
+    return this.objs[index];
+  }
+
+  public getTrackedContentRoots(): SceneObject[] {
+    const roots: SceneObject[] = [];
+    for (let i = 0; i < this.objs.length; i++) {
+      if (!isNull(this.objs[i])) {
+        roots.push(this.objs[i]);
+      }
+    }
+    return roots;
+  }
+
+  public destroyTrackedObject(candidate: SceneObject): boolean {
+    const index = this.findTrackedObjectIndex(candidate);
+    if (index < 0) {
+      return false;
+    }
+
+    this.removeTrackedObjectAt(index);
+    return true;
+  }
+
+  private removeTrackedObjectAt(index: number): void {
+    if (index < 0 || index >= this.wrappers.length) {
+      return;
+    }
+
+    const store = global.persistentStorageSystem.store;
+    const oldCount = this.wrappers.length;
     const wrapper = this.wrappers[index];
+
     this.wrappers.splice(index, 1);
     this.objs.splice(index, 1);
     this.objectKinds.splice(index, 1);
@@ -583,8 +622,30 @@ export class AnchorController extends BaseScriptComponent {
       wrapper.destroy();
     }
 
-    global.persistentStorageSystem.store.putInt('widget_count', this.wrappers.length);
+    store.putInt('widget_count', this.wrappers.length);
+    if (this.objs.length === 0) {
+      store.remove('has_world_data');
+      store.remove('uses_anchor_space');
+    }
+
+    this.trimStoredObjectSlots(store, this.wrappers.length, oldCount);
     this.persistPlantTransforms();
+    this.textlog.text = `${this.objs.length} object(s) remaining`;
+    print(`Removed tracked object at index ${index}`);
+  }
+
+  private trimStoredObjectSlots(
+    store: GeneralDataStore,
+    newCount: number,
+    oldCount: number
+  ): void {
+    for (let i = newCount; i < oldCount; i++) {
+      ['x', 'y', 'z', 'rx', 'ry', 'rz', 'rw', 'wx', 'wy', 'wz', 'wrx', 'wry', 'wrz', 'wrw']
+        .forEach((key) => store.remove(`w${i}_${key}`));
+      this.removePlantState(store, i);
+      store.remove(`w${i}_prefab`);
+      store.remove(`w${i}_object_kind`);
+    }
   }
 
   private getFloatingRoot(): SceneObject {
