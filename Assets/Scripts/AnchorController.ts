@@ -10,7 +10,7 @@ import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 
 const ANCHOR_CONTROLLER_VERSION = 'v11';
-const PLANT_LIFECYCLE_SAVE_VERSION = 3;
+const PLANT_LIFECYCLE_SAVE_VERSION = 4;
 const OBJECT_KIND_PLANT = 'plant';
 const OBJECT_KIND_POT = 'pot';
 const WORLD_PREVIEW_FALLBACK_SEC = 1;
@@ -90,7 +90,8 @@ export class AnchorController extends BaseScriptComponent {
     print(`Anchor found: ${anchor.id}`);
     this.textlog.text = 'Anchor found';
     const hadWorldFallback = this.hasRestored && this.restoredFromWorldFallback;
-    const worldSnapshots = hadWorldFallback ? this.capturePlantWorldTransforms() : [];
+    const worldSnapshots =
+      this.objs.length > 0 ? this.capturePlantWorldTransforms() : [];
 
     const isAlreadyTracking = this.currentAnchor?.id === anchor.id;
     const isUnsavedSessionAnchor =
@@ -109,10 +110,13 @@ export class AnchorController extends BaseScriptComponent {
       this.usingWorldSpace = false;
 
       if (hadWorldFallback) {
-        print('Upgrading world preview to anchor-local restore');
-        this.hasRestored = false;
+        print('Upgrading world preview to anchor space without respawn');
         this.restoredFromWorldFallback = false;
-        this.restoreSavedObjects(true);
+        this.reparentPlantsToAnchor();
+        this.reapplyPlantWorldTransforms(worldSnapshots);
+        this.persistPlantTransforms();
+        this.hasRestored = true;
+        this.usingWorldSpace = false;
         return;
       }
 
@@ -132,9 +136,8 @@ export class AnchorController extends BaseScriptComponent {
 
       if (this.hasRestored && !hadWorldFallback) {
         this.reparentPlantsToAnchor();
-        if (worldSnapshots.length > 0) {
-          this.reapplyPlantWorldTransforms(worldSnapshots);
-        }
+        this.reapplyPlantWorldTransforms(worldSnapshots);
+        this.persistPlantTransforms();
         return;
       }
 
@@ -557,10 +560,6 @@ export class AnchorController extends BaseScriptComponent {
     };
   }
 
-  private isNearZeroOffset(pos: vec3): boolean {
-    return Math.abs(pos.x) < 0.1 && Math.abs(pos.y) < 0.1 && Math.abs(pos.z) < 0.1;
-  }
-
   private getStoredAnchorLocalOffset(
     store: GeneralDataStore,
     index: number
@@ -589,6 +588,33 @@ export class AnchorController extends BaseScriptComponent {
       pos.y = PLANT_ANCHOR_Y_OFFSET;
     }
     return { pos, rot };
+  }
+
+  private hasStoredWorldTransform(store: GeneralDataStore, index: number): boolean {
+    return store.has(`w${index}_wx`);
+  }
+
+  private getStoredWorldTransform(
+    store: GeneralDataStore,
+    index: number
+  ): { pos: vec3; rot: quat } {
+    return {
+      pos: new vec3(
+        store.getFloat(`w${index}_wx`),
+        store.getFloat(`w${index}_wy`),
+        store.getFloat(`w${index}_wz`)
+      ),
+      rot: new quat(
+        store.getFloat(`w${index}_wrw`),
+        store.getFloat(`w${index}_wrx`),
+        store.getFloat(`w${index}_wry`),
+        store.getFloat(`w${index}_wrz`)
+      ),
+    };
+  }
+
+  private isNearZeroOffset(pos: vec3): boolean {
+    return Math.abs(pos.x) < 0.1 && Math.abs(pos.y) < 0.1 && Math.abs(pos.z) < 0.1;
   }
 
   spawnObject(localSpawnPos?: vec3, updateStoredCount = true): SceneObject | null {
@@ -833,15 +859,23 @@ export class AnchorController extends BaseScriptComponent {
         obj.getTransform().setWorldRotation(worldRot);
         print(`Restored plant ${i} at world: ${worldPos.toString()}`);
       } else {
-        const stored = this.getStoredAnchorLocalOffset(store, i);
-        const world = this.widgetLocalToWorld(stored.pos, stored.rot);
+        let worldPos: vec3;
+        let worldRot: quat;
+        if (this.hasStoredWorldTransform(store, i)) {
+          const world = this.getStoredWorldTransform(store, i);
+          worldPos = world.pos;
+          worldRot = world.rot;
+        } else {
+          const stored = this.getStoredAnchorLocalOffset(store, i);
+          const world = this.widgetLocalToWorld(stored.pos, stored.rot);
+          worldPos = world.pos;
+          worldRot = world.rot;
+        }
         wrapper.getTransform().setLocalPosition(new vec3(0, 0, 0));
         wrapper.getTransform().setLocalRotation(new quat(1, 0, 0, 0));
-        obj.getTransform().setWorldPosition(world.pos);
-        obj.getTransform().setWorldRotation(world.rot);
-        print(
-          `Restored plant ${i} anchor-local: ${stored.pos.toString()} world: ${world.pos.toString()}`
-        );
+        obj.getTransform().setWorldPosition(worldPos);
+        obj.getTransform().setWorldRotation(worldRot);
+        print(`Restored plant ${i} at world: ${worldPos.toString()}`);
       }
 
       this.wrappers.push(wrapper);
@@ -986,11 +1020,35 @@ export class AnchorController extends BaseScriptComponent {
       store.putFloat(`w${index}_plant_wrx`, worldRot.x);
       store.putFloat(`w${index}_plant_wry`, worldRot.y);
       store.putFloat(`w${index}_plant_wrz`, worldRot.z);
+      if (state.plantedModelLocalBaseY !== undefined) {
+        store.putFloat(`w${index}_plant_base_y`, state.plantedModelLocalBaseY);
+        store.putFloat(`w${index}_plant_align_cx`, state.plantedAlignCenterX ?? 0);
+        store.putFloat(`w${index}_plant_align_cz`, state.plantedAlignCenterZ ?? 0);
+        store.putFloat(`w${index}_plant_align_y`, state.plantedAlignY ?? 0);
+        store.putFloat(`w${index}_plant_growth_x`, state.plantedGrowthOffsetX ?? 0);
+        store.putFloat(`w${index}_plant_growth_y`, state.plantedGrowthOffsetY ?? 0);
+        store.putFloat(`w${index}_plant_growth_z`, state.plantedGrowthOffsetZ ?? 0);
+      } else {
+        store.remove(`w${index}_plant_base_y`);
+        store.remove(`w${index}_plant_align_cx`);
+        store.remove(`w${index}_plant_align_cz`);
+        store.remove(`w${index}_plant_align_y`);
+        store.remove(`w${index}_plant_growth_x`);
+        store.remove(`w${index}_plant_growth_y`);
+        store.remove(`w${index}_plant_growth_z`);
+      }
     } else {
       store.remove(`w${index}_plant_wrw`);
       store.remove(`w${index}_plant_wrx`);
       store.remove(`w${index}_plant_wry`);
       store.remove(`w${index}_plant_wrz`);
+      store.remove(`w${index}_plant_base_y`);
+      store.remove(`w${index}_plant_align_cx`);
+      store.remove(`w${index}_plant_align_cz`);
+      store.remove(`w${index}_plant_align_y`);
+      store.remove(`w${index}_plant_growth_x`);
+      store.remove(`w${index}_plant_growth_y`);
+      store.remove(`w${index}_plant_growth_z`);
     }
   }
 
@@ -1029,6 +1087,29 @@ export class AnchorController extends BaseScriptComponent {
             store.getFloat(`w${index}_plant_wrz`)
           )
         : null;
+    const plantedAlignment = store.has(`w${index}_plant_base_y`)
+      ? {
+            plantedModelLocalBaseY: store.getFloat(`w${index}_plant_base_y`),
+            plantedAlignCenterX: store.has(`w${index}_plant_align_cx`)
+              ? store.getFloat(`w${index}_plant_align_cx`)
+              : 0,
+            plantedAlignCenterZ: store.has(`w${index}_plant_align_cz`)
+              ? store.getFloat(`w${index}_plant_align_cz`)
+              : 0,
+            plantedAlignY: store.has(`w${index}_plant_align_y`)
+              ? store.getFloat(`w${index}_plant_align_y`)
+              : 0,
+            plantedGrowthOffsetX: store.has(`w${index}_plant_growth_x`)
+              ? store.getFloat(`w${index}_plant_growth_x`)
+              : 0,
+            plantedGrowthOffsetY: store.has(`w${index}_plant_growth_y`)
+              ? store.getFloat(`w${index}_plant_growth_y`)
+              : 0,
+            plantedGrowthOffsetZ: store.has(`w${index}_plant_growth_z`)
+              ? store.getFloat(`w${index}_plant_growth_z`)
+              : 0,
+          }
+        : {};
 
     const state: PlantLifecycleSaveState = {
       plantTypeId: plantTypeId,
@@ -1043,6 +1124,7 @@ export class AnchorController extends BaseScriptComponent {
         store.has(`w${index}_plant_watered`) && store.getBool(`w${index}_plant_watered`),
       isPlanted: isPlanted,
       plantedWorldRotation: plantedWorldRotation,
+      ...plantedAlignment,
     };
     plant.applySaveState(state);
   }
@@ -1089,6 +1171,13 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_wrx`);
     store.remove(`w${index}_plant_wry`);
     store.remove(`w${index}_plant_wrz`);
+    store.remove(`w${index}_plant_base_y`);
+    store.remove(`w${index}_plant_align_cx`);
+    store.remove(`w${index}_plant_align_cz`);
+    store.remove(`w${index}_plant_align_y`);
+    store.remove(`w${index}_plant_growth_x`);
+    store.remove(`w${index}_plant_growth_y`);
+    store.remove(`w${index}_plant_growth_z`);
   }
 
   private getActivePlantConfigs(): PlantSpawnConfig[] {
