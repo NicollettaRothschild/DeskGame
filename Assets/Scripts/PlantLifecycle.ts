@@ -135,7 +135,7 @@ export class PlantLifecycle extends BaseScriptComponent {
         this.plantedPreserveWorldRotation = this.getSceneObject().getTransform().getWorldRotation();
       }
       if (this.currentStage === PlantStage.Seed && !isNull(this.seedInstance)) {
-        this.resetAlignmentForPot();
+        this.applyPlantedSoilAnchor(true);
       } else {
         this.refreshPlantedVisual();
       }
@@ -520,7 +520,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.adultInstance = this.spawnAdultModel(parent);
     this.applyGrowthScale();
     if (this.isPlanted && this.growthElapsed <= 0) {
-      this.resetAlignmentForPot();
+      this.applyPlantedSoilAnchor(true);
     } else if (!this.isPlanted) {
       this.updateInteractionForPlantedState();
     }
@@ -867,7 +867,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.enforcePlantedWorldRotation();
   }
 
-  private applyPlantedSoilAnchor(): void {
+  private applyPlantedSoilAnchor(preserveContainerPlacement = false): void {
     if (!this.isPlanted) {
       return;
     }
@@ -889,7 +889,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     this.refreshAlignNodePosition(this.getCurrentGrowthScale());
-    this.alignPlantedRootToParent();
+    if (!preserveContainerPlacement) {
+      this.alignPlantedRootToParent();
+    }
     this.enforcePlantedWorldRotation();
   }
 
