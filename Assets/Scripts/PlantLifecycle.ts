@@ -553,7 +553,13 @@ export class PlantLifecycle extends BaseScriptComponent {
   private refreshAlignNodePosition(growthScale: number): void {
     const alignNode = this.ensureAlignNode();
     if (this.isPlanted) {
-      alignNode.getTransform().setLocalPosition(vec3.zero());
+      alignNode.getTransform().setLocalPosition(
+        new vec3(
+          this.alignCenterX,
+          -growthScale * this.modelLocalBaseY,
+          this.alignCenterZ
+        )
+      );
       return;
     }
 
@@ -757,12 +763,21 @@ export class PlantLifecycle extends BaseScriptComponent {
     const centerZ = (minZ + maxZ) * 0.5;
     const centerY = (minY + maxY) * 0.5;
     const growthScale = growthScaleNode.getTransform().getLocalScale();
+    const offsetY = this.isPlanted ? 0 : -centerY;
     growthScaleNode.getTransform().setLocalPosition(
-      new vec3(-centerX, -centerY, -centerZ)
+      new vec3(-centerX, offsetY, -centerZ)
     );
     growthScaleNode.getTransform().setLocalScale(growthScale);
+
+    if (this.isPlanted) {
+      this.captureModelMetrics(model as SceneObject);
+      this.alignCenterX = 0;
+      this.alignCenterZ = 0;
+      this.refreshAlignNodePosition(this.getCurrentGrowthScale());
+    }
+
     this.debugLog(
-      `centered planted model bounds=(${minX.toFixed(2)},${minY.toFixed(2)},${minZ.toFixed(2)})-(${maxX.toFixed(2)},${maxY.toFixed(2)},${maxZ.toFixed(2)}) offset=(${(-centerX).toFixed(2)},${(-minY).toFixed(2)},${(-centerZ).toFixed(2)})`
+      `centered planted model bounds=(${minX.toFixed(2)},${minY.toFixed(2)},${minZ.toFixed(2)})-(${maxX.toFixed(2)},${maxY.toFixed(2)},${maxZ.toFixed(2)}) offset=(${(-centerX).toFixed(2)},${this.isPlanted ? (-this.modelLocalBaseY).toFixed(2) : (-centerY).toFixed(2)},${(-centerZ).toFixed(2)})`
     );
   }
 
@@ -887,6 +902,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
+    const adultScale = this.getAdultGrowthScale();
     (growthScaleNode as SceneObject).getTransform().setLocalScale(
       new vec3(adultScale, adultScale, adultScale)
     );
