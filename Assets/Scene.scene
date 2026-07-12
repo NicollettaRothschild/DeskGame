@@ -17,6 +17,7 @@
     - !<own> 7c7350dc-41a2-4426-a5bb-047d14525a11
     - !<own> 8ee0f565-368b-4fd9-957d-8e90c5fb48d2
     - !<own> b1d7ad20-96e6-4bc7-9908-8c68e1af1b84
+    - !<own> f293204d-edc4-4b3a-8a09-4c89c40d6fa2
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - |
@@ -76,6 +77,21 @@
   MaskTexture: !<reference> 00000000-0000-0000-0000-000000000000
   RayTracing: !<reference> 00000000-0000-0000-0000-000000000000
   DevicePropertiesSource: !<reference> 00000000-0000-0000-0000-000000000000
+- !<SceneObject/00015e65-71ce-4f57-b0ae-ef06b231ca02>
+  PrefabRemaps:
+    []
+  Name: C_prop_bind_JNT
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
 - !<SceneObject/0005641c-028d-459a-0000-000000014b4d>
   PrefabRemaps:
     []
@@ -389,6 +405,22 @@
     - !<own> f00d0d0e-b956-4461-9720-fc05cd0e7d99
     - !<own> e819184b-3907-48f0-a104-01f19156b3fd
     - !<own> c16c30fb-7bca-4db9-92bb-0d75b6f01758
+- !<SceneObject/09516922-aba6-4b8b-a06c-a8fa663e23de>
+  PrefabRemaps:
+    []
+  Name: PROP
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 300f5cc8-039b-4d82-bb42-f1deacc2c1fb
+    - !<own> 8557b083-e50d-4792-8c3f-b9b7bce77b65
+  Components:
+    []
 - !<SceneObject/09e09c25-e443-445a-8eaa-095a73bf01d6>
   PrefabRemaps:
     []
@@ -1441,6 +1473,21 @@
   BlendNormals: false
   BlendShapes:
     {}
+- !<SceneObject/300f5cc8-039b-4d82-bb42-f1deacc2c1fb>
+  PrefabRemaps:
+    []
+  Name: geo_GRP
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 770dd22e-9794-467f-a272-1160565a5ed4
+  Components:
+    []
 - !<ScreenTransform/303454cf-e74c-422c-bc2d-fd1cc8ac59c1>
   PrefabRemaps:
     []
@@ -1773,6 +1820,20 @@
     - !<own> 91eb8656-22fa-4156-ba7a-807d8fa58eef
   Components:
     []
+- !<Skin/426ecf3f-c102-419b-b1f9-181d24e87b79>
+  PrefabRemaps:
+    []
+  Name: component_2
+  Enabled: true
+  skinBones:
+    C_bin_trash_GEO: !<reference> efe11af7-60a3-4c2b-be9b-2dbdbafa9fa8
+    C_prop_bind_JNT: !<reference> 00015e65-71ce-4f57-b0ae-ef06b231ca02
+    PROP: !<reference> 09516922-aba6-4b8b-a06c-a8fa663e23de
+    bin_trash_GRP: !<reference> 770dd22e-9794-467f-a272-1160565a5ed4
+    bin_trash_bindrig: !<reference> f293204d-edc4-4b3a-8a09-4c89c40d6fa2
+    bind_GRP: !<reference> a5020740-4c62-4606-9635-dfeff93c88d2
+    geo_GRP: !<reference> 300f5cc8-039b-4d82-bb42-f1deacc2c1fb
+    rig_GRP: !<reference> 8557b083-e50d-4792-8c3f-b9b7bce77b65
 - !<SceneObject/42daf5ef-b25b-44cb-90b0-76b91a70e43e>
   PrefabRemaps:
     []
@@ -2916,6 +2977,21 @@
   Components:
     - !<own> 8f683e86-0810-4696-80a0-b333944dced0
     - !<own> f1047b30-c5ee-4eed-8956-6a2fe0401dc7
+- !<SceneObject/770dd22e-9794-467f-a272-1160565a5ed4>
+  PrefabRemaps:
+    []
+  Name: bin_trash_GRP
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> efe11af7-60a3-4c2b-be9b-2dbdbafa9fa8
+  Components:
+    []
 - !<SceneObject/776f6005-3713-4720-a125-974af63bc8d3>
   PrefabRemaps:
     []
@@ -3633,6 +3709,21 @@
   ScriptTypes:
     "":
       {}
+- !<SceneObject/8557b083-e50d-4792-8c3f-b9b7bce77b65>
+  PrefabRemaps:
+    []
+  Name: rig_GRP
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> a5020740-4c62-4606-9635-dfeff93c88d2
+  Components:
+    []
 - !<SceneObject/8587b23c-0a66-4c2f-bc1b-715addbfc4d2>
   PrefabRemaps:
     []
@@ -4150,6 +4241,26 @@
     []
   Components:
     []
+- !<RenderMeshVisual/9636ff32-5a30-4b83-8873-47f8d41db672>
+  PrefabRemaps:
+    []
+  Name: component_0
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> e0fc263a-b800-4175-ba85-18864d66495f
+  Mesh: !<reference> eabe223e-087b-4a47-b034-9770b59200b4
+  Skin: !<reference> 426ecf3f-c102-419b-b1f9-181d24e87b79
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
 - !<SceneObject/967cf6b8-fbfb-4b27-909a-86a937da9826>
   PrefabRemaps:
     []
@@ -4451,6 +4562,21 @@
   ScriptTypes:
     "":
       {}
+- !<SceneObject/a5020740-4c62-4606-9635-dfeff93c88d2>
+  PrefabRemaps:
+    []
+  Name: bind_GRP
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 00015e65-71ce-4f57-b0ae-ef06b231ca02
+  Components:
+    []
 - !<ScriptComponent/a572bd4e-d10b-4cac-83b9-7278744d5417>
   PrefabRemaps:
     []
@@ -4899,6 +5025,24 @@
   ScriptTypes:
     "":
       {}
+- !<ColliderComponent/b6c77a4d-f512-4ac7-b655-81504f93fe0c>
+  PrefabRemaps:
+    []
+  Name: Physics Collider
+  Enabled: true
+  Shape: !<Sphere>
+    FitVisual: true
+    Radius: 26.000000
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: true
+  ShowCollider: false
 - !<SceneObject/b6e328d0-13c3-46af-9bbf-962fcc24f472>
   PrefabRemaps:
     []
@@ -5656,6 +5800,26 @@
     - !<own> b6e328d0-13c3-46af-9bbf-962fcc24f472
   Components:
     - !<own> f03ac2a8-d987-47ab-8c31-f6e5655dbf9e
+- !<ScriptComponent/d119e162-8ef7-47b7-9485-da37a530ce5c>
+  PrefabRemaps:
+    []
+  Name: TrashBin
+  Enabled: true
+  ScriptAsset: !<reference> 5645afd5-2040-4e50-9435-eeee7f8af0fd
+  ScriptInputsDefault:
+    destroyOverlapCooldown: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      triggerCollider: !<reference.ColliderComponent> b6c77a4d-f512-4ac7-b655-81504f93fe0c
+      anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
+      trashRadius: !<float> 8.000000
+      destroyOverlapCooldown: 0.350000
+      debugLogging: true
+  ScriptTypes:
+    "":
+      {}
 - !<ColliderComponent/d12010ec-b7ce-45a8-9d1d-5d2c2dfe8b57>
   PrefabRemaps:
     []
@@ -7430,6 +7594,21 @@
     - !<own> 5fa23fd3-5cc8-4c10-91a4-dad906cfeb02
   Components:
     []
+- !<SceneObject/efe11af7-60a3-4c2b-be9b-2dbdbafa9fa8>
+  PrefabRemaps:
+    []
+  Name: C_bin_trash_GEO
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 9636ff32-5a30-4b83-8873-47f8d41db672
 - !<ScriptComponent/f00d0d0e-b956-4461-9720-fc05cd0e7d99>
   PrefabRemaps:
     []
@@ -7630,6 +7809,23 @@
     - !<own> d10986a9-aec7-47c5-b8c2-154ac4b92869
   Components:
     []
+- !<SceneObject/f293204d-edc4-4b3a-8a09-4c89c40d6fa2>
+  PrefabRemaps:
+    []
+  Name: TrashBin
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -4.889552, y: -21.057720, z: -72.445465}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 0.311390, y: 0.311390, z: 0.311390}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 09516922-aba6-4b8b-a06c-a8fa663e23de
+  Components:
+    - !<own> 426ecf3f-c102-419b-b1f9-181d24e87b79
+    - !<own> b6c77a4d-f512-4ac7-b655-81504f93fe0c
+    - !<own> d119e162-8ef7-47b7-9485-da37a530ce5c
 - !<RenderMeshVisual/f62a2e90-9c60-4cc9-bf75-b5ea5456fcec>
   PrefabRemaps:
     []

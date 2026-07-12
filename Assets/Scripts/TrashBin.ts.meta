@@ -51,6 +51,6 @@
   InputLines:
     - // @input Component.ColliderComponent triggerCollider
     - // @input Component.ScriptComponent anchorController
-    - // @input float trashRadius = 14
+    - // @input float trashRadius = 8
     - // @input float destroyOverlapCooldown = 0.35
     - // @input bool debugLogging = true
