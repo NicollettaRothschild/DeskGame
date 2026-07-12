@@ -576,7 +576,11 @@ export class AnchorController extends BaseScriptComponent {
       store.getFloat(`w${index}_ry`),
       store.getFloat(`w${index}_rz`)
     );
+    const objectKind = store.has(`w${index}_object_kind`)
+      ? store.getString(`w${index}_object_kind`)
+      : OBJECT_KIND_PLANT;
     if (
+      objectKind === OBJECT_KIND_PLANT &&
       this.isNearZeroOffset(pos) &&
       store.has('uses_anchor_space') &&
       store.getBool('uses_anchor_space')

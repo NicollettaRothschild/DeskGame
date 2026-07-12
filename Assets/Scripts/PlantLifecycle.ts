@@ -99,7 +99,10 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   public setPlanted(planted: boolean): void {
     this.isPlanted = planted;
-    this.updateManipulationForPlantedState();
+    if (planted) {
+      this.refreshPlantedVisual();
+    }
+    this.updateInteractionForPlantedState();
     this.notifyAnchorStateChanged();
   }
 
@@ -191,6 +194,11 @@ export class PlantLifecycle extends BaseScriptComponent {
     } else {
       this.showBaby();
     }
+
+    if (this.isPlanted) {
+      this.resetAlignmentForPot();
+      this.updateInteractionForPlantedState();
+    }
   }
 
   private createUpdateLoop(): void {
@@ -221,6 +229,10 @@ export class PlantLifecycle extends BaseScriptComponent {
         this.currentStage = PlantStage.Adult;
         this.growthElapsed = Math.max(0, this.growthTime);
         this.applyAdultScale();
+        if (this.isPlanted) {
+          this.resetAlignmentForPot();
+        }
+        this.updateInteractionForPlantedState();
         this.notifyAnchorStateChanged();
       }
     }
@@ -312,8 +324,14 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.debugLog(`spawn baby root=${this.babyInstance.name} parent=${parent.name}`);
     this.prepareStageModel(this.babyInstance);
     this.applyClonedBabyMaterial(this.babyInstance);
-    this.captureModelMetrics(this.babyInstance);
-    this.refreshAlignNodePosition(1);
+    if (!this.isPlanted) {
+      this.captureModelMetrics(this.babyInstance);
+      this.refreshAlignNodePosition(1);
+      this.updateInteractionForPlantedState();
+      return;
+    }
+
+    this.resetAlignmentForPot();
   }
 
   private showSeed(): void {
@@ -337,8 +355,14 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.seedInstance.getTransform().setLocalScale(
       new vec3(this.seedScale, this.seedScale, this.seedScale)
     );
-    this.captureModelMetrics(this.seedInstance);
-    this.refreshAlignNodePosition(1);
+    if (!this.isPlanted) {
+      this.captureModelMetrics(this.seedInstance);
+      this.refreshAlignNodePosition(1);
+      this.updateInteractionForPlantedState();
+      return;
+    }
+
+    this.resetAlignmentForPot();
   }
 
   private showAdultAtGrowthScale(): void {
@@ -348,6 +372,11 @@ export class PlantLifecycle extends BaseScriptComponent {
     const parent = this.ensureGrowthScaleNode();
     this.adultInstance = this.spawnAdultModel(parent);
     this.applyGrowthScale();
+    if (this.isPlanted) {
+      this.resetAlignmentForPot();
+    } else {
+      this.updateInteractionForPlantedState();
+    }
   }
 
   private showAdult(): void {
@@ -355,6 +384,11 @@ export class PlantLifecycle extends BaseScriptComponent {
     const parent = this.ensureGrowthScaleNode();
     this.adultInstance = this.spawnAdultModel(parent);
     this.applyAdultScale();
+    if (this.isPlanted) {
+      this.resetAlignmentForPot();
+    } else {
+      this.updateInteractionForPlantedState();
+    }
   }
 
   private spawnAdultModel(parent: SceneObject): SceneObject {
@@ -427,6 +461,11 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   private refreshAlignNodePosition(growthScale: number): void {
     const alignNode = this.ensureAlignNode();
+    if (this.isPlanted) {
+      alignNode.getTransform().setLocalPosition(vec3.zero());
+      return;
+    }
+
     alignNode.getTransform().setLocalPosition(
       new vec3(
         this.alignCenterX,
@@ -476,7 +515,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
   }
 
-  private disableManipulationOnHierarchy(root: SceneObject): void {
+  private setInteractionEnabledOnHierarchy(root: SceneObject, enabled: boolean): void {
     const stack: SceneObject[] = [root];
 
     while (stack.length > 0) {
@@ -488,10 +527,10 @@ export class PlantLifecycle extends BaseScriptComponent {
       const scripts = current.getComponents('Component.ScriptComponent');
       for (let i = 0; i < scripts.length; i++) {
         const script = scripts[i];
-        if (isNull(script) || !this.isManipulationScript(script)) {
+        if (isNull(script) || !this.isInteractionScript(script)) {
           continue;
         }
-        script.enabled = false;
+        script.enabled = enabled;
       }
 
       for (let i = 0; i < current.getChildrenCount(); i++) {
@@ -500,9 +539,26 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
   }
 
+  private disableManipulationOnHierarchy(root: SceneObject): void {
+    this.setInteractionEnabledOnHierarchy(root, false);
+  }
+
   private isManipulationScript(script: ScriptComponent): boolean {
     const candidate = script as unknown as Record<string, unknown>;
     return candidate.manipulateRootSceneObject !== undefined;
+  }
+
+  private isInteractionScript(script: ScriptComponent): boolean {
+    if (this.isManipulationScript(script)) {
+      return true;
+    }
+
+    const candidate = script as unknown as Record<string, unknown>;
+    if (candidate.targetingMode !== undefined && candidate.onTriggerStart !== undefined) {
+      return true;
+    }
+
+    return Array.isArray(candidate.onPinchUp_Select);
   }
 
   private notifyAnchorStateChanged(): void {
@@ -513,13 +569,176 @@ export class PlantLifecycle extends BaseScriptComponent {
     (this.anchorPersistence as AnchorPersistence).persistPlantLifecycleState(this.getSceneObject() as SceneObject);
   }
 
-  private updateManipulationForPlantedState(): void {
-    const root = this.getSceneObject();
-    if (this.isPlanted) {
-      this.disableManipulationOnHierarchy(root as SceneObject);
-    } else {
-      this.wireManipulationToContainer(root as SceneObject);
+  private refreshPlantedVisual(): void {
+    if (this.currentStage === PlantStage.Seed) {
+      this.showSeed();
+      return;
     }
+
+    if (this.currentStage === PlantStage.Growing) {
+      this.showAdultAtGrowthScale();
+      return;
+    }
+
+    if (this.currentStage === PlantStage.Adult) {
+      this.showAdult();
+      return;
+    }
+
+    this.showBaby();
+  }
+
+  private alignPlantedRootToParent(): void {
+    if (!this.isPlanted) {
+      return;
+    }
+
+    const transform = this.getSceneObject().getTransform();
+    const scale = transform.getLocalScale();
+    transform.setLocalPosition(vec3.zero());
+    transform.setLocalRotation(quat.quatIdentity());
+    transform.setLocalScale(scale);
+  }
+
+  private getActiveStageModel(): SceneObject | null {
+    if (!isNull(this.seedInstance)) {
+      return this.seedInstance;
+    }
+    if (!isNull(this.babyInstance)) {
+      return this.babyInstance;
+    }
+    if (!isNull(this.adultInstance)) {
+      return this.adultInstance;
+    }
+    return null;
+  }
+
+  private flattenMeshChildRotations(model: SceneObject): void {
+    for (let i = 0; i < model.getChildrenCount(); i++) {
+      const child = model.getChild(i);
+      child.getTransform().setLocalRotation(quat.quatIdentity());
+    }
+  }
+
+  private normalizePlantedSeedMeshes(model: SceneObject): void {
+    for (let i = 0; i < model.getChildrenCount(); i++) {
+      const child = model.getChild(i);
+      const isPrimarySeedMesh = child.name === 'SeedBase.003';
+      child.enabled = isPrimarySeedMesh;
+      if (isPrimarySeedMesh) {
+        child.getTransform().setLocalRotation(quat.quatIdentity());
+      }
+    }
+  }
+
+  private getPlantedModelRotation(): quat {
+    const degToRad = Math.PI / 180;
+    if (this.currentStage === PlantStage.Seed) {
+      return quat.angleAxis(-90 * degToRad, new vec3(1, 0, 0));
+    }
+
+    return quat.angleAxis(90 * degToRad, new vec3(1, 0, 0));
+  }
+
+  private applyPlantedModelOrientation(): void {
+    const model = this.getActiveStageModel();
+    if (isNull(model)) {
+      return;
+    }
+
+    const modelObject = model as SceneObject;
+    if (this.currentStage === PlantStage.Seed) {
+      this.normalizePlantedSeedMeshes(modelObject);
+    } else {
+      this.flattenMeshChildRotations(modelObject);
+    }
+
+    const modelTransform = modelObject.getTransform();
+    const modelScale = modelTransform.getLocalScale();
+    modelTransform.setLocalPosition(vec3.zero());
+    modelTransform.setLocalRotation(this.getPlantedModelRotation());
+    modelTransform.setLocalScale(modelScale);
+  }
+
+  private centerActiveModelInGrowthSpace(): void {
+    const model = this.getActiveStageModel();
+    if (isNull(model) || isNull(this.growthScaleNode)) {
+      return;
+    }
+
+    const growthScaleNode = this.growthScaleNode as SceneObject;
+    const growthWorldToLocal = growthScaleNode.getTransform().getWorldTransform().inverse();
+    const visuals = this.findChildMeshVisuals(model as SceneObject);
+    if (visuals.length === 0) {
+      return;
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+
+    for (let i = 0; i < visuals.length; i++) {
+      const localMin = growthWorldToLocal.multiplyPoint(visuals[i].worldAabbMin());
+      const localMax = growthWorldToLocal.multiplyPoint(visuals[i].worldAabbMax());
+      minX = Math.min(minX, localMin.x, localMax.x);
+      maxX = Math.max(maxX, localMin.x, localMax.x);
+      minY = Math.min(minY, localMin.y, localMax.y);
+      maxY = Math.max(maxY, localMin.y, localMax.y);
+      minZ = Math.min(minZ, localMin.z, localMax.z);
+      maxZ = Math.max(maxZ, localMin.z, localMax.z);
+    }
+
+    const centerX = (minX + maxX) * 0.5;
+    const centerZ = (minZ + maxZ) * 0.5;
+    const centerY = (minY + maxY) * 0.5;
+    const growthScale = growthScaleNode.getTransform().getLocalScale();
+    growthScaleNode.getTransform().setLocalPosition(
+      new vec3(-centerX, -centerY, -centerZ)
+    );
+    growthScaleNode.getTransform().setLocalScale(growthScale);
+    this.debugLog(
+      `centered planted model bounds=(${minX.toFixed(2)},${minY.toFixed(2)},${minZ.toFixed(2)})-(${maxX.toFixed(2)},${maxY.toFixed(2)},${maxZ.toFixed(2)}) offset=(${(-centerX).toFixed(2)},${(-minY).toFixed(2)},${(-centerZ).toFixed(2)})`
+    );
+  }
+
+  private resetAlignmentForPot(): void {
+    this.alignCenterX = 0;
+    this.alignCenterZ = 0;
+    this.modelLocalBaseY = 0;
+
+    const stageRoot = this.ensureStageRoot();
+    stageRoot.getTransform().setLocalPosition(vec3.zero());
+    stageRoot.getTransform().setLocalRotation(quat.quatIdentity());
+
+    const alignNode = this.ensureAlignNode();
+    alignNode.getTransform().setLocalPosition(vec3.zero());
+    alignNode.getTransform().setLocalRotation(quat.quatIdentity());
+
+    if (!isNull(this.growthScaleNode)) {
+      const growthScaleNode = this.growthScaleNode as SceneObject;
+      const growthScale = growthScaleNode.getTransform().getLocalScale();
+      growthScaleNode.getTransform().setLocalPosition(vec3.zero());
+      growthScaleNode.getTransform().setLocalRotation(quat.quatIdentity());
+      growthScaleNode.getTransform().setLocalScale(growthScale);
+    }
+
+    this.applyPlantedModelOrientation();
+    this.centerActiveModelInGrowthSpace();
+    this.alignPlantedRootToParent();
+  }
+
+  private updateInteractionForPlantedState(): void {
+    const root = this.getSceneObject() as SceneObject;
+    if (this.isPlanted) {
+      this.setInteractionEnabledOnHierarchy(root, false);
+      return;
+    }
+
+    this.wireManipulationToContainer(root);
+    this.setInteractionEnabledOnHierarchy(root, true);
   }
 
   private applyClonedBabyMaterial(root: SceneObject): void {

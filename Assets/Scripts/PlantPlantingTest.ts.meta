@@ -1,0 +1,56 @@
+- !<AssetImportMetadata/5df60ca6-c438-4d42-b00a-c6d360a298e5>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> b1dafc09-7952-45eb-8e98-f8e5d8f4d74d
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> b1dafc09-7952-45eb-8e98-f8e5d8f4d74d
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 09dee6ce-8333-4087-afe6-8a3889e60ace
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/09dee6ce-8333-4087-afe6-8a3889e60ace>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: c91d80b7-bb6c-4da1-b829-6528baf8b77f
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    maxCenterOffsetCm: false
+    minUprightHeightCm: false
+    plantPrefab: false
+    potPrefab: false
+    runOnAwake: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - plantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      potPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      runOnAwake: false
+      maxCenterOffsetCm: !<float> 8.000000
+      minUprightHeightCm: 0.800000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Asset.ObjectPrefab plantPrefab
+    - // @input Asset.ObjectPrefab potPrefab
+    - // @input bool runOnAwake
+    - // @input float maxCenterOffsetCm = 8
+    - // @input float minUprightHeightCm = 0.8

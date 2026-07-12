@@ -82,7 +82,7 @@ export class PlantPot extends BaseScriptComponent {
     plant.setPlanted(true);
 
     if (this.disablePlantInteractionWhenPlanted) {
-      this.disableManipulationOnHierarchy(plantRoot);
+      this.setPlantInteractionEnabled(plantRoot, false);
     }
 
     this.debugLog(`restored planted ${plantRoot.name}`);
@@ -111,19 +111,16 @@ export class PlantPot extends BaseScriptComponent {
     this.attachPlant(plant);
   }
 
+  public simulatePlantForTest(plant: PlantLifecycle): void {
+    this.attachPlant(plant);
+  }
+
   private attachPlant(plant: PlantLifecycle): void {
     const plantRoot = plant.getSceneObject();
     const attachPoint = this.getAttachPoint();
 
-    const originalWorldRotation = plantRoot.getTransform().getWorldRotation();
-    const originalWorldScale = plantRoot.getTransform().getWorldScale();
     plantRoot.setParent(attachPoint);
-    this.snapExistingPlantRootToAttachPoint(
-      plantRoot,
-      attachPoint,
-      originalWorldRotation,
-      originalWorldScale
-    );
+    this.snapPlantedRootToAttachPoint(plantRoot);
 
     this.plantedPlant = plant;
     plant.setPlanted(true);
@@ -136,7 +133,7 @@ export class PlantPot extends BaseScriptComponent {
     }
 
     if (this.disablePlantInteractionWhenPlanted) {
-      this.disableManipulationOnHierarchy(plantRoot);
+      this.setPlantInteractionEnabled(plantRoot, false);
     }
 
     if (!isNull(this.anchorPersistence)) {
@@ -146,19 +143,15 @@ export class PlantPot extends BaseScriptComponent {
     this.debugLog(`planted ${plantRoot.name}`);
   }
 
-  private snapExistingPlantRootToAttachPoint(
-    plantRoot: SceneObject,
-    attachPoint: SceneObject,
-    worldRotation: quat,
-    worldScale: vec3
-  ): void {
-    plantRoot.getTransform().setWorldPosition(attachPoint.getTransform().getWorldPosition());
-    plantRoot.getTransform().setWorldRotation(worldRotation);
-    plantRoot.getTransform().setWorldScale(worldScale);
+  private snapPlantedRootToAttachPoint(plantRoot: SceneObject): void {
+    const scale = plantRoot.getTransform().getLocalScale();
+    plantRoot.getTransform().setLocalPosition(vec3.zero());
+    plantRoot.getTransform().setLocalRotation(quat.quatIdentity());
+    plantRoot.getTransform().setLocalScale(scale);
   }
 
   private snapRestoredPlantRootToAttachPoint(plantRoot: SceneObject): void {
-    plantRoot.getTransform().setLocalPosition(vec3.zero());
+    this.snapPlantedRootToAttachPoint(plantRoot);
   }
 
   private getAttachPoint(): SceneObject {
@@ -235,7 +228,7 @@ export class PlantPot extends BaseScriptComponent {
     return null as unknown as PlantLifecycle;
   }
 
-  private disableManipulationOnHierarchy(root: SceneObject): void {
+  private setPlantInteractionEnabled(root: SceneObject, enabled: boolean): void {
     const stack: SceneObject[] = [root];
     while (stack.length > 0) {
       const current = stack.pop();
@@ -245,16 +238,30 @@ export class PlantPot extends BaseScriptComponent {
 
       const scripts = current.getComponents('Component.ScriptComponent');
       for (let i = 0; i < scripts.length; i++) {
-        const script = scripts[i] as unknown as InteractableManipulationLike;
-        if (!isNull(script) && script.manipulateRootSceneObject !== undefined) {
-          script.enabled = false;
+        const script = scripts[i] as unknown as InteractableManipulationLike & Record<string, unknown>;
+        if (isNull(script)) {
+          continue;
         }
+
+        const isManipulation = script.manipulateRootSceneObject !== undefined;
+        const isInteractable =
+          script.targetingMode !== undefined && script.onTriggerStart !== undefined;
+        const isInteractableHelper = Array.isArray(script.onPinchUp_Select);
+        if (!isManipulation && !isInteractable && !isInteractableHelper) {
+          continue;
+        }
+
+        (scripts[i] as ScriptComponent).enabled = enabled;
       }
 
       for (let i = 0; i < current.getChildrenCount(); i++) {
         stack.push(current.getChild(i));
       }
     }
+  }
+
+  private disableManipulationOnHierarchy(root: SceneObject): void {
+    this.setPlantInteractionEnabled(root, false);
   }
 
   private debugLog(message: string): void {
