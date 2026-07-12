@@ -100,7 +100,11 @@ export class PlantLifecycle extends BaseScriptComponent {
   public setPlanted(planted: boolean): void {
     this.isPlanted = planted;
     if (planted) {
-      this.refreshPlantedVisual();
+      if (this.currentStage === PlantStage.Seed && !isNull(this.seedInstance)) {
+        this.resetAlignmentForPot();
+      } else {
+        this.refreshPlantedVisual();
+      }
     }
     this.updateInteractionForPlantedState();
     this.notifyAnchorStateChanged();
@@ -596,7 +600,6 @@ export class PlantLifecycle extends BaseScriptComponent {
     const transform = this.getSceneObject().getTransform();
     const scale = transform.getLocalScale();
     transform.setLocalPosition(vec3.zero());
-    transform.setLocalRotation(quat.quatIdentity());
     transform.setLocalScale(scale);
   }
 
@@ -620,23 +623,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
   }
 
-  private normalizePlantedSeedMeshes(model: SceneObject): void {
-    for (let i = 0; i < model.getChildrenCount(); i++) {
-      const child = model.getChild(i);
-      const isPrimarySeedMesh = child.name === 'SeedBase.003';
-      child.enabled = isPrimarySeedMesh;
-      if (isPrimarySeedMesh) {
-        child.getTransform().setLocalRotation(quat.quatIdentity());
-      }
-    }
-  }
-
   private getPlantedModelRotation(): quat {
     const degToRad = Math.PI / 180;
-    if (this.currentStage === PlantStage.Seed) {
-      return quat.angleAxis(-90 * degToRad, new vec3(1, 0, 0));
-    }
-
+    // Baby/adult meshes need the export -90° X correction when potted.
     return quat.angleAxis(90 * degToRad, new vec3(1, 0, 0));
   }
 
@@ -647,15 +636,17 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     const modelObject = model as SceneObject;
-    if (this.currentStage === PlantStage.Seed) {
-      this.normalizePlantedSeedMeshes(modelObject);
-    } else {
-      this.flattenMeshChildRotations(modelObject);
-    }
-
     const modelTransform = modelObject.getTransform();
     const modelScale = modelTransform.getLocalScale();
     modelTransform.setLocalPosition(vec3.zero());
+
+    if (this.currentStage === PlantStage.Seed) {
+      // Keep existing mesh child rotations from the prefab; only re-center position.
+      modelTransform.setLocalScale(modelScale);
+      return;
+    }
+
+    this.flattenMeshChildRotations(modelObject);
     modelTransform.setLocalRotation(this.getPlantedModelRotation());
     modelTransform.setLocalScale(modelScale);
   }

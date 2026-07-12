@@ -118,9 +118,14 @@ export class PlantPot extends BaseScriptComponent {
   private attachPlant(plant: PlantLifecycle): void {
     const plantRoot = plant.getSceneObject();
     const attachPoint = this.getAttachPoint();
+    const worldRot = plantRoot.getTransform().getWorldRotation();
+    const attachWorldPos = attachPoint.getTransform().getWorldPosition();
 
     plantRoot.setParent(attachPoint);
-    this.snapPlantedRootToAttachPoint(plantRoot);
+    const scale = plantRoot.getTransform().getLocalScale();
+    plantRoot.getTransform().setWorldPosition(attachWorldPos);
+    plantRoot.getTransform().setWorldRotation(worldRot);
+    plantRoot.getTransform().setLocalScale(scale);
 
     this.plantedPlant = plant;
     plant.setPlanted(true);

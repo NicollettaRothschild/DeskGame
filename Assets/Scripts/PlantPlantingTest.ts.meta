@@ -28,6 +28,7 @@
   ScriptInputsHidden:
     maxCenterOffsetCm: false
     minUprightHeightCm: false
+    minUprightRatio: false
     plantPrefab: false
     potPrefab: false
     runOnAwake: false
@@ -45,6 +46,7 @@
       runOnAwake: false
       maxCenterOffsetCm: !<float> 8.000000
       minUprightHeightCm: 0.800000
+      minUprightRatio: !<float> 1.000000
   ScriptTypes:
     -
       {}
@@ -54,3 +56,4 @@
     - // @input bool runOnAwake
     - // @input float maxCenterOffsetCm = 8
     - // @input float minUprightHeightCm = 0.8
+    - // @input float minUprightRatio = 1

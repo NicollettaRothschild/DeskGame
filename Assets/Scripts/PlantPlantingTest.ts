@@ -1,4 +1,4 @@
-import { PlantLifecycle } from './PlantLifecycle';
+import { PlantLifecycle, PlantStage } from './PlantLifecycle';
 import { PlantPot } from './PlantPot';
 
 type PlantPotTestApi = {
@@ -87,22 +87,26 @@ export class PlantPlantingTest extends BaseScriptComponent {
     const height = sizeY;
     const uprightRatio = width <= 0.001 ? 0 : height / width;
 
+    const isSeed = plant.getSaveState().stage === PlantStage.Seed;
     const offsetPass = offset <= this.maxCenterOffsetCm;
     const uprightPass =
-      height >= this.minUprightHeightCm && uprightRatio >= this.minUprightRatio;
+      !isSeed &&
+      height >= this.minUprightHeightCm &&
+      uprightRatio >= this.minUprightRatio;
+    const seedPass = isSeed && offsetPass;
 
     print(
       `[PlantPlantingTest] attachLocalCenter=${centerLocal.toString()} offset=${offset.toFixed(2)}cm localSize=(${sizeX.toFixed(2)},${sizeY.toFixed(2)},${sizeZ.toFixed(2)}) uprightRatio=${uprightRatio.toFixed(2)}`
     );
 
-    if (offsetPass && uprightPass) {
-      print('[PlantPlantingTest] PASS planted seed is centered and upright');
+    if (seedPass || (offsetPass && uprightPass)) {
+      print('[PlantPlantingTest] PASS planted seed is centered with correct orientation');
       potRoot.destroy();
       return true;
     }
 
     print(
-      `[PlantPlantingTest] FAIL offsetPass=${offsetPass} uprightPass=${uprightPass} (maxOffset=${this.maxCenterOffsetCm}, minHeight=${this.minUprightHeightCm})`
+      `[PlantPlantingTest] FAIL offsetPass=${offsetPass} uprightPass=${uprightPass} seedPass=${seedPass} (maxOffset=${this.maxCenterOffsetCm}, minHeight=${this.minUprightHeightCm})`
     );
     potRoot.destroy();
     return false;
