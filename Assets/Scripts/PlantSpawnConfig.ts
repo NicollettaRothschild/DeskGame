@@ -20,6 +20,21 @@ export class PlantSpawnConfig extends BaseScriptComponent {
   @input('float')
   scaleUpSize: number = 1;
 
+  public applySpawnConfigToPlant(plant: PlantLifecycle): void {
+    if (isNull(plant)) {
+      return;
+    }
+
+    plant.applySpawnConfig(
+      this.plantTypeId,
+      this.adultPlantPrefab,
+      this.plantTexture,
+      this.timeAsBaby,
+      this.growthTime,
+      this.scaleUpSize
+    );
+  }
+
   public applyToPlant(plant: PlantLifecycle): void {
     if (isNull(plant)) {
       return;

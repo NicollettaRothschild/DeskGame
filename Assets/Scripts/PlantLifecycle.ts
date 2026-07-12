@@ -13,6 +13,7 @@ export type PlantLifecycleSaveState = {
   growthElapsed: number;
   hasBeenWatered: boolean;
   isPlanted: boolean;
+  plantedWorldRotation?: quat | null;
 };
 
 type AnchorPersistence = {
@@ -83,13 +84,21 @@ export class PlantLifecycle extends BaseScriptComponent {
   private alignCenterX = 0;
   private alignCenterZ = 0;
   private isPlanted = false;
+  private plantedPreserveWorldScale: vec3 | null = null;
+  private plantedPreserveWorldRotation: quat | null = null;
+  private static readonly DEFAULT_CONTAINER_WORLD_SCALE = 0.1;
+  private static readonly GROWTH_SIZE_DIVISOR = 3;
 
   onAwake(): void {
     this.debugLog(`awake plantType=${this.plantTypeId}`);
-    this.babyTimerRemaining = Math.max(0, this.timeAsBaby);
-    this.currentStage = this.hasBeenWatered ? PlantStage.WateredBaby : PlantStage.Seed;
+    this.babyTimerRemaining = 0;
+    this.currentStage = this.hasBeenWatered ? PlantStage.Growing : PlantStage.Seed;
     this.ensureStageRoot();
-    this.showSeed();
+    if (this.hasBeenWatered) {
+      this.showAdultAtGrowthScale();
+    } else {
+      this.showSeed();
+    }
     this.createUpdateLoop();
   }
 
@@ -100,14 +109,64 @@ export class PlantLifecycle extends BaseScriptComponent {
   public setPlanted(planted: boolean): void {
     this.isPlanted = planted;
     if (planted) {
+      if (isNull(this.plantedPreserveWorldScale)) {
+        this.plantedPreserveWorldScale = this.getHierarchyWorldScale(this.getSceneObject());
+      }
+      if (isNull(this.plantedPreserveWorldRotation)) {
+        this.plantedPreserveWorldRotation = this.getSceneObject().getTransform().getWorldRotation();
+      }
       if (this.currentStage === PlantStage.Seed && !isNull(this.seedInstance)) {
         this.resetAlignmentForPot();
       } else {
         this.refreshPlantedVisual();
       }
+      this.enforcePlantedContainerScale();
+    } else {
+      this.plantedPreserveWorldScale = null;
+      this.plantedPreserveWorldRotation = null;
     }
     this.updateInteractionForPlantedState();
     this.notifyAnchorStateChanged();
+  }
+
+  public getHierarchyWorldScale(sceneObject: SceneObject): vec3 {
+    const localScale = sceneObject.getTransform().getLocalScale();
+    const parent = sceneObject.getParent();
+    if (isNull(parent)) {
+      return localScale;
+    }
+
+    const parentWorldScale = this.getHierarchyWorldScale(parent);
+    return new vec3(
+      localScale.x * parentWorldScale.x,
+      localScale.y * parentWorldScale.y,
+      localScale.z * parentWorldScale.z
+    );
+  }
+
+  public applyPlantedWorldScale(worldScale: vec3): void {
+    this.plantedPreserveWorldScale = worldScale;
+    this.enforcePlantedContainerScale();
+  }
+
+  public applyPlantedWorldRotation(worldRotation: quat): void {
+    this.plantedPreserveWorldRotation = worldRotation;
+    this.getSceneObject().getTransform().setWorldRotation(worldRotation);
+    this.enforcePlantedContainerScale();
+  }
+
+  public getPlantedWorldRotation(): quat | null {
+    return this.plantedPreserveWorldRotation;
+  }
+
+  public applyDefaultPlantedWorldScale(): void {
+    this.applyPlantedWorldScale(
+      new vec3(
+        PlantLifecycle.DEFAULT_CONTAINER_WORLD_SCALE,
+        PlantLifecycle.DEFAULT_CONTAINER_WORLD_SCALE,
+        PlantLifecycle.DEFAULT_CONTAINER_WORLD_SCALE
+      )
+    );
   }
 
   public getIsPlanted(): boolean {
@@ -138,6 +197,22 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.showSeed();
   }
 
+  public applySpawnConfig(
+    plantTypeId: string,
+    adultPlantPrefab: ObjectPrefab,
+    plantTexture: Texture,
+    timeAsBaby: number,
+    growthTime: number,
+    scaleUpSize: number
+  ): void {
+    this.plantTypeId = plantTypeId;
+    this.adultPlantPrefab = adultPlantPrefab;
+    this.plantTexture = plantTexture;
+    this.timeAsBaby = Math.max(0, timeAsBaby);
+    this.growthTime = Math.max(0, growthTime);
+    this.scaleUpSize = Math.max(0.001, scaleUpSize);
+  }
+
   public water(): boolean {
     if (this.requiresPlanting && !this.isPlanted) {
       print(`[PlantLifecycle] ${this.getSceneObject().name}: water ignored (seed must be planted in a pot)`);
@@ -152,28 +227,23 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.hasBeenWatered = true;
 
     if (this.currentStage === PlantStage.Seed) {
-      if (this.babyTimerRemaining <= 0) {
-        this.babyTimerRemaining = Math.max(0, this.timeAsBaby);
-      }
-      this.currentStage = PlantStage.WateredBaby;
-      this.showBaby();
-      this.notifyAnchorStateChanged();
+      this.startGrowth();
       print(
-        `[PlantLifecycle] ${this.getSceneObject().name}: watered seed -> baby (${this.babyTimerRemaining.toFixed(1)}s until growth)`
+        `[PlantLifecycle] ${this.getSceneObject().name}: watered seed -> growing (${this.growthTime.toFixed(1)}s to adult)`
       );
       return true;
     }
 
-    if (this.babyTimerRemaining <= 0) {
+    if (
+      this.currentStage === PlantStage.Baby ||
+      this.currentStage === PlantStage.WateredBaby
+    ) {
       this.startGrowth();
-      print(`[PlantLifecycle] ${this.getSceneObject().name}: watered baby -> growing`);
+      print(`[PlantLifecycle] ${this.getSceneObject().name}: legacy baby stage skipped -> growing`);
       return true;
     }
 
-    this.currentStage = PlantStage.WateredBaby;
-    this.notifyAnchorStateChanged();
-    print(`[PlantLifecycle] ${this.getSceneObject().name}: re-watered baby (${this.babyTimerRemaining.toFixed(1)}s remaining)`);
-    return true;
+    return false;
   }
 
   public getSaveState(): PlantLifecycleSaveState {
@@ -192,7 +262,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.hasBeenWatered = state.hasBeenWatered;
     this.babyTimerRemaining = Math.max(0, state.babyTimerRemaining);
     this.growthElapsed = Math.max(0, state.growthElapsed);
-    this.currentStage = this.clampStage(state.stage);
+    this.currentStage = this.normalizeStage(state.stage);
     this.isPlanted = state.isPlanted;
 
     if (this.currentStage === PlantStage.Seed) {
@@ -202,11 +272,19 @@ export class PlantLifecycle extends BaseScriptComponent {
     } else if (this.currentStage === PlantStage.Adult) {
       this.showAdult();
     } else {
-      this.showBaby();
+      this.showAdultAtGrowthScale();
     }
 
     if (this.isPlanted) {
+      if (isNull(this.plantedPreserveWorldScale)) {
+        this.applyDefaultPlantedWorldScale();
+      }
       this.resetAlignmentForPot();
+      if (!isNull(state.plantedWorldRotation)) {
+        this.applyPlantedWorldRotation(state.plantedWorldRotation as quat);
+      } else {
+        this.enforcePlantedWorldRotation();
+      }
       this.updateInteractionForPlantedState();
     }
   }
@@ -222,12 +300,10 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
-    if (this.currentStage !== PlantStage.Seed && this.babyTimerRemaining > 0) {
-      this.babyTimerRemaining = Math.max(0, this.babyTimerRemaining - getDeltaTime());
-    }
-
-    if (this.currentStage === PlantStage.WateredBaby && this.babyTimerRemaining <= 0) {
-      print(`[PlantLifecycle] ${this.getSceneObject().name}: baby stage complete -> growing`);
+    if (
+      this.currentStage === PlantStage.Baby ||
+      this.currentStage === PlantStage.WateredBaby
+    ) {
       this.startGrowth();
       return;
     }
@@ -358,8 +434,8 @@ export class PlantLifecycle extends BaseScriptComponent {
     parent.getTransform().setLocalScale(vec3.one());
 
     if (isNull(this.seedPlantPrefab)) {
-      this.debugLog('showSeed skipped: seedPlantPrefab is null, falling back to baby');
-      this.showBaby();
+      this.debugLog('showSeed skipped: seedPlantPrefab is null, falling back to adult growth');
+      this.showAdultAtGrowthScale();
       return;
     }
 
@@ -490,15 +566,21 @@ export class PlantLifecycle extends BaseScriptComponent {
     );
   }
 
+  private getAdultGrowthScale(): number {
+    return this.scaleUpSize / PlantLifecycle.GROWTH_SIZE_DIVISOR;
+  }
+
   private getCurrentGrowthScale(): number {
+    const adultScale = this.getAdultGrowthScale();
     if (this.currentStage === PlantStage.Adult) {
-      return this.scaleUpSize;
+      return adultScale;
     }
 
     if (this.currentStage === PlantStage.Growing) {
       const t = this.growthTime <= 0 ? 1 : Math.min(this.growthElapsed / this.growthTime, 1);
       const eased = t * t * (3 - 2 * t);
-      return 1 + (this.scaleUpSize - 1) * eased;
+      const growthStartScale = 1 / PlantLifecycle.GROWTH_SIZE_DIVISOR;
+      return growthStartScale + (adultScale - growthStartScale) * eased;
     }
 
     return 1;
@@ -600,7 +682,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
-    this.showBaby();
+    this.showAdultAtGrowthScale();
   }
 
   private alignPlantedRootToParent(): void {
@@ -713,6 +795,42 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
     this.centerActiveModelInGrowthSpace();
     this.alignPlantedRootToParent();
+    this.enforcePlantedContainerScale();
+    this.enforcePlantedWorldRotation();
+  }
+
+  private enforcePlantedWorldRotation(): void {
+    if (!this.isPlanted || isNull(this.plantedPreserveWorldRotation)) {
+      return;
+    }
+
+    this.getSceneObject().getTransform().setWorldRotation(this.plantedPreserveWorldRotation);
+  }
+
+  private enforcePlantedContainerScale(): void {
+    if (!this.isPlanted || isNull(this.plantedPreserveWorldScale)) {
+      return;
+    }
+
+    const container = this.getSceneObject();
+    const parent = container.getParent();
+    if (isNull(parent)) {
+      return;
+    }
+
+    const parentWorldScale = this.getHierarchyWorldScale(parent);
+    container.getTransform().setLocalScale(
+      this.getLocalScaleForWorldScale(this.plantedPreserveWorldScale, parentWorldScale)
+    );
+  }
+
+  private getLocalScaleForWorldScale(worldScale: vec3, parentWorldScale: vec3): vec3 {
+    const epsilon = 0.0001;
+    return new vec3(
+      worldScale.x / Math.max(epsilon, parentWorldScale.x),
+      worldScale.y / Math.max(epsilon, parentWorldScale.y),
+      worldScale.z / Math.max(epsilon, parentWorldScale.z)
+    );
   }
 
   private updateInteractionForPlantedState(): void {
@@ -758,6 +876,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     const scale = this.getCurrentGrowthScale();
     (growthScaleNode as SceneObject).getTransform().setLocalScale(new vec3(scale, scale, scale));
     this.refreshAlignNodePosition(scale);
+    if (this.isPlanted) {
+      this.enforcePlantedContainerScale();
+    }
   }
 
   private applyAdultScale(): void {
@@ -767,9 +888,12 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     (growthScaleNode as SceneObject).getTransform().setLocalScale(
-      new vec3(this.scaleUpSize, this.scaleUpSize, this.scaleUpSize)
+      new vec3(adultScale, adultScale, adultScale)
     );
-    this.refreshAlignNodePosition(this.scaleUpSize);
+    this.refreshAlignNodePosition(adultScale);
+    if (this.isPlanted) {
+      this.enforcePlantedContainerScale();
+    }
   }
 
   private destroyCurrentInstances(): void {
@@ -828,6 +952,14 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
     print(`[PlantLifecycle] ${this.getSceneObject().name}: ${message}`);
+  }
+
+  private normalizeStage(stage: number): PlantStage {
+    const clamped = this.clampStage(stage);
+    if (clamped === PlantStage.Baby || clamped === PlantStage.WateredBaby) {
+      return PlantStage.Growing;
+    }
+    return clamped;
   }
 
   private clampStage(stage: number): PlantStage {

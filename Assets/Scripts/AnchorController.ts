@@ -10,7 +10,7 @@ import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 
 const ANCHOR_CONTROLLER_VERSION = 'v11';
-const PLANT_LIFECYCLE_SAVE_VERSION = 2;
+const PLANT_LIFECYCLE_SAVE_VERSION = 3;
 const OBJECT_KIND_PLANT = 'plant';
 const OBJECT_KIND_POT = 'pot';
 const WORLD_PREVIEW_FALLBACK_SEC = 1;
@@ -979,6 +979,19 @@ export class AnchorController extends BaseScriptComponent {
     store.putFloat(`w${index}_plant_growth_elapsed`, state.growthElapsed);
     store.putBool(`w${index}_plant_watered`, state.hasBeenWatered);
     store.putBool(`w${index}_plant_planted`, state.isPlanted);
+    if (state.isPlanted) {
+      const plantRoot = plant.getSceneObject();
+      const worldRot = plantRoot.getTransform().getWorldRotation();
+      store.putFloat(`w${index}_plant_wrw`, worldRot.w);
+      store.putFloat(`w${index}_plant_wrx`, worldRot.x);
+      store.putFloat(`w${index}_plant_wry`, worldRot.y);
+      store.putFloat(`w${index}_plant_wrz`, worldRot.z);
+    } else {
+      store.remove(`w${index}_plant_wrw`);
+      store.remove(`w${index}_plant_wrx`);
+      store.remove(`w${index}_plant_wry`);
+      store.remove(`w${index}_plant_wrz`);
+    }
   }
 
   private restorePlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
@@ -996,7 +1009,7 @@ export class AnchorController extends BaseScriptComponent {
       : 'default';
     const config = this.findPlantConfig(plantTypeId);
     if (!isNull(config)) {
-      (config as PlantSpawnConfig).applyToPlant(plant);
+      (config as PlantSpawnConfig).applySpawnConfigToPlant(plant);
     }
 
     const saveVersion = store.has(`w${index}_plant_lifecycle_version`)
@@ -1004,6 +1017,18 @@ export class AnchorController extends BaseScriptComponent {
       : 1;
     const storedStage = store.getInt(`w${index}_plant_stage`);
     const stage = saveVersion >= PLANT_LIFECYCLE_SAVE_VERSION ? storedStage : storedStage + 1;
+    const isPlanted =
+      (store.has(`w${index}_plant_planted`) && store.getBool(`w${index}_plant_planted`)) ||
+      (store.has(`w${index}_object_kind`) && store.getString(`w${index}_object_kind`) === OBJECT_KIND_POT);
+    const plantedWorldRotation =
+      isPlanted && store.has(`w${index}_plant_wrw`)
+        ? new quat(
+            store.getFloat(`w${index}_plant_wrw`),
+            store.getFloat(`w${index}_plant_wrx`),
+            store.getFloat(`w${index}_plant_wry`),
+            store.getFloat(`w${index}_plant_wrz`)
+          )
+        : null;
 
     const state: PlantLifecycleSaveState = {
       plantTypeId: plantTypeId,
@@ -1016,9 +1041,8 @@ export class AnchorController extends BaseScriptComponent {
         : 0,
       hasBeenWatered:
         store.has(`w${index}_plant_watered`) && store.getBool(`w${index}_plant_watered`),
-      isPlanted:
-        (store.has(`w${index}_plant_planted`) && store.getBool(`w${index}_plant_planted`)) ||
-        (store.has(`w${index}_object_kind`) && store.getString(`w${index}_object_kind`) === OBJECT_KIND_POT),
+      isPlanted: isPlanted,
+      plantedWorldRotation: plantedWorldRotation,
     };
     plant.applySaveState(state);
   }
@@ -1061,6 +1085,10 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_growth_elapsed`);
     store.remove(`w${index}_plant_watered`);
     store.remove(`w${index}_plant_planted`);
+    store.remove(`w${index}_plant_wrw`);
+    store.remove(`w${index}_plant_wrx`);
+    store.remove(`w${index}_plant_wry`);
+    store.remove(`w${index}_plant_wrz`);
   }
 
   private getActivePlantConfigs(): PlantSpawnConfig[] {
@@ -1143,7 +1171,10 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     plant.setAnchorPersistence(this);
-    if (this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT) {
+    if (
+      this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT &&
+      !plant.getIsPlanted()
+    ) {
       plant.setPlanted(true);
     }
   }
