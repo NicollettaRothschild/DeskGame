@@ -706,6 +706,11 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     this.applyPlantedModelOrientation();
+    if (this.currentStage === PlantStage.Seed && !isNull(this.seedInstance)) {
+      (this.seedInstance as SceneObject).getTransform().setLocalScale(
+        new vec3(this.seedScale, this.seedScale, this.seedScale)
+      );
+    }
     this.centerActiveModelInGrowthSpace();
     this.alignPlantedRootToParent();
   }

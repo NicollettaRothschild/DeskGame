@@ -130,14 +130,17 @@ export class PlantPot extends BaseScriptComponent {
   private attachPlant(plant: PlantLifecycle): void {
     const plantRoot = plant.getSceneObject();
     const attachPoint = this.getAttachPoint();
-    const worldRot = plantRoot.getTransform().getWorldRotation();
+    const plantTransform = plantRoot.getTransform();
+    const worldRot = plantTransform.getWorldRotation();
     const attachWorldPos = attachPoint.getTransform().getWorldPosition();
+    const preservedWorldScale = this.getHierarchyWorldScale(plantRoot);
 
     plantRoot.setParent(attachPoint);
-    const scale = plantRoot.getTransform().getLocalScale();
-    plantRoot.getTransform().setWorldPosition(attachWorldPos);
-    plantRoot.getTransform().setWorldRotation(worldRot);
-    plantRoot.getTransform().setLocalScale(scale);
+
+    const attachWorldScale = this.getHierarchyWorldScale(attachPoint);
+    plantTransform.setWorldPosition(attachWorldPos);
+    plantTransform.setWorldRotation(worldRot);
+    plantTransform.setLocalScale(this.getLocalScaleForWorldScale(preservedWorldScale, attachWorldScale));
 
     this.plantedPlant = plant;
     plant.setPlanted(true);
@@ -158,6 +161,30 @@ export class PlantPot extends BaseScriptComponent {
     }
 
     this.debugLog(`planted ${plantRoot.name}`);
+  }
+
+  private getHierarchyWorldScale(sceneObject: SceneObject): vec3 {
+    const localScale = sceneObject.getTransform().getLocalScale();
+    const parent = sceneObject.getParent();
+    if (isNull(parent)) {
+      return localScale;
+    }
+
+    const parentWorldScale = this.getHierarchyWorldScale(parent);
+    return new vec3(
+      localScale.x * parentWorldScale.x,
+      localScale.y * parentWorldScale.y,
+      localScale.z * parentWorldScale.z
+    );
+  }
+
+  private getLocalScaleForWorldScale(worldScale: vec3, parentWorldScale: vec3): vec3 {
+    const epsilon = 0.0001;
+    return new vec3(
+      worldScale.x / Math.max(epsilon, parentWorldScale.x),
+      worldScale.y / Math.max(epsilon, parentWorldScale.y),
+      worldScale.z / Math.max(epsilon, parentWorldScale.z)
+    );
   }
 
   private snapPlantedRootToAttachPoint(plantRoot: SceneObject): void {
