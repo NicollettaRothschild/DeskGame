@@ -10,6 +10,10 @@ type WateringObjectLike = ScriptComponent & {
   beginUnusedLifetime?: () => void;
 };
 
+type PlantLifecycleLike = ScriptComponent & {
+  getIsPlanted?: () => boolean;
+};
+
 @component
 export class TrashBin extends BaseScriptComponent {
   @input
@@ -85,10 +89,57 @@ export class TrashBin extends BaseScriptComponent {
         continue;
       }
 
-      const distance = root.getTransform().getWorldPosition().distance(trashPos);
+      const distance = this.getClosestDistanceToTrash(trashPos, root);
       if (distance <= this.trashRadius) {
         this.tryDestroyRoot(root, now);
       }
+    }
+  }
+
+  private getClosestDistanceToTrash(trashPos: vec3, root: SceneObject): number {
+    let minDistance = Number.MAX_VALUE;
+    const visited: SceneObject[] = [];
+
+    let current = root;
+    while (!isNull(current)) {
+      minDistance = Math.min(minDistance, this.getObjectProbeDistance(trashPos, current));
+      if (current === this.getSceneObject()) {
+        break;
+      }
+      current = current.getParent();
+    }
+
+    this.visitObjectHierarchy(root, (sceneObject) => {
+      minDistance = Math.min(minDistance, this.getObjectProbeDistance(trashPos, sceneObject));
+    }, visited);
+
+    return minDistance;
+  }
+
+  private getObjectProbeDistance(trashPos: vec3, sceneObject: SceneObject): number {
+    return sceneObject.getTransform().getWorldPosition().distance(trashPos);
+  }
+
+  private visitObjectHierarchy(
+    root: SceneObject,
+    visitor: (sceneObject: SceneObject) => void,
+    visited: SceneObject[],
+    depth = 0
+  ): void {
+    if (isNull(root) || depth > 12) {
+      return;
+    }
+
+    for (let i = 0; i < visited.length; i++) {
+      if (visited[i] === root) {
+        return;
+      }
+    }
+    visited.push(root);
+    visitor(root);
+
+    for (let i = 0; i < root.getChildrenCount(); i++) {
+      this.visitObjectHierarchy(root.getChild(i), visitor, visited, depth + 1);
     }
   }
 
@@ -154,6 +205,11 @@ export class TrashBin extends BaseScriptComponent {
         return wateringObject.getSceneObject();
       }
 
+      const freePlant = this.findFreePlantLifecycle(current);
+      if (!isNull(freePlant)) {
+        return freePlant.getSceneObject();
+      }
+
       const trackedRoot = this.getTrackedContentRoot(current);
       if (!isNull(trackedRoot)) {
         return trackedRoot;
@@ -171,6 +227,25 @@ export class TrashBin extends BaseScriptComponent {
       return null;
     }
     return handler.getTrackedContentRoot(candidate);
+  }
+
+  private findFreePlantLifecycle(sceneObject: SceneObject): PlantLifecycleLike | null {
+    let current = sceneObject;
+    while (!isNull(current)) {
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as PlantLifecycleLike;
+        if (
+          !isNull(candidate) &&
+          typeof candidate.getIsPlanted === 'function' &&
+          !candidate.getIsPlanted()
+        ) {
+          return candidate;
+        }
+      }
+      current = current.getParent();
+    }
+    return null;
   }
 
   private findWateringObject(sceneObject: SceneObject): WateringObjectLike | null {
