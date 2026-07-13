@@ -22,8 +22,6 @@ const ANCHOR_SCAN_REMINDER_SEC = 3;
 const PLANT_ANCHOR_Y_OFFSET = 15;
 const ANCHOR_RESTORE_STABLE_FRAMES = 2;
 const ANCHOR_RESTORE_MAX_WAIT_SEC = 1.5;
-// Trash is authored left of the desk contact; keep it beside restored plants.
-const DESK_TRASH_LOCAL_OFFSET = new vec3(-42, 0, 6);
 
 @component
 export class AnchorController extends BaseScriptComponent {
@@ -107,6 +105,8 @@ export class AnchorController extends BaseScriptComponent {
   private sessionEpoch = 0;
   private anchorSettleEvent?: UpdateEvent;
   private nextPlantSpawnIndex = 0;
+  private trashFixedWorldPosition: vec3 | null = null;
+  private trashFixedWorldRotation: quat | null = null;
 
   onAwake() {
     this.setupInteractionSounds();
@@ -161,6 +161,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     this.startAnchorSaveLoop();
+    this.captureAndLockTrashAtDesk();
   }
 
   public onAnchorNearby(anchor: Anchor) {
@@ -720,7 +721,7 @@ export class AnchorController extends BaseScriptComponent {
       this.floatingRoot = undefined;
     }
 
-    this.positionDeskTrashNearPlants();
+    this.captureAndLockTrashAtDesk();
   }
 
   private getTrashSceneObject(): SceneObject | null {
@@ -730,15 +731,32 @@ export class AnchorController extends BaseScriptComponent {
     return this.trashBin.getSceneObject();
   }
 
-  private positionDeskTrashNearPlants(): void {
+  private findSceneRoot(): SceneObject {
+    let root = this.getSceneObject();
+    while (!isNull(root.getParent())) {
+      root = root.getParent();
+    }
+    return root;
+  }
+
+  private captureAndLockTrashAtDesk(): void {
     const trashObject = this.getTrashSceneObject();
-    if (isNull(trashObject) || !this.currentAnchor || this.usingWorldSpace) {
+    if (isNull(trashObject)) {
       return;
     }
 
-    trashObject.setParent(this.widgetParent);
-    trashObject.getTransform().setLocalPosition(DESK_TRASH_LOCAL_OFFSET);
-    trashObject.getTransform().setLocalRotation(quat.quatIdentity());
+    if (isNull(this.trashFixedWorldPosition)) {
+      this.trashFixedWorldPosition = trashObject.getTransform().getWorldPosition();
+      this.trashFixedWorldRotation = trashObject.getTransform().getWorldRotation();
+    }
+
+    const parent = trashObject.getParent();
+    if (!isNull(parent) && parent === this.widgetParent) {
+      trashObject.setParent(this.findSceneRoot());
+    }
+
+    trashObject.getTransform().setWorldPosition(this.trashFixedWorldPosition);
+    trashObject.getTransform().setWorldRotation(this.trashFixedWorldRotation);
   }
 
   private notifyTrashSpawnGrace(content: SceneObject): void {
@@ -905,6 +923,7 @@ export class AnchorController extends BaseScriptComponent {
     if (objectKind === OBJECT_KIND_PLANT) {
       playInteractionSound((sounds) => sounds.playSpawnSeed());
     }
+    this.notifyTrashSpawnGrace(wrapper);
     this.notifyTrashSpawnGrace(obj);
     return obj;
   }
@@ -928,7 +947,7 @@ export class AnchorController extends BaseScriptComponent {
       `pinch up ${ANCHOR_CONTROLLER_VERSION} anchor=${!!this.currentAnchor} worldOnly=${this.usingWorldSpace} creating=${this.anchorCreationInProgress}`
     );
 
-    const trashed = this.tryTrashPlantsOnRelease();
+    this.captureAndLockTrashAtDesk();
 
     if (!this.currentAnchor && !this.anchorCreationInProgress && this.objs.length > 0 && !this.usingWorldSpace) {
       this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
@@ -937,58 +956,10 @@ export class AnchorController extends BaseScriptComponent {
 
     this.restoredFromWorldFallback = false;
     this.persistPlantTransforms();
-    if (!this.anchorCreationInProgress && !trashed) {
+    if (!this.anchorCreationInProgress) {
       playInteractionSound((sounds) => sounds.playPlaceObject());
     }
     this.trySaveAnchorOnce();
-  }
-
-  private tryTrashPlantsOnRelease(): boolean {
-    const trash = this.trashBin as unknown as {
-      isSceneObjectInTrash?: (root: SceneObject) => boolean;
-      tryTrashSceneObject?: (candidate: SceneObject) => boolean;
-      getDistanceToTrash?: (root: SceneObject) => number;
-      getTrashAcceptRadius?: () => number;
-    };
-
-    if (
-      isNull(trash) ||
-      typeof trash.isSceneObjectInTrash !== 'function' ||
-      typeof trash.tryTrashSceneObject !== 'function'
-    ) {
-      return false;
-    }
-
-    let trashedAny = false;
-    for (let i = this.objs.length - 1; i >= 0; i--) {
-      const obj = this.objs[i];
-      const wrapper = this.wrappers[i];
-      if (isNull(obj) && isNull(wrapper)) {
-        continue;
-      }
-
-      const candidate = !isNull(obj) ? obj : wrapper;
-      if (!trash.isSceneObjectInTrash(candidate)) {
-        if (typeof trash.getDistanceToTrash === 'function') {
-          const distance = trash.getDistanceToTrash(candidate);
-          const radius =
-            typeof trash.getTrashAcceptRadius === 'function' ? trash.getTrashAcceptRadius() : 0;
-          if (distance <= radius + 20) {
-            print(
-              `[AnchorController] plant ${i} near trash but not inside dist=${distance.toFixed(1)} radius=${radius.toFixed(1)}`
-            );
-          }
-        }
-        continue;
-      }
-
-      if (trash.tryTrashSceneObject(candidate)) {
-        trashedAny = true;
-        print(`[AnchorController] trashed plant ${i} via release`);
-      }
-    }
-
-    return trashedAny;
   }
 
   private persistPlantTransforms() {
@@ -1185,7 +1156,6 @@ export class AnchorController extends BaseScriptComponent {
     store.putInt('widget_count', this.wrappers.length);
     this.hasRestored = true;
     this.syncPlantCycleFromCount();
-    this.positionDeskTrashNearPlants();
     this.textlog.text = restoredCount > 0
       ? `Restored ${restoredCount} object(s)`
       : 'Could not restore saved objects';

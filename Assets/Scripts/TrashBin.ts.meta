@@ -57,9 +57,9 @@
   InputLines:
     - // @input Component.ColliderComponent triggerCollider
     - // @input Component.ScriptComponent anchorController
-    - // @input float trashRadius = 14
-    - // @input float trashColliderRadius = 26
-    - // @input float fitVisualRadiusMultiplier = 3.5
+    - // @input float trashRadius = 12
+    - // @input float trashColliderRadius = 1
+    - // @input float fitVisualRadiusMultiplier = 1.5
     - // @input bool useProximityTrash
     - // @input float destroyOverlapCooldown = 0.35
     - // @input bool debugLogging = true

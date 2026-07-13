@@ -5293,7 +5293,7 @@
   Enabled: true
   Shape: !<Sphere>
     FitVisual: true
-    Radius: 26.000000
+    Radius: 2.000000
   Matter: !<reference> 00000000-0000-0000-0000-000000000000
   Filter: !<reference> 00000000-0000-0000-0000-000000000000
   OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
@@ -6111,9 +6111,9 @@
     "":
       triggerCollider: !<reference.ColliderComponent> b6c77a4d-f512-4ac7-b655-81504f93fe0c
       anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
-      trashRadius: !<float> 45.000000
-      trashColliderRadius: !<float> 26.000000
-      fitVisualRadiusMultiplier: !<float> 3.500000
+      trashRadius: !<float> 12.000000
+      trashColliderRadius: !<float> 1.000000
+      fitVisualRadiusMultiplier: !<float> 3.000000
       useProximityTrash: false
       destroyOverlapCooldown: 0.350000
       debugLogging: true

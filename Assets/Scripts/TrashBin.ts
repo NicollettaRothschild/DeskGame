@@ -32,13 +32,13 @@ export class TrashBin extends BaseScriptComponent {
   anchorController!: ScriptComponent;
 
   @input('float')
-  trashRadius: number = 14;
+  trashRadius: number = 12;
 
   @input('float')
-  trashColliderRadius: number = 26;
+  trashColliderRadius: number = 1;
 
   @input('float')
-  fitVisualRadiusMultiplier: number = 3.5;
+  fitVisualRadiusMultiplier: number = 1.5;
 
   @input
   useProximityTrash: boolean = false;
@@ -213,9 +213,19 @@ export class TrashBin extends BaseScriptComponent {
 
     const worldScale = colliderObject.getTransform().getWorldScale();
     const scale = Math.max(worldScale.x, worldScale.y, worldScale.z);
-    let shapeRadius = Math.max(1, this.trashColliderRadius * scale);
+    const shape = (collider as unknown as {
+      shape?: { FitVisual?: boolean; radius?: number; size?: vec3 };
+    }).shape;
 
-    const shape = (collider as unknown as { shape?: { FitVisual?: boolean } }).shape;
+    let shapeRadius = Math.max(1, this.trashColliderRadius * scale);
+    if (shape && shape.radius !== undefined && shape.radius > 0) {
+      shapeRadius = shape.radius * scale;
+    } else if (shape && shape.size) {
+      const size = shape.size;
+      shapeRadius =
+        Math.sqrt(size.x * size.x + size.y * size.y + size.z * size.z) * 0.5 * scale;
+    }
+
     if (shape && shape.FitVisual) {
       shapeRadius *= Math.max(1, this.fitVisualRadiusMultiplier);
     }
@@ -317,11 +327,8 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
-    if (this.isAnchorTrackedDestroyRoot(destroyRoot)) {
-      return;
-    }
-
-    this.tryDestroyRoot(destroyRoot, getTime(), false);
+    const deliberate = this.isAnchorTrackedDestroyRoot(destroyRoot);
+    this.tryDestroyRoot(destroyRoot, getTime(), deliberate);
   }
 
   private isAnchorTrackedDestroyRoot(destroyRoot: SceneObject): boolean {
@@ -358,11 +365,7 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
-    if (!deliberate && this.isInSpawnGrace(destroyRoot, now)) {
-      return;
-    }
-
-    if (!deliberate && this.isAnchorTrackedDestroyRoot(destroyRoot)) {
+    if (this.isInSpawnGrace(destroyRoot, now)) {
       return;
     }
 
