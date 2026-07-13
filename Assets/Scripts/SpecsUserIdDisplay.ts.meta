@@ -1,0 +1,50 @@
+- !<AssetImportMetadata/cd4d8a59-0698-46c4-94af-d33f633c4e96>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> dae33bdb-0027-484f-9805-ec9e7cfdc7d0
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> dae33bdb-0027-484f-9805-ec9e7cfdc7d0
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> c97f6b8d-1863-4a1c-b242-51d67f0cc1e2
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/c97f6b8d-1863-4a1c-b242-51d67f0cc1e2>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: a625746a-382f-4d03-8f54-2313e2a61784
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    debugLogging: false
+    deviceRegistry: false
+    userIdText3D: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - userIdText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      deviceRegistry: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      debugLogging: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Component.Text3D userIdText3D
+    - // @input Component.ScriptComponent deviceRegistry
+    - // @input bool debugLogging = true

@@ -42,7 +42,9 @@
     spawnPotTrack: false
     spawnSeedTrack: false
     spawnWaterTrack: false
+    specsApi: false
     textlog: false
+    trashBin: false
     wateringTrack: false
     widgetParent: false
   ScriptTypesHidden:
@@ -75,6 +77,8 @@
       spawnPotTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       spawnWaterTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       placeObjectTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      trashBin: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
@@ -98,3 +102,5 @@
     - // @input Asset.AudioTrackAsset spawnPotTrack
     - // @input Asset.AudioTrackAsset spawnWaterTrack
     - // @input Asset.AudioTrackAsset placeObjectTrack
+    - // @input Component.ScriptComponent trashBin
+    - // @input AssignableType_3 specsApi

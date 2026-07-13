@@ -29,8 +29,11 @@
     anchorController: false
     debugLogging: false
     destroyOverlapCooldown: false
+    fitVisualRadiusMultiplier: false
+    trashColliderRadius: false
     trashRadius: false
     triggerCollider: false
+    useProximityTrash: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -43,6 +46,9 @@
     - triggerCollider: !<reference.ColliderComponent> 00000000-0000-0000-0000-000000000000
       anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       trashRadius: !<float> 14.000000
+      trashColliderRadius: !<float> 26.000000
+      fitVisualRadiusMultiplier: 3.500000
+      useProximityTrash: false
       destroyOverlapCooldown: 0.350000
       debugLogging: false
   ScriptTypes:
@@ -51,6 +57,9 @@
   InputLines:
     - // @input Component.ColliderComponent triggerCollider
     - // @input Component.ScriptComponent anchorController
-    - // @input float trashRadius = 8
+    - // @input float trashRadius = 14
+    - // @input float trashColliderRadius = 26
+    - // @input float fitVisualRadiusMultiplier = 3.5
+    - // @input bool useProximityTrash
     - // @input float destroyOverlapCooldown = 0.35
     - // @input bool debugLogging = true

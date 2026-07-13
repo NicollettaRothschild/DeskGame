@@ -18,6 +18,7 @@
     - !<own> 8ee0f565-368b-4fd9-957d-8e90c5fb48d2
     - !<own> b1d7ad20-96e6-4bc7-9908-8c68e1af1b84
     - !<own> f293204d-edc4-4b3a-8a09-4c89c40d6fa2
+    - !<own> 7576c1fb-b8e0-4047-b500-2d347889203c
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - |
@@ -405,6 +406,34 @@
     - !<own> 5e53c572-8464-4609-bd62-e95c2e342cc9
   Components:
     []
+- !<ScriptComponent/0b29b3d7-c41c-41c5-839c-90c6faa5112d>
+  PrefabRemaps:
+    []
+  Name: SpecsApiClient
+  Enabled: true
+  ScriptAsset: !<reference> f1a343a6-62ec-47eb-bfa3-1c41cb74c1e8
+  ScriptInputsDefault:
+    internetModule: true
+    apiBaseUrl: true
+    requestTimeoutSec: true
+    useEditorMockWhenOffline: true
+    editorStartPaired: true
+    editorAutoPairDelaySec: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      internetModule: !<reference.InternetModule> 00000000-0000-0000-0000-000000000000
+      apiBaseUrl: "https://arvis.space"
+      requestTimeoutSec: !<float> 20.000000
+      useEditorMockWhenOffline: true
+      editorStartPaired: false
+      editorAutoPairDelaySec: !<float> 12.000000
+      debugLogging: true
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/0b371a5f-ecbb-4922-8988-a271dc62dddc>
   PrefabRemaps:
     []
@@ -1383,6 +1412,40 @@
   ScriptTypes:
     "":
       {}
+- !<ScriptComponent/2bd21101-27b0-43aa-98bb-4da218d8b35f>
+  PrefabRemaps:
+    []
+  Name: TaskBerryManager
+  Enabled: true
+  ScriptAsset: !<reference> 8f1e933e-b14e-4e42-ad12-3d136deefba5
+  ScriptInputsDefault:
+    apiBaseUrl: true
+    pairPollSec: true
+    taskPollSec: true
+    berryRingRadius: true
+    berryHeight: true
+    useDemoTasksWhenOffline: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      specsApi: !<MappingBased.AssignableType> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_1> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      widgetParent: !<reference.SceneObject> c41a3ab5-4451-42ca-8332-990d76bcd69b
+      berryPrefab: !<reference.ObjectPrefab> 1b4e65f7-89b6-4a66-8b40-734a318bfc98
+      statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
+      apiBaseUrl: "https://arvis.space"
+      pairPollSec: !<float> 4.000000
+      taskPollSec: !<float> 45.000000
+      berryRingRadius: !<float> 22.000000
+      berryHeight: !<float> 2.000000
+      useDemoTasksWhenOffline: true
+      debugLogging: true
+      spacePanel: !<MappingBased.AssignableType_2> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
+  ScriptTypes:
+    "":
+      {}
 - !<ScriptComponent/2cbcfdfc-3e27-4493-a540-b6d621dfa24b>
   PrefabRemaps:
     []
@@ -2045,6 +2108,28 @@
   ScriptTypes:
     "":
       {}
+- !<ScriptComponent/4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182>
+  PrefabRemaps:
+    []
+  Name: SpeechRecognition
+  Enabled: true
+  ScriptAsset: !<reference> 2f847a23-53c2-4432-ba78-20f3f08d5fb1
+  ScriptInputsDefault:
+    languageCode: true
+    autoStartListening: true
+    debugLogging: true
+    commandCooldownSec: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      languageCode: en_US
+      autoStartListening: true
+      debugLogging: true
+      commandCooldownSec: 1.500000
+  ScriptTypes:
+    "":
+      {}
 - !<ScriptComponent/50508d8b-eba3-42b5-bba7-6d397d2608ef>
   PrefabRemaps:
     []
@@ -2470,6 +2555,31 @@
     []
   Components:
     - !<own> 1992b1f4-3d17-43d4-8082-62a45bf41fef
+- !<ScriptComponent/5d1a9b7c-4e6f-7a8b-1c2d-3e4f5a718293>
+  PrefabRemaps:
+    []
+  Name: FlowGardenVoiceCommands
+  Enabled: true
+  ScriptAsset: !<reference> e86285e0-3c97-44fc-b74e-0016e7872331
+  ScriptInputsDefault:
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      speechRecognition: !<MappingBased.AssignableType> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
+      taskBerryManager: !<MappingBased.AssignableType_1> 2bd21101-27b0-43aa-98bb-4da218d8b35f
+      specsApi: !<MappingBased.AssignableType_2> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_3> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      seedSource: !<MappingBased.AssignableType_4> 1a90ffcf-5171-4022-a802-9f081ad0b17e
+      waterSource: !<MappingBased.AssignableType_5> 05bf011c-1e69-427e-b52d-355ceb25ef39
+      potSource: !<MappingBased.AssignableType_6> 52ab20dc-e17d-4082-b1fc-590d526cd8b1
+      statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
+      spacePanel: !<MappingBased.AssignableType_7> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
+      debugLogging: true
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/5da3eb1d-5ae6-4554-84f5-9d3ac6251167>
   PrefabRemaps:
     []
@@ -2554,6 +2664,8 @@
       spawnPotTrack: !<reference.AudioTrackAsset> c3a74a51-d7e1-4567-99fe-569fec255ed6
       spawnWaterTrack: !<reference.AudioTrackAsset> 18682cb4-7f4d-41cb-a3b4-c8074ca2def9
       placeObjectTrack: !<reference.AudioTrackAsset> 0c246528-b9e9-4db2-97d5-46649ae9f36b
+      trashBin: !<reference.ScriptComponent> d119e162-8ef7-47b7-9485-da37a530ce5c
+      specsApi: !<reference.ScriptComponent> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
   ScriptTypes:
     "":
       {}
@@ -2952,6 +3064,25 @@
     []
   Components:
     - !<own> 28ba5d80-3f9a-470c-8c3e-af2db06054b9
+- !<SceneObject/7576c1fb-b8e0-4047-b500-2d347889203c>
+  PrefabRemaps:
+    []
+  Name: Text3D UserID
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 27.054745, y: 0.000000, z: -72.451370}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> a4904560-c685-4e78-9b57-deee28b5cf0d
+    - !<own> 86f6985a-0620-412d-b342-0cfadc2d0e8f
+    - !<own> f6a7b8c9-0d1e-4f5a-9b0c-1d2e3f4a5b6d
+    - !<own> 9f2d3e4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
+    - !<own> a1b2c3d4-e5f6-7890-abcd-ef1234567892
 - !<ScriptComponent/75e07e24-4315-42d3-9ca4-e6332e4ab55a>
   PrefabRemaps:
     []
@@ -3779,6 +3910,120 @@
   MaxDistance: 100.000000
   EnableDirectivityEffect: false
   EnablePositionEffect: false
+- !<ScriptComponent/86f6985a-0620-412d-b342-0cfadc2d0e8f>
+  PrefabRemaps:
+    []
+  Name: SpecsUserIdDisplay
+  Enabled: true
+  ScriptAsset: !<reference> dae33bdb-0027-484f-9805-ec9e7cfdc7d0
+  ScriptInputsDefault:
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      userIdText3D: !<reference.Text3D> a4904560-c685-4e78-9b57-deee28b5cf0d
+      deviceRegistry: !<reference.ScriptComponent> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      debugLogging: true
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/f6a7b8c9-0d1e-4f5a-9b0c-1d2e3f4a5b6d>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    ignoreInteractionPlane: true
+    keepHoverOnTrigger: true
+    enableInstantDrag: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: false
+      keepHoverOnTrigger: false
+      enableInstantDrag: false
+      isScrollable: false
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/9f2d3e4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a>
+  PrefabRemaps:
+    []
+  Name: ArvisAgentChat
+  Enabled: true
+  ScriptAsset: !<reference> 0f4a6303-5205-42a6-b0cd-0455ebca40bf
+  ScriptInputsDefault:
+    agentName: true
+    useHoldToTalk: true
+    maxHistoryTurns: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      speechRecognition: !<MappingBased.AssignableType> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
+      specsApi: !<MappingBased.AssignableType_1> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_2> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      agentResponseText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
+      agentResponseText3D: !<reference.Text3D> a4904560-c685-4e78-9b57-deee28b5cf0d
+      statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
+      talkInteractable: !<MappingBased.AssignableType_3> f6a7b8c9-0d1e-4f5a-9b0c-1d2e3f4a5b6d
+      agentTts: !<MappingBased.AssignableType_4> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      agentName: "Stephany"
+      useHoldToTalk: true
+      enableSpeechOutput: true
+      maxHistoryTurns: !<float> 8.000000
+      debugLogging: true
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/a1b2c3d4-e5f6-7890-abcd-ef1234567892>
+  PrefabRemaps:
+    []
+  Name: FlowGardenTTS
+  Enabled: true
+  ScriptAsset: !<reference> b4c5d6e7-f8a9-4013-a456-789abcdef012
+  ScriptInputsDefault:
+    voiceName: true
+    speed: true
+    preferArvisVoiceWhenPaired: true
+    agentName: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      ttsModule: !<reference.TextToSpeechModule> d1e2f3a4-b5c6-7890-def1-234567890abc
+      specsApi: !<MappingBased.AssignableType> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_1> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      voiceName: "Sasha"
+      speed: !<float> 1.000000
+      preferArvisVoiceWhenPaired: true
+      agentName: "Stephany"
+      debugLogging: true
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/87e8ca5e-73d4-4b0d-8a50-1678668cfdec>
   PrefabRemaps:
     []
@@ -4537,6 +4782,42 @@
   ScriptTypes:
     "":
       {}
+- !<Text3D/a4904560-c685-4e78-9b57-deee28b5cf0d>
+  PrefabRemaps:
+    []
+  Name: Text3D
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 1c799e17-6e27-46dd-a915-f43c1635c47c
+  Text: User ID
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 100
+  ExtrusionDepth: 0.400000
+  ExtrudeDirection: Both
+  Font: !<reference> 00000000-0000-0000-0000-000000000000
+  LayoutRect:
+    left: -7.500000
+    bottom: -2.250000
+    right: 7.500000
+    top: 2.250000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Overflow
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.000000
+    CapitalizationOverride: None
+  EnableBatching: false
 - !<ScriptComponent/a572bd4e-d10b-4cac-83b9-7278744d5417>
   PrefabRemaps:
     []
@@ -5433,6 +5714,24 @@
     []
   Components:
     - !<own> 3668f148-4b75-48b9-9617-782dad184f0f
+- !<ScriptComponent/c33cf58b-fff6-4a7d-a112-71b1a506b4bc>
+  PrefabRemaps:
+    []
+  Name: SpecsDeviceRegistry
+  Enabled: true
+  ScriptAsset: !<reference> 1913c950-c77f-4843-8d15-c562e49b1c89
+  ScriptInputsDefault:
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
+      userIdText3D: !<reference.Text3D> a4904560-c685-4e78-9b57-deee28b5cf0d
+      debugLogging: true
+  ScriptTypes:
+    "":
+      {}
 - !<RenderMeshVisual/c36d3fc1-b546-4274-9c48-468f8ccd289b>
   PrefabRemaps:
     []
@@ -5465,7 +5764,7 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    []
+    - !<own> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
   Components:
     - !<own> a8ce7f01-e844-458d-a945-b93d4bb1ea05
 - !<SceneObject/c4ca7ade-5e74-49a0-9f67-2b15ec7c3c06>
@@ -5812,7 +6111,10 @@
     "":
       triggerCollider: !<reference.ColliderComponent> b6c77a4d-f512-4ac7-b655-81504f93fe0c
       anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
-      trashRadius: !<float> 8.000000
+      trashRadius: !<float> 45.000000
+      trashColliderRadius: !<float> 26.000000
+      fitVisualRadiusMultiplier: !<float> 3.500000
+      useProximityTrash: false
       destroyOverlapCooldown: 0.350000
       debugLogging: true
   ScriptTypes:
@@ -6004,6 +6306,12 @@
     - !<own> 86a97912-cfb2-430c-a999-629b0d721ce3
     - !<own> 8fbe2c3f-c08b-4a38-8050-a65b3d859369
     - !<own> c8b7a6cd-d7ba-493f-9f09-ad5c0d46ad65
+    - !<own> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+    - !<own> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+    - !<own> 2bd21101-27b0-43aa-98bb-4da218d8b35f
+    - !<own> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
+    - !<own> 5d1a9b7c-4e6f-7a8b-1c2d-3e4f5a718293
+    - !<own> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
 - !<ScreenTransform/d36216bd-792a-43a6-be71-1656039955f0>
   PrefabRemaps:
     []
@@ -8015,3 +8323,403 @@
     - !<own> e1a77db6-4ec9-4b71-ae66-12fbc53d3b2a
   Components:
     - !<own> d5aa1bc6-63b3-4e66-9177-e8c5163258d4
+- !<SceneObject/e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2>
+  PrefabRemaps:
+    []
+  Name: SpacePanel
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 24.000000, y: 10.000000, z: -18.000000}
+    Rotation: {x: 0.000000, y: -18.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c
+    - !<own> b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e
+    - !<own> c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f
+    - !<own> d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a
+  Components:
+    - !<own> a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d
+    - !<own> f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c
+    - !<own> e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b
+- !<SceneObject/f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c>
+  PrefabRemaps:
+    []
+  Name: PanelBackground
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 9.500000, y: 12.000000, z: 0.200000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f
+- !<RenderMeshVisual/0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f>
+  PrefabRemaps:
+    []
+  Name: Render Mesh Visual
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 55afd613-54c4-4571-9bf1-7994d5a8378f
+  Mesh: !<reference> 3799b093-633d-48bc-842e-fc20750539b9
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e>
+  PrefabRemaps:
+    []
+  Name: SpaceTitle
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 4.200000, z: 0.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.200000, y: 1.200000, z: 1.200000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
+- !<Text3D/1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a>
+  PrefabRemaps:
+    []
+  Name: Text3D
+  Enabled: true
+  RenderOrder: 1
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 1c799e17-6e27-46dd-a915-f43c1635c47c
+  Text: ARVIS Space
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 40
+  ExtrusionDepth: 0.450000
+  ExtrudeDirection: Both
+  Font: !<reference> e46c0d03-1d80-497d-aedb-7ad89ee27e57
+  LayoutRect:
+    left: -4.000000
+    bottom: -2.200000
+    right: 4.000000
+    top: 2.200000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Wrap
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.100000
+    CapitalizationOverride: None
+  EnableBatching: false
+- !<SceneObject/c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f>
+  PrefabRemaps:
+    []
+  Name: SpaceBody
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -1.800000, z: 0.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 0.900000, y: 0.900000, z: 0.900000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b
+- !<Text3D/2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b>
+  PrefabRemaps:
+    []
+  Name: Text3D
+  Enabled: true
+  RenderOrder: 2
+  StretchMode: Stretch
+  VerticalAlignment: Top
+  HorizontalAlignment: Left
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 1c799e17-6e27-46dd-a915-f43c1635c47c
+  Text: Pair at arvis.space/specs to load your writing board.
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 34
+  ExtrusionDepth: 0.350000
+  ExtrudeDirection: Both
+  Font: !<reference> e46c0d03-1d80-497d-aedb-7ad89ee27e57
+  LayoutRect:
+    left: -4.800000
+    bottom: -5.500000
+    right: 4.800000
+    top: 4.500000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Wrap
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.150000
+    CapitalizationOverride: None
+  EnableBatching: false
+- !<SceneObject/d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a>
+  PrefabRemaps:
+    []
+  Name: SpaceImage
+  Enabled: false
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -6.500000, z: 0.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 0.100000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 3f4a5b6c-7d8e-9f0a-1b2c-3d4e5f6a7b8c
+- !<RenderMeshVisual/3f4a5b6c-7d8e-9f0a-1b2c-3d4e5f6a7b8c>
+  PrefabRemaps:
+    []
+  Name: Render Mesh Visual
+  Enabled: true
+  RenderOrder: 3
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> c35011d8-594a-4df0-93b8-a8c8461f7666
+  Mesh: !<reference> 3799b093-633d-48bc-842e-fc20750539b9
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d>
+  PrefabRemaps:
+    []
+  Name: ScrollZone
+  Enabled: false
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.800000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d
+    - !<own> 5b6c7d8e-9f0a-1b2c-3d4e-5f6a7b8c9d0e
+- !<ColliderComponent/4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d>
+  PrefabRemaps:
+    []
+  Name: Physics Collider
+  Enabled: false
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 8.500000, y: 11.500000, z: 0.500000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<ScriptComponent/5b6c7d8e-9f0a-1b2c-3d4e-5f6a7b8c9d0e>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: false
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    ignoreInteractionPlane: true
+    keepHoverOnTrigger: true
+    enableInstantDrag: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: false
+      keepHoverOnTrigger: false
+      enableInstantDrag: true
+      isScrollable: true
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 1.000000
+      acceptableZDirections: !<float> 0.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<ColliderComponent/a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d>
+  PrefabRemaps:
+    []
+  Name: Physics Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 7.500000, y: 10.000000, z: 0.500000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<ScriptComponent/f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    ignoreInteractionPlane: true
+    keepHoverOnTrigger: true
+    enableInstantDrag: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: false
+      keepHoverOnTrigger: false
+      enableInstantDrag: true
+      isScrollable: false
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: true
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    enableRotation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    enableStretchZ: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    useFilter: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
+      enableTranslation: true
+      enableRotation: true
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: false
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: true
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e>
+  PrefabRemaps:
+    []
+  Name: FlowGardenSpacePanel
+  Enabled: true
+  ScriptAsset: !<reference> d4eb7915-4ff7-423d-9880-b2dc9f586e5f
+  ScriptInputsDefault:
+    refreshIntervalSec: true
+    scrollDragSensitivity: true
+    startVisible: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      specsApi: !<MappingBased.AssignableType> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_1> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      widgetParent: !<reference.SceneObject> c41a3ab5-4451-42ca-8332-990d76bcd69b
+      panelRoot: !<reference.SceneObject> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
+      titleText3D: !<reference.Text3D> 1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
+      bodyText3D: !<reference.Text3D> 2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b
+      imageVisual: !<reference.RenderMeshVisual> 3f4a5b6c-7d8e-9f0a-1b2c-3d4e5f6a7b8c
+      statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
+      scrollInteractable: !<MappingBased.AssignableType_2> f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c
+      refreshIntervalSec: !<float> 30.000000
+      scrollDragSensitivity: 0.350000
+      startVisible: true
+      debugLogging: true
+      titleWorldScale: !<float> 1.200000
+      bodyWorldScale: !<float> 0.900000
+      maxBodyCharacters: !<float> 360.000000
+  ScriptTypes:
+    "":
+      {}

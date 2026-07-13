@@ -1,0 +1,56 @@
+- !<AssetImportMetadata/12510ee5-2f37-48a3-a0c3-64dbb3b529f1>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 414f391a-cd77-4d97-b3e6-d558af100787
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 414f391a-cd77-4d97-b3e6-d558af100787
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> d3b45ca3-5107-4256-bbff-01f9f175d2f1
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/d3b45ca3-5107-4256-bbff-01f9f175d2f1>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 40a38cb9-5cb3-464a-af12-de9d1717218d
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    interactable: false
+    labelText: false
+    manager: false
+    taskId: false
+    taskLabel: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - taskId: ""
+      taskLabel: ""
+      labelText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      manager: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      interactable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input string taskId
+    - // @input string taskLabel
+    - // @input Component.Text labelText
+    - // @input Component.ScriptComponent manager
+    - // @input Component.ScriptComponent interactable

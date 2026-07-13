@@ -1,0 +1,62 @@
+- !<AssetImportMetadata/fbae4a1c-848e-4923-82ed-68f2453cdfa6>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> f1a343a6-62ec-47eb-bfa3-1c41cb74c1e8
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> f1a343a6-62ec-47eb-bfa3-1c41cb74c1e8
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 6eab6ec6-0022-4f1a-8e02-f09c170ba31d
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/6eab6ec6-0022-4f1a-8e02-f09c170ba31d>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 37f07cc4-ad7d-44eb-8eea-06bffc0fac29
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    apiBaseUrl: false
+    debugLogging: false
+    editorAutoPairDelaySec: false
+    editorStartPaired: false
+    internetModule: false
+    requestTimeoutSec: false
+    useEditorMockWhenOffline: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - internetModule: !<reference.InternetModule> 00000000-0000-0000-0000-000000000000
+      apiBaseUrl: "https://arvis.space"
+      requestTimeoutSec: !<float> 20.000000
+      useEditorMockWhenOffline: true
+      editorStartPaired: false
+      editorAutoPairDelaySec: !<float> 12.000000
+      debugLogging: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Asset.InternetModule internetModule
+    - '// @input string apiBaseUrl = "https://arvis.space"'
+    - // @input float requestTimeoutSec = 20
+    - // @input bool useEditorMockWhenOffline = true
+    - // @input bool editorStartPaired
+    - // @input float editorAutoPairDelaySec = 12
+    - // @input bool debugLogging = true

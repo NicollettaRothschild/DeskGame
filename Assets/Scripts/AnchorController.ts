@@ -9,6 +9,8 @@ import { WorldAnchor } from 'Spatial Anchors.lspkg/WorldAnchor';
 import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 import { InteractionSoundRegistry, playInteractionSound } from './InteractionSoundRegistry';
+import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
+import { SpecsApiClient } from './SpecsApiClient';
 
 const ANCHOR_CONTROLLER_VERSION = 'v11';
 const PLANT_LIFECYCLE_SAVE_VERSION = 4;
@@ -20,6 +22,8 @@ const ANCHOR_SCAN_REMINDER_SEC = 3;
 const PLANT_ANCHOR_Y_OFFSET = 15;
 const ANCHOR_RESTORE_STABLE_FRAMES = 2;
 const ANCHOR_RESTORE_MAX_WAIT_SEC = 1.5;
+// Trash is authored left of the desk contact; keep it beside restored plants.
+const DESK_TRASH_LOCAL_OFFSET = new vec3(-42, 0, 6);
 
 @component
 export class AnchorController extends BaseScriptComponent {
@@ -72,6 +76,14 @@ export class AnchorController extends BaseScriptComponent {
   @input
   @allowUndefined
   placeObjectTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  trashBin!: ScriptComponent;
+
+  @input
+  @allowUndefined
+  specsApi!: SpecsApiClient;
 
   private anchorSession?: AnchorSession;
   private wrappers: SceneObject[] = [];
@@ -128,7 +140,17 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorSession.onAnchorNearby.add(this.onAnchorNearby.bind(this));
 
     const store = global.persistentStorageSystem.store;
-    if (store.has('widget_count') && store.getInt('widget_count') > 0) {
+    const editorPreview = this.isEditorPreviewSession();
+    if (editorPreview) {
+      const count = store.has('widget_count') ? store.getInt('widget_count') : 0;
+      if (count > 0) {
+        print(`Editor preview: clearing ${count} persisted plant(s) for a fresh desk`);
+      }
+      this.clearPersistedPlantStorageOnly();
+      this.clearSpawnedObjects();
+    }
+
+    if (!editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0) {
       print('Saved plants found, starting fast restore');
       this.runFastStartupRestore();
       const usesAnchorSpace =
@@ -594,6 +616,16 @@ export class AnchorController extends BaseScriptComponent {
     return roots;
   }
 
+  public getTrackedWrapperRoots(): SceneObject[] {
+    const roots: SceneObject[] = [];
+    for (let i = 0; i < this.wrappers.length; i++) {
+      if (!isNull(this.wrappers[i])) {
+        roots.push(this.wrappers[i]);
+      }
+    }
+    return roots;
+  }
+
   public destroyTrackedObject(candidate: SceneObject): boolean {
     const index = this.findTrackedObjectIndex(candidate);
     if (index < 0) {
@@ -612,6 +644,7 @@ export class AnchorController extends BaseScriptComponent {
     const store = global.persistentStorageSystem.store;
     const oldCount = this.wrappers.length;
     const wrapper = this.wrappers[index];
+    const content = this.objs[index];
 
     this.wrappers.splice(index, 1);
     this.objs.splice(index, 1);
@@ -619,7 +652,13 @@ export class AnchorController extends BaseScriptComponent {
     this.objectPrefabIndices.splice(index, 1);
 
     if (!isNull(wrapper)) {
-      wrapper.destroy();
+      prepareSceneObjectForDestroy(wrapper);
+      const wrapperRef = wrapper;
+      this.scheduleDelayed(() => {
+        if (!isNull(wrapperRef)) {
+          wrapperRef.destroy();
+        }
+      }, 0.15);
     }
 
     store.putInt('widget_count', this.wrappers.length);
@@ -680,6 +719,63 @@ export class AnchorController extends BaseScriptComponent {
       this.floatingRoot.destroy();
       this.floatingRoot = undefined;
     }
+
+    this.positionDeskTrashNearPlants();
+  }
+
+  private getTrashSceneObject(): SceneObject | null {
+    if (isNull(this.trashBin)) {
+      return null;
+    }
+    return this.trashBin.getSceneObject();
+  }
+
+  private positionDeskTrashNearPlants(): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject) || !this.currentAnchor || this.usingWorldSpace) {
+      return;
+    }
+
+    trashObject.setParent(this.widgetParent);
+    trashObject.getTransform().setLocalPosition(DESK_TRASH_LOCAL_OFFSET);
+    trashObject.getTransform().setLocalRotation(quat.quatIdentity());
+  }
+
+  private notifyTrashSpawnGrace(content: SceneObject): void {
+    const trash = this.trashBin as {
+      notifySpawned?: (root: SceneObject, graceSeconds?: number) => void;
+    };
+    if (!isNull(trash) && typeof trash.notifySpawned === 'function') {
+      trash.notifySpawned(content, 2);
+    }
+  }
+
+  private isEditorPreviewSession(): boolean {
+    if (!isNull(this.specsApi) && typeof this.specsApi.isEditorMockActive === 'function') {
+      return this.specsApi.isEditorMockActive();
+    }
+
+    try {
+      RemoteServiceHttpRequest.create();
+      return false;
+    } catch {
+      return true;
+    }
+  }
+
+  private clearPersistedPlantStorageOnly(): void {
+    const store = global.persistentStorageSystem.store;
+    const count = store.has('widget_count') ? store.getInt('widget_count') : 0;
+    for (let i = 0; i < count; i++) {
+      ['x', 'y', 'z', 'rx', 'ry', 'rz', 'rw', 'wx', 'wy', 'wz', 'wrx', 'wry', 'wrz', 'wrw']
+        .forEach((key) => store.remove(`w${i}_${key}`));
+      this.removePlantState(store, i);
+      store.remove(`w${i}_prefab`);
+      store.remove(`w${i}_object_kind`);
+    }
+    store.remove('widget_count');
+    store.remove('has_world_data');
+    store.remove('uses_anchor_space');
   }
 
   private worldToWidgetLocal(worldPos: vec3, worldRot: quat): { pos: vec3; rot: quat } {
@@ -809,6 +905,7 @@ export class AnchorController extends BaseScriptComponent {
     if (objectKind === OBJECT_KIND_PLANT) {
       playInteractionSound((sounds) => sounds.playSpawnSeed());
     }
+    this.notifyTrashSpawnGrace(obj);
     return obj;
   }
 
@@ -831,6 +928,8 @@ export class AnchorController extends BaseScriptComponent {
       `pinch up ${ANCHOR_CONTROLLER_VERSION} anchor=${!!this.currentAnchor} worldOnly=${this.usingWorldSpace} creating=${this.anchorCreationInProgress}`
     );
 
+    const trashed = this.tryTrashPlantsOnRelease();
+
     if (!this.currentAnchor && !this.anchorCreationInProgress && this.objs.length > 0 && !this.usingWorldSpace) {
       this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
       return;
@@ -838,10 +937,58 @@ export class AnchorController extends BaseScriptComponent {
 
     this.restoredFromWorldFallback = false;
     this.persistPlantTransforms();
-    if (!this.anchorCreationInProgress) {
+    if (!this.anchorCreationInProgress && !trashed) {
       playInteractionSound((sounds) => sounds.playPlaceObject());
     }
     this.trySaveAnchorOnce();
+  }
+
+  private tryTrashPlantsOnRelease(): boolean {
+    const trash = this.trashBin as unknown as {
+      isSceneObjectInTrash?: (root: SceneObject) => boolean;
+      tryTrashSceneObject?: (candidate: SceneObject) => boolean;
+      getDistanceToTrash?: (root: SceneObject) => number;
+      getTrashAcceptRadius?: () => number;
+    };
+
+    if (
+      isNull(trash) ||
+      typeof trash.isSceneObjectInTrash !== 'function' ||
+      typeof trash.tryTrashSceneObject !== 'function'
+    ) {
+      return false;
+    }
+
+    let trashedAny = false;
+    for (let i = this.objs.length - 1; i >= 0; i--) {
+      const obj = this.objs[i];
+      const wrapper = this.wrappers[i];
+      if (isNull(obj) && isNull(wrapper)) {
+        continue;
+      }
+
+      const candidate = !isNull(obj) ? obj : wrapper;
+      if (!trash.isSceneObjectInTrash(candidate)) {
+        if (typeof trash.getDistanceToTrash === 'function') {
+          const distance = trash.getDistanceToTrash(candidate);
+          const radius =
+            typeof trash.getTrashAcceptRadius === 'function' ? trash.getTrashAcceptRadius() : 0;
+          if (distance <= radius + 20) {
+            print(
+              `[AnchorController] plant ${i} near trash but not inside dist=${distance.toFixed(1)} radius=${radius.toFixed(1)}`
+            );
+          }
+        }
+        continue;
+      }
+
+      if (trash.tryTrashSceneObject(candidate)) {
+        trashedAny = true;
+        print(`[AnchorController] trashed plant ${i} via release`);
+      }
+    }
+
+    return trashedAny;
   }
 
   private persistPlantTransforms() {
@@ -1038,6 +1185,7 @@ export class AnchorController extends BaseScriptComponent {
     store.putInt('widget_count', this.wrappers.length);
     this.hasRestored = true;
     this.syncPlantCycleFromCount();
+    this.positionDeskTrashNearPlants();
     this.textlog.text = restoredCount > 0
       ? `Restored ${restoredCount} object(s)`
       : 'Could not restore saved objects';
@@ -1406,6 +1554,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     plant.setAnchorPersistence(this);
+    plant.setAllowTrashManipulation(true);
     if (
       this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT &&
       !plant.getIsPlanted()
@@ -1439,10 +1588,17 @@ export class AnchorController extends BaseScriptComponent {
   private findTrackedObjectIndex(sceneObject: SceneObject): number {
     for (let i = 0; i < this.objs.length; i++) {
       const obj = this.objs[i];
+      const wrapper = this.wrappers[i];
       if (isNull(obj)) {
         continue;
       }
       if (obj === sceneObject || this.isDescendantOf(sceneObject, obj)) {
+        return i;
+      }
+      if (
+        !isNull(wrapper) &&
+        (wrapper === sceneObject || this.isDescendantOf(sceneObject, wrapper))
+      ) {
         return i;
       }
     }

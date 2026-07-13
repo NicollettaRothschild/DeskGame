@@ -1,6 +1,7 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
 import { PlantLifecycle } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
+import { registerPreDestroyHook } from './FlowGardenDestroyHooks';
 
 type PublicEventLike<T> = {
   add(callback: (event: T) => void): void;
@@ -87,6 +88,7 @@ export class MainSeedSource extends BaseScriptComponent {
   private nextConfigIndex = 0;
 
   onAwake(): void {
+    registerPreDestroyHook((root) => this.abandonActivePullIfMatches(root));
     this.createEvent('OnStartEvent').bind(() => this.tryBindInteractable());
   }
 
@@ -189,6 +191,10 @@ export class MainSeedSource extends BaseScriptComponent {
     }
 
     const pull = this.activePull as PullState;
+    if (!this.isSceneObjectAlive(pull.seedObject)) {
+      this.abandonActivePull();
+      return;
+    }
     const interactor = pull.interactor;
     if (!isNull(interactor) && interactor.isActive && !interactor.isActive()) {
       this.releaseActivePull();
@@ -404,6 +410,49 @@ export class MainSeedSource extends BaseScriptComponent {
         (anchorSpawner as AnchorSeedSpawner).saveObjectPosition!();
       }
     }
+    this.abandonActivePull();
+  }
+
+  private abandonActivePullIfMatches(root: SceneObject): void {
+    if (isNull(this.activePull) || isNull(this.activePull.seedObject) || isNull(root)) {
+      return;
+    }
+
+    const seed = this.activePull.seedObject;
+    if (seed === root || this.isSameHierarchy(seed, root)) {
+      this.abandonActivePull();
+    }
+  }
+
+  private isSameHierarchy(a: SceneObject, b: SceneObject): boolean {
+    return this.isDescendantOf(a, b) || this.isDescendantOf(b, a);
+  }
+
+  private isDescendantOf(candidate: SceneObject, ancestor: SceneObject): boolean {
+    let current = candidate;
+    while (!isNull(current)) {
+      if (current === ancestor) {
+        return true;
+      }
+      current = current.getParent();
+    }
+    return false;
+  }
+
+  private isSceneObjectAlive(sceneObject: SceneObject | null): boolean {
+    if (isNull(sceneObject)) {
+      return false;
+    }
+
+    try {
+      sceneObject.getTransform();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private abandonActivePull(): void {
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
       (this.updateEvent as UpdateEvent).enabled = false;

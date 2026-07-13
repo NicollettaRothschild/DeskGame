@@ -93,6 +93,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private alignCenterX = 0;
   private alignCenterZ = 0;
   private isPlanted = false;
+  private allowTrashManipulation = false;
   private plantedPreserveWorldScale: vec3 | null = null;
   private plantedPreserveWorldRotation: quat | null = null;
   private visualStateApplied = false;
@@ -190,6 +191,11 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   public getIsPlanted(): boolean {
     return this.isPlanted;
+  }
+
+  public setAllowTrashManipulation(enabled: boolean): void {
+    this.allowTrashManipulation = enabled;
+    this.updateInteractionForPlantedState();
   }
 
   public configurePlant(
@@ -513,6 +519,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     this.resetAlignmentForPot();
+    if (this.allowTrashManipulation) {
+      this.updateInteractionForPlantedState();
+    }
   }
 
   private showAdultAtGrowthScale(): void {
@@ -665,7 +674,7 @@ export class PlantLifecycle extends BaseScriptComponent {
         if (isNull(script) || !this.isManipulationScript(script)) {
           continue;
         }
-        script.enabled = !this.isPlanted;
+        script.enabled = !this.isPlanted || this.allowTrashManipulation;
         (script as unknown as InteractableManipulationLike).manipulateRootSceneObject = container;
       }
 
@@ -1045,7 +1054,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   private updateInteractionForPlantedState(): void {
     const root = this.getSceneObject() as SceneObject;
-    if (this.isPlanted) {
+    if (this.isPlanted && !this.allowTrashManipulation) {
       this.setInteractionEnabledOnHierarchy(root, false);
       return;
     }

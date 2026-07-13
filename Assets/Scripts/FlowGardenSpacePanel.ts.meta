@@ -1,0 +1,89 @@
+- !<AssetImportMetadata/146c59b2-4d2a-489b-8dd8-ff80d1a81228>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> d4eb7915-4ff7-423d-9880-b2dc9f586e5f
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> d4eb7915-4ff7-423d-9880-b2dc9f586e5f
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 217fc171-1f01-4e4c-bfc3-864fd1afa059
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/217fc171-1f01-4e4c-bfc3-864fd1afa059>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 1015ff4d-d0a0-40c4-a36c-fbc6ba61bb37
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    bodyText3D: false
+    bodyWorldScale: false
+    debugLogging: false
+    deviceRegistry: false
+    imageVisual: false
+    maxBodyCharacters: false
+    panelRoot: false
+    refreshIntervalSec: false
+    scrollDragSensitivity: false
+    scrollInteractable: false
+    specsApi: false
+    startVisible: false
+    statusText: false
+    titleText3D: false
+    titleWorldScale: false
+    widgetParent: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - specsApi: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      deviceRegistry: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      widgetParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      panelRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      titleText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      bodyText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      imageVisual: !<reference.RenderMeshVisual> 00000000-0000-0000-0000-000000000000
+      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      scrollInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      refreshIntervalSec: !<float> 30.000000
+      scrollDragSensitivity: 0.350000
+      startVisible: true
+      debugLogging: true
+      titleWorldScale: 0.220000
+      bodyWorldScale: 0.160000
+      maxBodyCharacters: !<float> 360.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input AssignableType specsApi
+    - // @input AssignableType_1 deviceRegistry
+    - // @input SceneObject widgetParent
+    - // @input SceneObject panelRoot
+    - // @input Component.Text3D titleText3D
+    - // @input Component.Text3D bodyText3D
+    - // @input Component.RenderMeshVisual imageVisual
+    - // @input Component.Text statusText
+    - // @input Component.ScriptComponent scrollInteractable
+    - // @input float refreshIntervalSec = 30
+    - // @input float scrollDragSensitivity = 0.35
+    - // @input bool startVisible = true
+    - // @input bool debugLogging = true
+    - // @input float titleWorldScale = 1.2
+    - // @input float bodyWorldScale = 0.9
+    - // @input float maxBodyCharacters = 360
