@@ -34,6 +34,7 @@
     deviceRegistry: false
     enableSpeechOutput: false
     maxHistoryTurns: false
+    spacePanel: false
     specsApi: false
     speechRecognition: false
     statusText: false
@@ -51,6 +52,7 @@
     - speechRecognition: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       deviceRegistry: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       agentResponseText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       agentResponseText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
@@ -68,6 +70,7 @@
     - // @input AssignableType speechRecognition
     - // @input AssignableType_1 specsApi
     - // @input AssignableType_2 deviceRegistry
+    - // @input Component.ScriptComponent spacePanel
     - // @input Component.Text agentResponseText
     - // @input Component.Text3D agentResponseText3D
     - // @input Component.Text statusText
@@ -75,6 +78,6 @@
     - // @input AssignableType_3 agentTts
     - // @input bool enableSpeechOutput = true
     - '// @input string agentName = "Stephany"'
-    - // @input bool useHoldToTalk = true
+    - // @input bool useHoldToTalk
     - // @input float maxHistoryTurns = 8
     - // @input bool debugLogging = true

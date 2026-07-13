@@ -1,3 +1,8 @@
+import {
+  getSharedFlowGardenSpacePanel,
+  registerSpeechRecognition,
+} from './FlowGardenServiceRegistry';
+
 /**
  * VoiceML speech recognition — adapted from Voice Arena Lens.
  * Listens continuously and exposes the latest final transcript for other scripts.
@@ -62,6 +67,9 @@ export class SpeechRecognition extends BaseScriptComponent {
   @input
   commandCooldownSec: number = 1.5;
 
+  @input
+  mirrorTranscriptToSpacePanel: boolean = true;
+
   private voiceMLModule: VoiceMLModuleLike | null = null;
   private listeningOptions: VoiceMLListeningOptions | null = null;
   private lastCommandTime = 0;
@@ -81,6 +89,7 @@ export class SpeechRecognition extends BaseScriptComponent {
       return;
     }
     globals[GLOBAL_SPEECH_KEY] = true;
+    registerSpeechRecognition(this);
 
     try {
       this.voiceMLModule = require('LensStudio:VoiceMLModule') as VoiceMLModuleLike;
@@ -138,6 +147,19 @@ export class SpeechRecognition extends BaseScriptComponent {
   public clearFinalTranscript(): void {
     this.finalTranscript = '';
     this.interimTranscript = '';
+  }
+
+  public getLiveTranscript(): string {
+    return String(
+      this.interimTranscript || this.finalTranscript || this.lastHeard || ''
+    ).trim();
+  }
+
+  public endAgentSessionPreserveListening(): string {
+    this.agentSessionActive = false;
+    const text = this.getLiveTranscript();
+    this.pushTranscriptToSpacePanel(false);
+    return text;
   }
 
   public isAgentSessionActive(): boolean {
@@ -233,6 +255,8 @@ export class SpeechRecognition extends BaseScriptComponent {
           print(`[SpeechRecognition] FINAL: ${text}`);
         }
       }
+
+      this.pushTranscriptToSpacePanel(true);
     });
 
     this.createEvent('TapEvent').bind(() => {
@@ -241,5 +265,18 @@ export class SpeechRecognition extends BaseScriptComponent {
       }
       this.requestListening();
     });
+  }
+
+  private pushTranscriptToSpacePanel(isListening: boolean): void {
+    if (!this.mirrorTranscriptToSpacePanel) {
+      return;
+    }
+
+    const panel = getSharedFlowGardenSpacePanel();
+    if (isNull(panel)) {
+      return;
+    }
+
+    panel.showSpeechTranscript(this.getLiveTranscript(), isListening);
   }
 }

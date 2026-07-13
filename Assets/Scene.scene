@@ -4039,6 +4039,7 @@
     "":
       userIdText3D: !<reference.Text3D> a4904560-c685-4e78-9b57-deee28b5cf0d
       deviceRegistry: !<MappingBased.AssignableType> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      arvisAgentChat: !<MappingBased.AssignableType> 9f2d3e4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
       debugLogging: true
   ScriptTypes:
     "":
@@ -4659,6 +4660,7 @@
     speechRecognition: true
     specsApi: true
     deviceRegistry: true
+    spacePanel: true
     agentResponseText: true
     agentResponseText3D: true
     statusText: true
@@ -4673,17 +4675,18 @@
     {}
   ScriptInputs:
     "":
-      speechRecognition: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
-      specsApi: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
-      deviceRegistry: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      speechRecognition: !<MappingBased.AssignableType> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
+      specsApi: !<MappingBased.AssignableType_1> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_2> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      spacePanel: !<reference.ScriptComponent> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
       agentResponseText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       agentResponseText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
-      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
-      talkInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-      agentTts: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
+      talkInteractable: !<reference.ScriptComponent> f6a7b8c9-0d1e-4f5a-9b0c-1d2e3f4a5b6d
+      agentTts: !<MappingBased.AssignableType_3> a1b2c3d4-e5f6-7890-abcd-ef1234567892
       enableSpeechOutput: true
       agentName: Stephany
-      useHoldToTalk: true
+      useHoldToTalk: false
       maxHistoryTurns: !<float> 8.000000
       debugLogging: true
   ScriptTypes:

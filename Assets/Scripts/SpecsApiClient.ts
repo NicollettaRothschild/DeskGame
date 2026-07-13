@@ -1,3 +1,4 @@
+import { registerSpecsApi } from './FlowGardenServiceRegistry';
 import { SpecsEditorMock } from './SpecsEditorMock';
 
 export type SpecsTask = {
@@ -67,6 +68,7 @@ export class SpecsApiClient extends BaseScriptComponent {
   private editorAutoPairScheduled = false;
 
   onAwake(): void {
+    registerSpecsApi(this);
     this.resolveInternetModule();
   }
 
@@ -515,7 +517,7 @@ export class SpecsApiClient extends BaseScriptComponent {
       if (!SpecsEditorMock.fetchPairStatus().paired) {
         SpecsEditorMock.markPaired();
         if (this.debugLogging) {
-          print('[SpecsApi] Editor mock auto-paired (simulated web pairing)');
+          print('[SpecsApi] Editor mock auto-paired locally (website pairing still requires Specs hardware)');
         }
       }
     });

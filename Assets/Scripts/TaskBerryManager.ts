@@ -205,7 +205,9 @@ export class TaskBerryManager extends BaseScriptComponent {
 
   private registerDevice(): void {
     const deviceId = this.deviceRegistry.getDeviceId();
-    const mockHint = this.specsApi.isEditorMockActive() ? '\n(Editor mock — auto-pairs in ~12s)' : '';
+    const mockHint = this.specsApi.isEditorMockActive()
+      ? '\n(Editor preview — device is NOT on arvis.space; deploy to Specs to pair on website)'
+      : '';
     this.setStatus(`Pair at arvis.space/specs\nDevice: ${deviceId}${mockHint}`);
 
     this.specsApi.registerDevice(deviceId, (registration, error) => {

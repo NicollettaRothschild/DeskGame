@@ -1,3 +1,10 @@
+import {
+  getSharedFlowGardenSpacePanel,
+  getSharedFlowGardenTts,
+  getSharedSpecsApi,
+  getSharedSpecsDeviceRegistry,
+  getSharedSpeechRecognition,
+} from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
@@ -6,6 +13,16 @@ import { FlowGardenTTS } from './FlowGardenTTS';
 type AgentHistoryEntry = {
   role: 'user' | 'assistant';
   text: string;
+};
+
+type SpacePanelLike = {
+  showAgentChat?: (
+    transcript: string,
+    response: string | null,
+    agentName: string,
+    phase: 'listening' | 'thinking' | 'reply' | 'error'
+  ) => void;
+  isAgentViewActive?: () => boolean;
 };
 
 type InteractableLike = ScriptComponent & {
@@ -28,6 +45,10 @@ export class ArvisAgentChat extends BaseScriptComponent {
   @input
   @allowUndefined
   deviceRegistry!: SpecsDeviceRegistry;
+
+  @input
+  @allowUndefined
+  spacePanel!: ScriptComponent;
 
   @input
   @allowUndefined
@@ -56,7 +77,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   agentName: string = 'Stephany';
 
   @input
-  useHoldToTalk: boolean = true;
+  useHoldToTalk: boolean = false;
 
   @input
   maxHistoryTurns: number = 8;
@@ -64,24 +85,43 @@ export class ArvisAgentChat extends BaseScriptComponent {
   @input
   debugLogging: boolean = true;
 
+  @input
+  transcriptOnlyMode: boolean = true;
+
   private history: AgentHistoryEntry[] = [];
   private listening = false;
   private sending = false;
   private interactableBound = false;
+  private dependenciesLogged = false;
 
   onAwake(): void {
-    this.setDisplay('Hold pinch on Text3D UserID to talk to ' + this.agentName);
-    this.createEvent('OnStartEvent').bind(() => this.bindTalkInteractable());
+    this.setStatus('Tap or pinch UserID to talk to ' + this.agentName);
+    this.createEvent('OnStartEvent').bind(() => {
+      this.resolveDependencies();
+      this.bindTalkInteractable();
+    });
+    this.createEvent('TapEvent').bind(() => this.toggleAgentTalk());
+  }
 
-    if (isNull(this.talkInteractable)) {
-      this.createEvent('TapEvent').bind(() => this.toggleAgentTalk());
-    }
+  public isBusy(): boolean {
+    return this.listening || this.sending;
+  }
+
+  public isAgentBoardActive(): boolean {
+    const panel = this.getSpacePanel();
+    return (
+      !isNull(panel) &&
+      typeof panel.isAgentViewActive === 'function' &&
+      panel.isAgentViewActive()
+    );
   }
 
   public beginAgentTalk(): void {
     if (this.listening || this.sending) {
       return;
     }
+
+    this.resolveDependencies();
     if (isNull(this.speechRecognition)) {
       this.setStatus('Speech recognition not wired');
       return;
@@ -89,7 +129,11 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     this.listening = true;
     this.speechRecognition.beginAgentSession();
-    this.setDisplay('Listening…');
+    if (this.transcriptOnlyMode) {
+      this.setStatus('Speak — tap again when done');
+      return;
+    }
+    this.updateBoard('listening', '', null);
     this.setStatus('Speak to ' + this.agentName);
   }
 
@@ -99,10 +143,17 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     this.listening = false;
-    const transcript = this.speechRecognition.endAgentSession();
+    const transcript = this.transcriptOnlyMode
+      ? this.speechRecognition.endAgentSessionPreserveListening()
+      : this.speechRecognition.endAgentSession();
     if (!transcript) {
-      this.setDisplay('Did not catch that. Try again.');
+      this.updateBoard('error', '', 'Did not catch that. Try again.');
       this.setStatus('No speech detected');
+      return;
+    }
+
+    if (this.transcriptOnlyMode) {
+      this.setStatus(transcript ? 'Transcript captured' : 'No speech detected');
       return;
     }
 
@@ -114,7 +165,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
     if (!isNull(this.speechRecognition)) {
       this.speechRecognition.cancelAgentSession();
     }
-    this.setDisplay('Cancelled');
+    this.updateBoard('error', '', 'Cancelled');
     this.setStatus('');
   }
 
@@ -124,6 +175,32 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
     this.beginAgentTalk();
+  }
+
+  private resolveDependencies(): void {
+    if (isNull(this.specsApi)) {
+      this.specsApi = getSharedSpecsApi();
+    }
+    if (isNull(this.deviceRegistry)) {
+      this.deviceRegistry = getSharedSpecsDeviceRegistry();
+    }
+    if (isNull(this.speechRecognition)) {
+      this.speechRecognition = getSharedSpeechRecognition();
+    }
+    if (isNull(this.spacePanel)) {
+      const panel = getSharedFlowGardenSpacePanel();
+      this.spacePanel = panel as unknown as ScriptComponent;
+    }
+    if (isNull(this.agentTts)) {
+      this.agentTts = getSharedFlowGardenTts();
+    }
+
+    if (this.debugLogging && !this.dependenciesLogged) {
+      this.dependenciesLogged = true;
+      print(
+        `[ArvisAgentChat] resolved speech=${!isNull(this.speechRecognition)} panel=${!isNull(this.spacePanel)} api=${!isNull(this.specsApi)}`
+      );
+    }
   }
 
   private bindTalkInteractable(): void {
@@ -137,7 +214,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     if (!triggerStart) {
       if (this.debugLogging) {
-        print('[ArvisAgentChat] talkInteractable has no trigger events — use beginAgentTalk/endAgentTalkAndSend from a button');
+        print('[ArvisAgentChat] talkInteractable has no trigger events — tap UserID to talk');
       }
       return;
     }
@@ -167,19 +244,20 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
 
+    this.resolveDependencies();
     if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
-      this.setDisplay('Missing Specs API wiring');
+      this.updateBoard('error', trimmed, 'Missing Specs API wiring');
       return;
     }
 
     if (!this.deviceRegistry.isPaired() && !this.specsApi.isEditorMockActive()) {
-      this.setDisplay('Pair at arvis.space/specs first');
+      this.updateBoard('error', trimmed, 'Pair at arvis.space/specs first');
       this.setStatus('Device not paired');
       return;
     }
 
     this.sending = true;
-    this.setDisplay('You: ' + trimmed + '\n\n…');
+    this.updateBoard('thinking', trimmed, null);
     this.setStatus('Thinking…');
 
     const payloadHistory = this.history.map((entry) => ({
@@ -196,7 +274,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
       (result, error) => {
         this.sending = false;
         if (!result) {
-          this.setDisplay('Agent error: ' + (error || 'unknown'));
+          this.updateBoard('error', trimmed, error || 'unknown');
           this.setStatus('');
           return;
         }
@@ -204,7 +282,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
         this.pushHistory('user', trimmed);
         this.pushHistory('assistant', result.response);
         const label = result.agentName || this.agentName;
-        this.setDisplay(`${label}:\n${result.response}`);
+        this.updateBoard('reply', trimmed, result.response, label);
         this.setStatus('');
         if (this.debugLogging) {
           print(`[ArvisAgentChat] ${label}: ${result.response}`);
@@ -212,6 +290,41 @@ export class ArvisAgentChat extends BaseScriptComponent {
         this.speakAgentResponse(result.response, label);
       }
     );
+  }
+
+  private updateBoard(
+    phase: 'listening' | 'thinking' | 'reply' | 'error',
+    transcript: string,
+    response: string | null,
+    agentName?: string
+  ): void {
+    const label = agentName || this.agentName;
+    const panel = this.getSpacePanel();
+    if (!isNull(panel) && typeof panel.showAgentChat === 'function') {
+      panel.showAgentChat(transcript, response, label, phase);
+      return;
+    }
+
+    if (phase === 'listening') {
+      this.setDisplay('Listening…');
+      return;
+    }
+    if (phase === 'thinking') {
+      this.setDisplay(`You: ${transcript}\n\n…`);
+      return;
+    }
+    if (phase === 'error') {
+      this.setDisplay(response || 'Error');
+      return;
+    }
+    this.setDisplay(`${label}:\n${response || ''}`);
+  }
+
+  private getSpacePanel(): SpacePanelLike | null {
+    if (isNull(this.spacePanel)) {
+      return null;
+    }
+    return this.spacePanel as unknown as SpacePanelLike;
   }
 
   private speakAgentResponse(response: string, label: string): void {

@@ -1,4 +1,6 @@
-import { applySpecsPairingText3D } from './SpecsPairingDisplay';
+import { ArvisAgentChat } from './ArvisAgentChat';
+import { getSharedSpecsDeviceRegistry } from './FlowGardenServiceRegistry';
+import { applySpecsPairingText3D, isSpecsEditorMockActive } from './SpecsPairingDisplay';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 
 const STORAGE_DEVICE_ID = 'specs_device_id';
@@ -16,6 +18,10 @@ export class SpecsUserIdDisplay extends BaseScriptComponent {
   @input
   @allowUndefined
   deviceRegistry!: SpecsDeviceRegistry;
+
+  @input
+  @allowUndefined
+  arvisAgentChat!: ArvisAgentChat;
 
   @input
   debugLogging: boolean = true;
@@ -77,6 +83,17 @@ export class SpecsUserIdDisplay extends BaseScriptComponent {
   }
 
   private refreshFromRegistry(): void {
+    if (isNull(this.deviceRegistry)) {
+      this.deviceRegistry = getSharedSpecsDeviceRegistry();
+    }
+
+    if (!isNull(this.arvisAgentChat) && this.arvisAgentChat.isBusy()) {
+      return;
+    }
+    if (!isNull(this.arvisAgentChat) && this.arvisAgentChat.isAgentBoardActive()) {
+      return;
+    }
+
     if (isNull(this.userIdText3D)) {
       if (this.debugLogging) {
         print('[SpecsUserIdDisplay] No Text3D component found on this object.');
@@ -95,10 +112,12 @@ export class SpecsUserIdDisplay extends BaseScriptComponent {
       ? this.deviceRegistry.isPaired()
       : false;
 
-    applySpecsPairingText3D(this.userIdText3D as Text3D, deviceId, paired);
+    const editorMock = isSpecsEditorMockActive();
+    applySpecsPairingText3D(this.userIdText3D as Text3D, deviceId, paired, { editorMock });
 
     if (this.debugLogging) {
-      print(`[SpecsUserIdDisplay] ${deviceId} paired=${paired}`);
+      const mode = editorMock ? ' editor-mock' : '';
+      print(`[SpecsUserIdDisplay] ${deviceId} paired=${paired}${mode}`);
     }
   }
 }

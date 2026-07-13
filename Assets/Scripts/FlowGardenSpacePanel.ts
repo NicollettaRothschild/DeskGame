@@ -1,3 +1,4 @@
+import { registerFlowGardenSpacePanel } from './FlowGardenServiceRegistry';
 import { SpecsApiClient, SpecsSpaceItem, SpecsSpacePanel } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 
@@ -71,6 +72,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   @input('float')
   maxBodyCharacters: number = 360;
 
+  @input('float')
+  speechBodyExtraOffset: number = 12;
+
   private panel: SpecsSpacePanel | null = null;
   private itemIndex = 0;
   private refreshEvent: DelayedCallbackEvent | null = null;
@@ -83,8 +87,10 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private panelFixedWorldRotation: quat | null = null;
   private deskFixedParent: SceneObject | null = null;
   private panelLockEvent: UpdateEvent | null = null;
+  private agentViewActive = false;
 
   onAwake(): void {
+    registerFlowGardenSpacePanel(this);
     this.resolvePanelRoot();
     this.disablePanelManipulation();
     this.lockPanelAtDesk();
@@ -100,7 +106,84 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     });
   }
 
+  public isAgentViewActive(): boolean {
+    return this.agentViewActive;
+  }
+
+  public showSpeechTranscript(liveText: string, isListening: boolean): void {
+    this.agentViewActive = true;
+    this.setPanelVisible(true);
+    this.hideImage();
+
+    const text = String(liveText || '').trim();
+    this.setTitle(isListening ? 'Speech · Listening' : 'Speech');
+    this.setBody(text || (isListening ? '(speak now…)' : '(no speech heard)'));
+    this.setStatus(isListening ? 'Listening…' : text ? 'Heard' : '');
+    this.applySpeechTextLayout();
+  }
+
+  public showAgentChat(
+    transcript: string,
+    response: string | null,
+    agentName: string,
+    phase: 'listening' | 'thinking' | 'reply' | 'error'
+  ): void {
+    this.agentViewActive = true;
+    this.setPanelVisible(true);
+    this.hideImage();
+
+    const label = String(agentName || 'Agent').trim() || 'Agent';
+    const userLine = String(transcript || '').trim();
+    const replyLine = String(response || '').trim();
+
+    if (phase === 'listening') {
+      this.setTitle(`${label} · Listening`);
+      this.setBody(userLine ? `You: ${userLine}\n\n(Speak now…)` : 'Speak now…');
+      this.setStatus('Listening…');
+      this.applySpeechTextLayout();
+      return;
+    }
+
+    if (phase === 'thinking') {
+      this.setTitle(`${label} · Thinking`);
+      this.setBody(userLine ? `You: ${userLine}\n\n…` : '…');
+      this.setStatus('Thinking…');
+      return;
+    }
+
+    if (phase === 'error') {
+      this.setTitle(`${label} · Error`);
+      const detail = replyLine || 'Something went wrong.';
+      this.setBody(userLine ? `You: ${userLine}\n\n${detail}` : detail);
+      this.setStatus(detail);
+      return;
+    }
+
+    this.setTitle(label);
+    const body = userLine
+      ? `You: ${userLine}\n\n${label}:\n${replyLine || '(no response)'}`
+      : `${label}:\n${replyLine || '(no response)'}`;
+    this.setBody(this.truncateBody(body));
+    this.setStatus('');
+  }
+
+  public clearAgentView(): void {
+    if (!this.agentViewActive) {
+      return;
+    }
+    this.agentViewActive = false;
+    if (this.panel && this.panel.items.length > 0) {
+      this.renderCurrentItem();
+      return;
+    }
+    this.refreshPanel();
+  }
+
   public refreshPanel(): void {
+    if (this.agentViewActive) {
+      return;
+    }
+
     if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
       this.setStatus('Space panel not wired');
       return;
@@ -180,6 +263,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   }
 
   public nextItem(): void {
+    if (this.agentViewActive) {
+      this.clearAgentView();
+    }
     if (!this.panel || this.panel.items.length === 0) {
       return;
     }
@@ -188,6 +274,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   }
 
   public previousItem(): void {
+    if (this.agentViewActive) {
+      this.clearAgentView();
+    }
     if (!this.panel || this.panel.items.length === 0) {
       return;
     }
@@ -439,6 +528,30 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.setTextLocalY(this.bodyText3D, bodyY);
   }
 
+  private applySpeechTextLayout(): void {
+    const panelSize = this.resolvePanelBackgroundSize();
+    if (!panelSize) {
+      return;
+    }
+
+    this.applyTextWorldScale(this.titleText3D, this.titleWorldScale);
+    this.applyTextWorldScale(this.bodyText3D, this.bodyWorldScale);
+
+    const marginY = panelSize.height * 0.08;
+    const innerHeight = panelSize.height - marginY * 2;
+    const titleBandHeight = innerHeight * 0.28;
+    const titleY = panelSize.height * 0.5 - marginY - titleBandHeight * 0.5;
+    const bodyY =
+      panelSize.height * 0.5 -
+      marginY -
+      titleBandHeight -
+      (innerHeight - titleBandHeight) * 0.5 -
+      this.speechBodyExtraOffset;
+
+    this.setTextLocalY(this.titleText3D, titleY);
+    this.setTextLocalY(this.bodyText3D, bodyY);
+  }
+
   private resolvePanelBackgroundSize(): { width: number; height: number } | null {
     if (isNull(this.panelRoot)) {
       return null;
@@ -571,11 +684,15 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       combined = title || body || '(empty)';
     }
 
+    return this.truncateBody(combined);
+  }
+
+  private truncateBody(value: string): string {
+    const combined = String(value || '');
     const maxChars = Math.max(80, Math.floor(this.maxBodyCharacters));
     if (combined.length <= maxChars) {
       return combined;
     }
-
     return combined.slice(0, maxChars - 1) + '…';
   }
 

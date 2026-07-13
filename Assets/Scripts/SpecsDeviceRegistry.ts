@@ -1,4 +1,5 @@
-import { applySpecsPairingText3D, SPECS_PAIRING_URL } from './SpecsPairingDisplay';
+import { registerSpecsDeviceRegistry } from './FlowGardenServiceRegistry';
+import { applySpecsPairingText3D, isSpecsEditorMockActive, SPECS_PAIRING_URL } from './SpecsPairingDisplay';
 
 const STORAGE_DEVICE_ID = 'specs_device_id';
 const STORAGE_DEVICE_SECRET = 'specs_device_secret';
@@ -23,6 +24,7 @@ export class SpecsDeviceRegistry extends BaseScriptComponent {
   private pairSyncEvent: DelayedCallbackEvent | null = null;
 
   onAwake(): void {
+    registerSpecsDeviceRegistry(this);
     this.resolveUserIdText3D();
     this.loadFromStorage();
     if (!this.deviceId) {
@@ -117,12 +119,19 @@ export class SpecsDeviceRegistry extends BaseScriptComponent {
     const displayId = this.deviceId || 'SPEC-????';
 
     const text3d = this.resolveUserIdText3D();
+    const editorMock = isSpecsEditorMockActive();
+
     if (!isNull(text3d)) {
-      applySpecsPairingText3D(text3d as Text3D, displayId, this.paired);
+      applySpecsPairingText3D(text3d as Text3D, displayId, this.paired, { editorMock });
     }
 
     if (!isNull(this.statusText)) {
-      const pairHint = this.paired ? 'paired' : SPECS_PAIRING_URL;
+      let pairHint = this.paired ? 'paired' : SPECS_PAIRING_URL;
+      if (editorMock) {
+        pairHint = this.paired
+          ? 'editor mock paired (not on arvis.space)'
+          : 'editor preview — deploy to Specs to register';
+      }
       this.statusText.text = `Specs ID: ${displayId}\n${pairHint}`;
     }
 

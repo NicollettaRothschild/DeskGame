@@ -26,6 +26,7 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    arvisAgentChat: false
     debugLogging: false
     deviceRegistry: false
     userIdText3D: false
@@ -40,6 +41,7 @@
   DefaultScriptInputs:
     - userIdText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       deviceRegistry: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      arvisAgentChat: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       debugLogging: true
   ScriptTypes:
     -
@@ -47,4 +49,5 @@
   InputLines:
     - // @input Component.Text3D userIdText3D
     - // @input AssignableType deviceRegistry
+    - // @input AssignableType_1 arvisAgentChat
     - // @input bool debugLogging = true

@@ -1,3 +1,4 @@
+import { registerFlowGardenTts } from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 
@@ -38,6 +39,7 @@ export class FlowGardenTTS extends BaseScriptComponent {
   private speaking = false;
 
   onAwake(): void {
+    registerFlowGardenTts(this);
     this.audioPlayer = this.getSceneObject().createComponent('Component.AudioComponent') as AudioComponent;
   }
 
