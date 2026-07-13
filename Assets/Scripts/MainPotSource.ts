@@ -38,6 +38,7 @@ type AnchorPotSpawner = {
     worldPos: vec3
   ): SceneObject | null;
   saveObjectPosition?: () => void;
+  setActiveManipulatedRoot?: (root: SceneObject | null) => void;
 };
 
 type PullState = {
@@ -367,8 +368,14 @@ export class MainPotSource extends BaseScriptComponent {
     if (!isNull(this.activePull)) {
       this.debugLog('released active pot pull.');
       const anchorSpawner = this.getAnchorPotSpawner();
-      if (!isNull(anchorSpawner) && typeof (anchorSpawner as AnchorPotSpawner).saveObjectPosition === 'function') {
-        (anchorSpawner as AnchorPotSpawner).saveObjectPosition!();
+      if (!isNull(anchorSpawner)) {
+        const spawner = anchorSpawner as AnchorPotSpawner;
+        if (typeof spawner.setActiveManipulatedRoot === 'function') {
+          spawner.setActiveManipulatedRoot(this.activePull.potObject);
+        }
+        if (typeof spawner.saveObjectPosition === 'function') {
+          spawner.saveObjectPosition();
+        }
       }
     }
     this.activePull = null;

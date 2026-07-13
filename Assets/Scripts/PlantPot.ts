@@ -133,7 +133,7 @@ export class PlantPot extends BaseScriptComponent {
     const attachPoint = this.getAttachPoint();
     const plantTransform = plantRoot.getTransform();
     const preservedWorldScale = plant.getHierarchyWorldScale(plantRoot);
-    const worldRot = plantTransform.getWorldRotation();
+    const preservedWorldRotation = plantTransform.getWorldRotation();
 
     plantRoot.setParent(attachPoint);
     const localScale = plantTransform.getLocalScale();
@@ -142,7 +142,7 @@ export class PlantPot extends BaseScriptComponent {
 
     this.plantedPlant = plant;
     plant.applyPlantedWorldScale(preservedWorldScale);
-    plant.applyPlantedWorldRotation(worldRot);
+    plant.applyPlantedWorldRotation(preservedWorldRotation);
     plant.setPlanted(true);
 
     if (

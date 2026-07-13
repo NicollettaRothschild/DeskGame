@@ -111,6 +111,10 @@ export class AnchorController extends BaseScriptComponent {
   private nextPlantSpawnIndex = 0;
   private trashFixedWorldPosition: vec3 | null = null;
   private trashFixedWorldRotation: quat | null = null;
+  private activeManipulatedRoot: SceneObject | null = null;
+  private lastSaveObjectPositionAt = -1;
+  private readonly saveObjectPositionCooldownSec = 0.1;
+  private trashReleaseWiredObjects: SceneObject[] = [];
 
   onAwake() {
     this.setupInteractionSounds();
@@ -782,14 +786,114 @@ export class AnchorController extends BaseScriptComponent {
     }
   }
 
-  private tryTrashTrackedOnRelease(): boolean {
+  private tryTrashTrackedOnRelease(releasedRoot?: SceneObject | null): boolean {
     const trash = this.trashBin as {
-      tryTrashTrackedOnRelease?: () => boolean;
+      tryTrashTrackedOnRelease?: (root?: SceneObject | null) => boolean;
     };
     if (!isNull(trash) && typeof trash.tryTrashTrackedOnRelease === 'function') {
-      return trash.tryTrashTrackedOnRelease();
+      return trash.tryTrashTrackedOnRelease(releasedRoot ?? null);
     }
     return false;
+  }
+
+  public setActiveManipulatedRoot(root: SceneObject | null): void {
+    this.activeManipulatedRoot = root;
+  }
+
+  private resolveReleasedTrackedRoot(): SceneObject | null {
+    return this.activeManipulatedRoot;
+  }
+
+  private wireTrashReleaseTracking(trackedRoot: SceneObject, wrapper?: SceneObject | null): void {
+    const roots: SceneObject[] = [];
+    if (!isNull(trackedRoot)) {
+      roots.push(trackedRoot);
+    }
+    if (!isNull(wrapper) && wrapper !== trackedRoot) {
+      roots.push(wrapper);
+    }
+
+    for (let i = 0; i < roots.length; i++) {
+      this.bindTrashReleaseTrackingOnHierarchy(roots[i], trackedRoot);
+    }
+  }
+
+  private bindTrashReleaseTrackingOnHierarchy(
+    node: SceneObject,
+    trackedRoot: SceneObject
+  ): void {
+    if (isNull(node)) {
+      return;
+    }
+
+    if (!this.isTrashReleaseWired(node)) {
+      this.markTrashReleaseWired(node);
+      const scripts = node.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i] as ScriptComponent & {
+          onDragStart?: { add: (cb: () => void) => void };
+          onDragEnd?: { add: (cb: () => void) => void };
+          onTriggerStart?: { add: (cb: () => void) => void };
+          onTriggerEnd?: { add: (cb: () => void) => void };
+          onTriggerEndOutside?: { add: (cb: () => void) => void };
+          onInteractorTriggerStart?: { add: (cb: () => void) => void };
+          onInteractorTriggerEnd?: { add: (cb: () => void) => void };
+          onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
+        };
+        if (isNull(script) || !this.isTrashTrackingInteractionScript(script)) {
+          continue;
+        }
+
+        const markActive = (): void => {
+          this.activeManipulatedRoot = trackedRoot;
+        };
+        const onRelease = (): void => {
+          this.activeManipulatedRoot = trackedRoot;
+          this.saveObjectPosition();
+        };
+
+        if (script.onDragStart) {
+          script.onDragStart.add(markActive);
+        }
+        if (script.onTriggerStart) {
+          script.onTriggerStart.add(markActive);
+        }
+        if (script.onInteractorTriggerStart) {
+          script.onInteractorTriggerStart.add(markActive);
+        }
+
+        if (script.onDragEnd) {
+          script.onDragEnd.add(onRelease);
+        }
+        if (script.onTriggerEnd) {
+          script.onTriggerEnd.add(onRelease);
+        }
+        if (script.onTriggerEndOutside) {
+          script.onTriggerEndOutside.add(onRelease);
+        }
+        if (script.onInteractorTriggerEnd) {
+          script.onInteractorTriggerEnd.add(onRelease);
+        }
+        if (script.onInteractorTriggerEndOutside) {
+          script.onInteractorTriggerEndOutside.add(onRelease);
+        }
+      }
+    }
+
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      this.bindTrashReleaseTrackingOnHierarchy(node.getChild(i), trackedRoot);
+    }
+  }
+
+  private isTrashTrackingInteractionScript(script: ScriptComponent): boolean {
+    const candidate = script as unknown as Record<string, unknown>;
+    if (Array.isArray(candidate.onPinchUp_Select)) {
+      return false;
+    }
+    if (candidate.manipulateRootSceneObject !== undefined) {
+      return true;
+    }
+    return candidate.targetingMode !== undefined && candidate.onTriggerStart !== undefined;
   }
 
   private isEditorPreviewSession(): boolean {
@@ -940,6 +1044,7 @@ export class AnchorController extends BaseScriptComponent {
     this.objectPrefabIndices.push(prefabIndex);
     this.wirePlantLifecycle(obj);
     this.wirePotPersistence(obj);
+    this.wireTrashReleaseTracking(obj, wrapper);
 
     if (updateStoredCount) {
       global.persistentStorageSystem.store.putInt('widget_count', this.wrappers.length);
@@ -962,10 +1067,46 @@ export class AnchorController extends BaseScriptComponent {
     this.persistPlantState(store, index, this.objs[index]);
   }
 
+  public notifyTrackedVisualHierarchyChanged(contentRoot: SceneObject): void {
+    const index = this.findTrackedObjectIndex(contentRoot);
+    if (index < 0) {
+      return;
+    }
+
+    this.wireTrashReleaseTracking(this.objs[index], this.wrappers[index]);
+  }
+
+  private isTrashReleaseWired(node: SceneObject): boolean {
+    for (let i = this.trashReleaseWiredObjects.length - 1; i >= 0; i--) {
+      const wired = this.trashReleaseWiredObjects[i];
+      if (isNull(wired)) {
+        this.trashReleaseWiredObjects.splice(i, 1);
+        continue;
+      }
+      if (wired === node) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private markTrashReleaseWired(node: SceneObject): void {
+    if (this.isTrashReleaseWired(node)) {
+      return;
+    }
+    this.trashReleaseWiredObjects.push(node);
+  }
+
   saveObjectPosition() {
     if (this.isResetting) {
       return;
     }
+
+    const now = getTime();
+    if (now - this.lastSaveObjectPositionAt < this.saveObjectPositionCooldownSec) {
+      return;
+    }
+    this.lastSaveObjectPositionAt = now;
 
     print(
       `pinch up ${ANCHOR_CONTROLLER_VERSION} anchor=${!!this.currentAnchor} worldOnly=${this.usingWorldSpace} creating=${this.anchorCreationInProgress}`
@@ -973,7 +1114,9 @@ export class AnchorController extends BaseScriptComponent {
 
     this.captureAndLockTrashAtDesk();
     this.lockSpacePanelAtDesk();
-    const trashedOnRelease = this.tryTrashTrackedOnRelease();
+    const releaseRoot = this.resolveReleasedTrackedRoot();
+    this.activeManipulatedRoot = null;
+    const trashedOnRelease = this.tryTrashTrackedOnRelease(releaseRoot);
 
     if (!this.currentAnchor && !this.anchorCreationInProgress && this.objs.length > 0 && !this.usingWorldSpace) {
       this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
@@ -1176,6 +1319,7 @@ export class AnchorController extends BaseScriptComponent {
       this.wirePotPersistence(obj);
       this.restorePlantState(store, i, obj);
       this.wirePlantLifecycle(obj);
+      this.wireTrashReleaseTracking(obj, wrapper);
       restoredCount++;
     }
 

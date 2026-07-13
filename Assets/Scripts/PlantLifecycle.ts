@@ -27,6 +27,7 @@ export type PlantLifecycleSaveState = {
 
 type AnchorPersistence = {
   persistPlantLifecycleState(plantContainer: SceneObject): void;
+  notifyTrackedVisualHierarchyChanged?: (plantContainer: SceneObject) => void;
 };
 
 type InteractableManipulationLike = {
@@ -96,6 +97,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private allowTrashManipulation = false;
   private plantedPreserveWorldScale: vec3 | null = null;
   private plantedPreserveWorldRotation: quat | null = null;
+  private soilLineOffsetY = 0;
   private visualStateApplied = false;
   private static readonly DEFAULT_CONTAINER_WORLD_SCALE = 0.1;
   private static readonly GROWTH_SIZE_DIVISOR = 3;
@@ -140,7 +142,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       } else {
         this.refreshPlantedVisual();
       }
-      this.enforcePlantedContainerScale();
+      this.schedulePlantedSoilAlign();
     } else {
       this.plantedPreserveWorldScale = null;
       this.plantedPreserveWorldRotation = null;
@@ -191,6 +193,13 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   public getIsPlanted(): boolean {
     return this.isPlanted;
+  }
+
+  public setSoilLineOffsetY(offsetY: number): void {
+    this.soilLineOffsetY = offsetY;
+    if (this.isPlanted) {
+      this.finalizePlantedPlacement({ preserveContainerPlacement: true });
+    }
   }
 
   public setAllowTrashManipulation(enabled: boolean): void {
@@ -335,22 +344,9 @@ export class PlantLifecycle extends BaseScriptComponent {
         this.applyDefaultPlantedWorldScale();
       }
       if (!isNull(state.plantedWorldRotation)) {
-        this.applyPlantedWorldRotation(state.plantedWorldRotation as quat);
-      } else {
-        this.enforcePlantedWorldRotation();
+        this.plantedPreserveWorldRotation = state.plantedWorldRotation as quat;
       }
-      this.enforcePlantedContainerScale();
-      if (
-        this.currentStage === PlantStage.Seed ||
-        this.currentStage === PlantStage.Adult ||
-        this.currentStage === PlantStage.Growing
-      ) {
-        if (this.hasSavedPlantedAlignment(state)) {
-          this.restorePlantedAlignment(state);
-        } else if (this.currentStage !== PlantStage.Seed) {
-          this.applyPlantedSoilAnchor();
-        }
-      }
+      this.finalizePlantedPlacement();
       this.updateInteractionForPlantedState();
     }
   }
@@ -525,26 +521,42 @@ export class PlantLifecycle extends BaseScriptComponent {
   }
 
   private showAdultAtGrowthScale(): void {
-    this.captureAlignCenterFromCurrentModel();
+    if (!this.isPlanted) {
+      this.captureAlignCenterFromCurrentModel();
+    }
     this.destroyCurrentInstances();
 
     const parent = this.ensureGrowthScaleNode();
     this.adultInstance = this.spawnAdultModel(parent);
 
-    if (this.isPlanted && this.growthElapsed <= 0) {
-      this.applyPlantedSoilAnchor(true);
-    } else if (!this.isPlanted) {
-      this.updateInteractionForPlantedState();
+    if (this.isPlanted) {
+      this.applyPlantedModelOrientation();
     }
 
     this.applyGrowthScale();
+    if (this.isPlanted) {
+      this.finalizePlantedPlacement({ preserveContainerPlacement: true });
+      return;
+    }
+    if (!this.isPlanted) {
+      this.updateInteractionForPlantedState();
+    }
   }
 
   private showAdult(): void {
     this.destroyCurrentInstances();
     const parent = this.ensureGrowthScaleNode();
     this.adultInstance = this.spawnAdultModel(parent);
+
+    if (this.isPlanted) {
+      this.applyPlantedModelOrientation();
+    }
+
     this.applyAdultScale();
+    if (this.isPlanted) {
+      this.finalizePlantedPlacement({ preserveContainerPlacement: true });
+      return;
+    }
     if (!this.isPlanted) {
       this.updateInteractionForPlantedState();
     }
@@ -555,8 +567,10 @@ export class PlantLifecycle extends BaseScriptComponent {
     adult.name = 'AdultPlantModel';
     this.debugLog(`spawn adult root=${adult.name} parent=${parent.name}`);
     this.prepareStageModel(adult);
-    this.captureModelMetrics(adult);
-    this.refreshAlignNodePosition(this.getCurrentGrowthScale());
+    if (!this.isPlanted) {
+      this.captureModelMetrics(adult);
+      this.refreshAlignNodePosition(this.getCurrentGrowthScale());
+    }
     return adult;
   }
 
@@ -565,6 +579,18 @@ export class PlantLifecycle extends BaseScriptComponent {
     model.getTransform().setLocalRotation(quat.quatIdentity());
     model.getTransform().setLocalScale(vec3.one());
     this.wireManipulationToContainer(model);
+    this.notifyTrackedVisualHierarchyChanged();
+  }
+
+  private notifyTrackedVisualHierarchyChanged(): void {
+    if (
+      isNull(this.anchorPersistence) ||
+      typeof this.anchorPersistence.notifyTrackedVisualHierarchyChanged !== 'function'
+    ) {
+      return;
+    }
+
+    this.anchorPersistence.notifyTrackedVisualHierarchyChanged(this.getSceneObject());
   }
 
   private captureAlignCenterFromCurrentModel(): void {
@@ -582,7 +608,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     const stageRoot = this.ensureStageRoot();
     const stageRootWorldToLocal = stageRoot.getTransform().getWorldTransform().inverse();
-    const visuals = this.findChildMeshVisuals(current as SceneObject);
+    const visuals = this.findAlignmentMeshVisuals(current as SceneObject);
     if (visuals.length === 0) {
       return;
     }
@@ -607,7 +633,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   private captureModelMetrics(model: SceneObject): void {
     const modelWorldToLocal = model.getTransform().getWorldTransform().inverse();
-    const visuals = this.findChildMeshVisuals(model);
+    const visuals = this.findAlignmentMeshVisuals(model);
     let minY = Infinity;
 
     for (let i = 0; i < visuals.length; i++) {
@@ -620,6 +646,12 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   private refreshAlignNodePosition(growthScale: number): void {
     const alignNode = this.ensureAlignNode();
+    if (this.isPlanted) {
+      alignNode.getTransform().setLocalPosition(vec3.zero());
+      this.applyPlantedAttachAlignment();
+      return;
+    }
+
     const soilAnchorScale = this.getSoilAnchorScale(growthScale);
     alignNode.getTransform().setLocalPosition(
       new vec3(
@@ -630,12 +662,122 @@ export class PlantLifecycle extends BaseScriptComponent {
     );
   }
 
-  private getSoilAnchorScale(growthScale: number): number {
-    if (this.currentStage === PlantStage.Seed && !isNull(this.seedInstance)) {
-      const seedLocalScale = (this.seedInstance as SceneObject).getTransform().getLocalScale();
-      return growthScale * seedLocalScale.y;
+  private measureMeshFootprintInAttachSpace(): { minY: number; centerX: number; centerZ: number } {
+    const container = this.getSceneObject();
+    const attachParent = container.getParent();
+    const attachReference = isNull(attachParent) ? this.ensureStageRoot() : attachParent;
+    const attachWorldToLocal = attachReference.getTransform().getWorldTransform().inverse();
+    const activeModel = this.getActiveStageModel();
+    const measureRoot = isNull(activeModel) ? this.ensureStageRoot() : (activeModel as SceneObject);
+    const visuals = this.findAlignmentMeshVisuals(measureRoot);
+    if (visuals.length === 0) {
+      return { minY: 0, centerX: 0, centerZ: 0 };
     }
 
+    const corners: vec3[] = [];
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+
+    for (let i = 0; i < visuals.length; i++) {
+      this.appendWorldAabbCorners(corners, visuals[i].worldAabbMin(), visuals[i].worldAabbMax());
+    }
+
+    for (let i = 0; i < corners.length; i++) {
+      const localPoint = attachWorldToLocal.multiplyPoint(corners[i]);
+      minX = Math.min(minX, localPoint.x);
+      maxX = Math.max(maxX, localPoint.x);
+      minY = Math.min(minY, localPoint.y);
+      maxY = Math.max(maxY, localPoint.y);
+      minZ = Math.min(minZ, localPoint.z);
+      maxZ = Math.max(maxZ, localPoint.z);
+    }
+
+    if (minY === Infinity) {
+      return { minY: 0, centerX: 0, centerZ: 0 };
+    }
+
+    return {
+      minY,
+      centerX: (minX + maxX) * 0.5,
+      centerZ: (minZ + maxZ) * 0.5,
+    };
+  }
+
+  private applyPlantedAttachAlignment(): void {
+    const container = this.getSceneObject();
+    const attachParent = container.getParent();
+    if (isNull(attachParent) || isNull(this.growthScaleNode)) {
+      return;
+    }
+
+    const growthScaleNode = this.growthScaleNode as SceneObject;
+    const attachTransform = attachParent.getTransform();
+    const attachWorldToLocal = attachTransform.getWorldTransform().inverse();
+    const pivotLocalInAttach = attachWorldToLocal.multiplyPoint(
+      growthScaleNode.getTransform().getWorldPosition()
+    );
+    const targetLocalInAttach = new vec3(0, this.soilLineOffsetY, 0);
+    const deltaLocalInAttach = new vec3(
+      targetLocalInAttach.x - pivotLocalInAttach.x,
+      targetLocalInAttach.y - pivotLocalInAttach.y,
+      targetLocalInAttach.z - pivotLocalInAttach.z
+    );
+
+    if (
+      Math.abs(deltaLocalInAttach.x) < 0.0001 &&
+      Math.abs(deltaLocalInAttach.y) < 0.0001 &&
+      Math.abs(deltaLocalInAttach.z) < 0.0001
+    ) {
+      const footprint = this.measureMeshFootprintInAttachSpace();
+      this.modelLocalBaseY = footprint.minY;
+      return;
+    }
+
+    const deltaWorld = this.localOffsetToWorldOffset(deltaLocalInAttach, attachParent);
+    const containerTransform = container.getTransform();
+    const worldPosition = containerTransform.getWorldPosition();
+    containerTransform.setWorldPosition(
+      new vec3(
+        worldPosition.x + deltaWorld.x,
+        worldPosition.y + deltaWorld.y,
+        worldPosition.z + deltaWorld.z
+      )
+    );
+    this.modelLocalBaseY = targetLocalInAttach.y;
+    this.debugLog(
+      `attach align pivotLocal=(${pivotLocalInAttach.x.toFixed(4)},${pivotLocalInAttach.y.toFixed(4)},${pivotLocalInAttach.z.toFixed(4)}) deltaLocal=(${deltaLocalInAttach.x.toFixed(4)},${deltaLocalInAttach.y.toFixed(4)},${deltaLocalInAttach.z.toFixed(4)})`
+    );
+  }
+
+  private schedulePlantedSoilAlign(): void {
+    const alignEvent = this.createEvent('DelayedCallbackEvent');
+    alignEvent.bind(() => {
+      if (!this.isPlanted) {
+        return;
+      }
+      this.finalizePlantedPlacement();
+    });
+    alignEvent.reset(0);
+  }
+
+  private appendWorldAabbCorners(corners: vec3[], worldMin: vec3, worldMax: vec3): void {
+    corners.push(
+      new vec3(worldMin.x, worldMin.y, worldMin.z),
+      new vec3(worldMin.x, worldMin.y, worldMax.z),
+      new vec3(worldMin.x, worldMax.y, worldMin.z),
+      new vec3(worldMin.x, worldMax.y, worldMax.z),
+      new vec3(worldMax.x, worldMin.y, worldMin.z),
+      new vec3(worldMax.x, worldMin.y, worldMax.z),
+      new vec3(worldMax.x, worldMax.y, worldMin.z),
+      new vec3(worldMax.x, worldMax.y, worldMax.z)
+    );
+  }
+
+  private getSoilAnchorScale(growthScale: number): number {
     return growthScale;
   }
 
@@ -652,7 +794,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     if (this.currentStage === PlantStage.Growing) {
       const t = this.growthTime <= 0 ? 1 : Math.min(this.growthElapsed / this.growthTime, 1);
       const eased = t * t * (3 - 2 * t);
-      return adultScale * eased;
+      return adultScale * Math.max(0.01, eased);
     }
 
     return 1;
@@ -800,7 +942,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     });
   }
 
-  private computeModelXZCenterOffsetInGrowthSpace(model: SceneObject): vec3 {
+  private computePlantedGrowthNodeOffset(model: SceneObject): vec3 {
     return this.withUnitGrowthScaleForMeasurement(() => {
       if (isNull(this.growthScaleNode)) {
         return vec3.zero();
@@ -808,30 +950,52 @@ export class PlantLifecycle extends BaseScriptComponent {
 
       const growthScaleNode = this.growthScaleNode as SceneObject;
       const growthWorldToLocal = growthScaleNode.getTransform().getWorldTransform().inverse();
-      const visuals = this.findChildMeshVisuals(model);
+      const visuals = this.findAlignmentMeshVisuals(model);
       if (visuals.length === 0) {
         return vec3.zero();
       }
 
+      const corners: vec3[] = [];
       let minX = Infinity;
       let maxX = -Infinity;
+      let minY = Infinity;
       let minZ = Infinity;
       let maxZ = -Infinity;
 
       for (let i = 0; i < visuals.length; i++) {
-        const localMin = growthWorldToLocal.multiplyPoint(visuals[i].worldAabbMin());
-        const localMax = growthWorldToLocal.multiplyPoint(visuals[i].worldAabbMax());
-        minX = Math.min(minX, localMin.x, localMax.x);
-        maxX = Math.max(maxX, localMin.x, localMax.x);
-        minZ = Math.min(minZ, localMin.z, localMax.z);
-        maxZ = Math.max(maxZ, localMin.z, localMax.z);
+        this.appendWorldAabbCorners(corners, visuals[i].worldAabbMin(), visuals[i].worldAabbMax());
       }
 
-      return new vec3((minX + maxX) * 0.5, 0, (minZ + maxZ) * 0.5);
-    });
+      for (let i = 0; i < corners.length; i++) {
+        const localPoint = growthWorldToLocal.multiplyPoint(corners[i]);
+        minX = Math.min(minX, localPoint.x);
+        maxX = Math.max(maxX, localPoint.x);
+        minY = Math.min(minY, localPoint.y);
+        minZ = Math.min(minZ, localPoint.z);
+        maxZ = Math.max(maxZ, localPoint.z);
+      }
+
+      if (minY === Infinity) {
+        return vec3.zero();
+      }
+
+      return new vec3(-(minX + maxX) * 0.5, -minY, -(minZ + maxZ) * 0.5);
+    }, true);
   }
 
-  private withUnitGrowthScaleForMeasurement<T>(measure: () => T): T {
+  private applyPlantedGrowthPivot(model: SceneObject): void {
+    if (isNull(this.growthScaleNode)) {
+      return;
+    }
+
+    const growthScaleNode = this.growthScaleNode as SceneObject;
+    const growthScale = growthScaleNode.getTransform().getLocalScale();
+    const pivotOffset = this.computePlantedGrowthNodeOffset(model);
+    growthScaleNode.getTransform().setLocalPosition(pivotOffset);
+    growthScaleNode.getTransform().setLocalScale(growthScale);
+  }
+
+  private withUnitGrowthScaleForMeasurement<T>(measure: () => T, forceUnitScale = false): T {
     if (isNull(this.growthScaleNode)) {
       return measure();
     }
@@ -841,17 +1005,24 @@ export class PlantLifecycle extends BaseScriptComponent {
     const savedScale = transform.getLocalScale();
     const savedPosition = transform.getLocalPosition();
     const maxAxis = Math.max(savedScale.x, savedScale.y, savedScale.z);
+    const useUnitScale = forceUnitScale || maxAxis < 0.001;
 
-    if (maxAxis < 0.001) {
+    if (useUnitScale) {
       transform.setLocalScale(vec3.one());
-      transform.setLocalPosition(new vec3(savedPosition.x, 0, savedPosition.z));
+      if (forceUnitScale) {
+        transform.setLocalPosition(vec3.zero());
+      } else {
+        transform.setLocalPosition(new vec3(savedPosition.x, 0, savedPosition.z));
+      }
     }
 
     const result = measure();
 
-    if (maxAxis < 0.001) {
+    if (useUnitScale) {
       transform.setLocalScale(savedScale);
-      transform.setLocalPosition(savedPosition);
+      if (!forceUnitScale) {
+        transform.setLocalPosition(savedPosition);
+      }
     }
 
     return result;
@@ -863,9 +1034,14 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
+    if (this.isPlanted) {
+      this.applyPlantedGrowthPivot(model as SceneObject);
+      return;
+    }
+
     const growthScaleNode = this.growthScaleNode as SceneObject;
     const growthWorldToLocal = growthScaleNode.getTransform().getWorldTransform().inverse();
-    const visuals = this.findChildMeshVisuals(model as SceneObject);
+    const visuals = this.findAlignmentMeshVisuals(model as SceneObject);
     if (visuals.length === 0) {
       return;
     }
@@ -892,21 +1068,13 @@ export class PlantLifecycle extends BaseScriptComponent {
     const centerZ = (minZ + maxZ) * 0.5;
     const centerY = (minY + maxY) * 0.5;
     const growthScale = growthScaleNode.getTransform().getLocalScale();
-    const offsetY = this.isPlanted ? 0 : -centerY;
     growthScaleNode.getTransform().setLocalPosition(
-      new vec3(-centerX, offsetY, -centerZ)
+      new vec3(-centerX, -centerY, -centerZ)
     );
     growthScaleNode.getTransform().setLocalScale(growthScale);
 
-    if (this.isPlanted) {
-      this.captureModelMetrics(model as SceneObject);
-      this.alignCenterX = 0;
-      this.alignCenterZ = 0;
-      this.refreshAlignNodePosition(this.getCurrentGrowthScale());
-    }
-
     this.debugLog(
-      `centered planted model bounds=(${minX.toFixed(2)},${minY.toFixed(2)},${minZ.toFixed(2)})-(${maxX.toFixed(2)},${maxY.toFixed(2)},${maxZ.toFixed(2)}) offset=(${(-centerX).toFixed(2)},${this.isPlanted ? (-this.modelLocalBaseY).toFixed(2) : (-centerY).toFixed(2)},${(-centerZ).toFixed(2)})`
+      `centered model bounds=(${minX.toFixed(2)},${minY.toFixed(2)},${minZ.toFixed(2)})-(${maxX.toFixed(2)},${maxY.toFixed(2)},${maxZ.toFixed(2)}) offset=(${(-centerX).toFixed(2)},${(-centerY).toFixed(2)},${(-centerZ).toFixed(2)})`
     );
   }
 
@@ -937,10 +1105,7 @@ export class PlantLifecycle extends BaseScriptComponent {
         new vec3(this.seedScale, this.seedScale, this.seedScale)
       );
     }
-    this.centerActiveModelInGrowthSpace();
-    this.alignPlantedRootToParent();
-    this.enforcePlantedContainerScale();
-    this.enforcePlantedWorldRotation();
+    this.finalizePlantedPlacement();
   }
 
   private applyPlantedSoilAnchor(preserveContainerPlacement = false): void {
@@ -949,34 +1114,29 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     this.applyPlantedModelOrientation();
+    this.finalizePlantedPlacement({ preserveContainerPlacement });
+  }
 
-    const model = this.getActiveStageModel();
-    if (!isNull(model)) {
-      this.captureModelMetricsAtGrowthScale(model as SceneObject);
-      this.alignCenterX = 0;
-      this.alignCenterZ = 0;
+  private finalizePlantedPlacement(options?: { preserveContainerPlacement?: boolean }): void {
+    if (!this.isPlanted) {
+      return;
     }
 
-    if (!isNull(this.growthScaleNode) && !isNull(model)) {
-      const growthScaleNode = this.growthScaleNode as SceneObject;
-      const growthScale = growthScaleNode.getTransform().getLocalScale();
-      const xzCenter = this.computeModelXZCenterOffsetInGrowthSpace(model as SceneObject);
-      growthScaleNode.getTransform().setLocalPosition(
-        new vec3(-xzCenter.x, 0, -xzCenter.z)
-      );
-      growthScaleNode.getTransform().setLocalScale(growthScale);
-    } else if (!isNull(this.growthScaleNode)) {
-      const growthScaleNode = this.growthScaleNode as SceneObject;
-      const growthScale = growthScaleNode.getTransform().getLocalScale();
-      growthScaleNode.getTransform().setLocalPosition(vec3.zero());
-      growthScaleNode.getTransform().setLocalScale(growthScale);
+    const model = this.getActiveStageModel();
+    this.alignCenterX = 0;
+    this.alignCenterZ = 0;
+
+    if (!options?.preserveContainerPlacement) {
+      this.alignPlantedRootToParent();
+    }
+    this.enforcePlantedContainerScale();
+    this.enforcePlantedWorldRotation();
+
+    if (!isNull(model)) {
+      this.applyPlantedGrowthPivot(model as SceneObject);
     }
 
     this.refreshAlignNodePosition(this.getCurrentGrowthScale());
-    if (!preserveContainerPlacement) {
-      this.alignPlantedRootToParent();
-    }
-    this.enforcePlantedWorldRotation();
   }
 
   private hasSavedPlantedAlignment(state: PlantLifecycleSaveState): boolean {
@@ -1094,10 +1254,14 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     const scale = this.getCurrentGrowthScale();
     (growthScaleNode as SceneObject).getTransform().setLocalScale(new vec3(scale, scale, scale));
-    this.refreshAlignNodePosition(scale);
     if (this.isPlanted) {
       this.enforcePlantedContainerScale();
+      this.enforcePlantedWorldRotation();
+      this.applyPlantedAttachAlignment();
+      return;
     }
+
+    this.refreshAlignNodePosition(scale);
   }
 
   private applyAdultScale(): void {
@@ -1110,10 +1274,14 @@ export class PlantLifecycle extends BaseScriptComponent {
     (growthScaleNode as SceneObject).getTransform().setLocalScale(
       new vec3(adultScale, adultScale, adultScale)
     );
-    this.refreshAlignNodePosition(adultScale);
     if (this.isPlanted) {
       this.enforcePlantedContainerScale();
+      this.enforcePlantedWorldRotation();
+      this.applyPlantedAttachAlignment();
+      return;
     }
+
+    this.refreshAlignNodePosition(adultScale);
   }
 
   private destroyCurrentInstances(): void {
@@ -1165,6 +1333,44 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     return results;
+  }
+
+  private findAlignmentMeshVisuals(root: SceneObject): RenderMeshVisual[] {
+    const visuals = this.findChildMeshVisuals(root);
+    const filtered: RenderMeshVisual[] = [];
+
+    for (let i = 0; i < visuals.length; i++) {
+      if (this.shouldIncludeMeshVisualForAlignment(visuals[i])) {
+        filtered.push(visuals[i]);
+      }
+    }
+
+    return filtered;
+  }
+
+  private shouldIncludeMeshVisualForAlignment(visual: RenderMeshVisual): boolean {
+    const object = visual.getSceneObject();
+    if (!object || isNull(object) || !object.enabled) {
+      return false;
+    }
+
+    const ownerName = object.name;
+    if (ownerName.indexOf('Sphere') === 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private localOffsetToWorldOffset(localOffset: vec3, referenceObject: SceneObject): vec3 {
+    const world = referenceObject.getTransform().getWorldTransform();
+    const origin = world.multiplyPoint(vec3.zero());
+    const offsetEnd = world.multiplyPoint(localOffset);
+    return new vec3(
+      offsetEnd.x - origin.x,
+      offsetEnd.y - origin.y,
+      offsetEnd.z - origin.z
+    );
   }
 
   private debugLog(message: string): void {

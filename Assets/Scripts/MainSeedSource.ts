@@ -37,6 +37,7 @@ type InteractableLike = ScriptComponent & {
 type AnchorSeedSpawner = {
   createSeedAtWorldPosition(worldPos: vec3): SceneObject | null;
   saveObjectPosition?: () => void;
+  setActiveManipulatedRoot?: (root: SceneObject | null) => void;
 };
 
 type PullState = {
@@ -406,8 +407,14 @@ export class MainSeedSource extends BaseScriptComponent {
     if (!isNull(this.activePull)) {
       this.debugLog('released active seed pull.');
       const anchorSpawner = this.getAnchorSeedSpawner();
-      if (!isNull(anchorSpawner) && typeof (anchorSpawner as AnchorSeedSpawner).saveObjectPosition === 'function') {
-        (anchorSpawner as AnchorSeedSpawner).saveObjectPosition!();
+      if (!isNull(anchorSpawner)) {
+        const spawner = anchorSpawner as AnchorSeedSpawner;
+        if (typeof spawner.setActiveManipulatedRoot === 'function') {
+          spawner.setActiveManipulatedRoot(this.activePull.seedObject);
+        }
+        if (typeof spawner.saveObjectPosition === 'function') {
+          spawner.saveObjectPosition();
+        }
       }
     }
     this.abandonActivePull();
