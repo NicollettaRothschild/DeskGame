@@ -278,7 +278,7 @@ export class SpecsApiClient extends BaseScriptComponent {
       return;
     }
 
-    const agent = String(agentName || 'Stephany').trim() || 'Stephany';
+    const agent = String(agentName || 'Arvis').trim() || 'Arvis';
 
     if (this.isEditorMockActive()) {
       const mock = SpecsEditorMock.chatWithAgent(agent, trimmed, history);

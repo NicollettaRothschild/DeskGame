@@ -41,6 +41,14 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
   @input
   @allowUndefined
+  transcriptText3D!: Text3D;
+
+  @input
+  @allowUndefined
+  agentResponseText3D!: Text3D;
+
+  @input
+  @allowUndefined
   imageVisual!: RenderMeshVisual;
 
   @input
@@ -100,6 +108,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       this.lockPanelAtDesk();
       this.bindScrollInteractable();
       this.applyPanelTypography();
+      this.setAgentChatFieldsVisible(false);
       this.refreshPanel();
       this.scheduleRefresh();
       this.schedulePairPoll();
@@ -114,12 +123,15 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.agentViewActive = true;
     this.setPanelVisible(true);
     this.hideImage();
+    this.resolvePanelVisuals();
+    this.setAgentChatFieldsVisible(true);
 
     const text = String(liveText || '').trim();
     this.setTitle(isListening ? 'Speech · Listening' : 'Speech');
-    this.setBody(text || (isListening ? '(speak now…)' : '(no speech heard)'));
+    this.setTranscript(text || (isListening ? '(speak now…)' : '(no speech heard)'));
+    this.setAgentResponse('');
     this.setStatus(isListening ? 'Listening…' : text ? 'Heard' : '');
-    this.applySpeechTextLayout();
+    this.applyAgentChatLayout();
   }
 
   public showAgentChat(
@@ -131,43 +143,47 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.agentViewActive = true;
     this.setPanelVisible(true);
     this.hideImage();
+    this.resolvePanelVisuals();
 
     const label = String(agentName || 'Agent').trim() || 'Agent';
     const userLine = String(transcript || '').trim();
     const replyLine = String(response || '').trim();
 
+    this.setAgentChatFieldsVisible(true);
+
     if (phase === 'listening') {
       this.setTitle(`${label} · Listening`);
-      this.setBody(userLine ? `You: ${userLine}\n\n(Speak now…)` : 'Speak now…');
+      this.setTranscript(userLine || '(speak now…)');
+      this.setAgentResponse('');
       this.setStatus('Listening…');
-      this.applySpeechTextLayout();
+      this.applyAgentChatLayout();
       return;
     }
 
     if (phase === 'thinking') {
       this.setTitle(`${label} · Thinking`);
-      this.setBody(userLine ? `You: ${userLine}\n\n…` : '…');
+      this.setTranscript(userLine || '…');
+      this.setAgentResponse('…');
       this.setStatus('Thinking…');
-      this.applySpeechTextLayout();
+      this.applyAgentChatLayout();
       return;
     }
 
     if (phase === 'error') {
       this.setTitle(`${label} · Error`);
       const detail = replyLine || 'Something went wrong.';
-      this.setBody(userLine ? `You: ${userLine}\n\n${detail}` : detail);
+      this.setTranscript(userLine || '');
+      this.setAgentResponse(detail);
       this.setStatus(detail);
-      this.applySpeechTextLayout();
+      this.applyAgentChatLayout();
       return;
     }
 
     this.setTitle(label);
-    const body = userLine
-      ? `You: ${userLine}\n\n${label}:\n${replyLine || '(no response)'}`
-      : `${label}:\n${replyLine || '(no response)'}`;
-    this.setBody(this.truncateBody(body));
+    this.setTranscript(userLine || '');
+    this.setAgentResponse(this.truncateBody(replyLine || '(no response)'));
     this.setStatus('');
-    this.applySpeechTextLayout();
+    this.applyAgentChatLayout();
   }
 
   public clearAgentView(): void {
@@ -205,10 +221,15 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       this.deviceRegistry.getDeviceSecret(),
       (panel, error) => {
         if (!panel) {
-          this.setStatus(error || 'Could not load space');
+          if (!this.agentViewActive) {
+            this.setStatus(error || 'Could not load space');
+          }
           return;
         }
         this.panel = panel;
+        if (this.agentViewActive) {
+          return;
+        }
         this.itemIndex = 0;
         this.renderCurrentItem();
         this.setStatus(`Loaded ${panel.items.length} item(s)`);
@@ -246,6 +267,12 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
           return;
         }
         this.panel = panel;
+        if (this.agentViewActive) {
+          if (onDone) {
+            onDone(true);
+          }
+          return;
+        }
         this.itemIndex = 0;
         this.renderCurrentItem();
         this.setStatus('Note saved to space');
@@ -498,14 +525,34 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       return;
     }
 
-    if (isNull(this.titleText3D) || isNull(this.bodyText3D) || isNull(this.imageVisual)) {
+    if (
+      isNull(this.titleText3D) ||
+      isNull(this.bodyText3D) ||
+      isNull(this.transcriptText3D) ||
+      isNull(this.agentResponseText3D) ||
+      isNull(this.imageVisual)
+    ) {
       this.walkPanelVisuals(this.panelRoot);
     }
+
+    if (this.debugLogging) {
+      print(
+        `[SpacePanel] visuals title=${!isNull(this.titleText3D)} body=${!isNull(this.bodyText3D)} transcript=${!isNull(this.transcriptText3D)} agent=${!isNull(this.agentResponseText3D)}`
+      );
+    }
+
     this.applyPanelTypography();
   }
 
   private applyPanelTypography(): void {
     this.applyTextWorldScale(this.titleText3D, this.titleWorldScale);
+    if (this.agentViewActive) {
+      this.applyTextWorldScale(this.transcriptText3D, this.bodyWorldScale);
+      this.applyTextWorldScale(this.agentResponseText3D, this.bodyWorldScale);
+      this.applyAgentChatLayout();
+      return;
+    }
+
     this.applyTextWorldScale(this.bodyText3D, this.bodyWorldScale);
     this.applyPanelTextPositions();
   }
@@ -531,28 +578,38 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.setTextLocalY(this.bodyText3D, bodyY);
   }
 
-  private applySpeechTextLayout(): void {
+  private applyAgentChatLayout(): void {
     const panelSize = this.resolvePanelBackgroundSize();
     if (!panelSize) {
       return;
     }
 
     this.applyTextWorldScale(this.titleText3D, this.titleWorldScale);
-    this.applyTextWorldScale(this.bodyText3D, this.bodyWorldScale);
+    this.applyTextWorldScale(this.transcriptText3D, this.bodyWorldScale);
+    this.applyTextWorldScale(this.agentResponseText3D, this.bodyWorldScale);
 
     const marginY = panelSize.height * 0.08;
     const innerHeight = panelSize.height - marginY * 2;
-    const titleBandHeight = innerHeight * 0.28;
+    const titleBandHeight = innerHeight * 0.18;
     const titleY = panelSize.height * 0.5 - marginY - titleBandHeight * 0.5;
-    const bodyY =
-      panelSize.height * 0.5 -
-      marginY -
-      titleBandHeight -
-      (innerHeight - titleBandHeight) * 0.5 -
-      this.speechBodyExtraOffset;
+    const contentHeight = innerHeight - titleBandHeight;
+
+    // Split content into two bands with a visible gap so transcript never overlaps response.
+    const gap = Math.max(0.6, contentHeight * 0.05);
+    const usableHeight = Math.max(0.1, contentHeight - gap);
+    const transcriptBand = usableHeight * 0.32;
+    const agentBand = usableHeight - transcriptBand;
+    const contentTop = panelSize.height * 0.5 - marginY - titleBandHeight;
+
+    // Extra offset keeps transcript from colliding with the title band.
+    const transcriptY =
+      contentTop - transcriptBand * 0.5 - gap * 0.25 - this.speechBodyExtraOffset * 0.35;
+    const agentY =
+      contentTop - transcriptBand - gap - agentBand * 0.5 - this.speechBodyExtraOffset * 0.15;
 
     this.setTextLocalY(this.titleText3D, titleY);
-    this.setTextLocalY(this.bodyText3D, bodyY);
+    this.setTextLocalY(this.transcriptText3D, transcriptY);
+    this.setTextLocalY(this.agentResponseText3D, agentY);
   }
 
   private resolvePanelBackgroundSize(): { width: number; height: number } | null {
@@ -620,6 +677,18 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
         this.bodyText3D = text3d as Text3D;
       }
     }
+    if (isNull(this.transcriptText3D) && name === 'SpaceTranscript') {
+      const text3d = node.getComponent('Component.Text3D');
+      if (!isNull(text3d)) {
+        this.transcriptText3D = text3d as Text3D;
+      }
+    }
+    if (isNull(this.agentResponseText3D) && name === 'SpaceAgentResponse') {
+      const text3d = node.getComponent('Component.Text3D');
+      if (!isNull(text3d)) {
+        this.agentResponseText3D = text3d as Text3D;
+      }
+    }
     if (isNull(this.imageVisual) && name === 'SpaceImage') {
       const visual = node.getComponent('Component.RenderMeshVisual');
       if (!isNull(visual)) {
@@ -640,13 +709,18 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   }
 
   private renderUnpaired(): void {
+    this.setAgentChatFieldsVisible(false);
     this.setTitle('ARVIS Space');
     this.setBody('Pair at arvis.space/specs to load your writing board, notes, and generated images.');
     this.hideImage();
     this.setStatus('Not paired');
+    this.applyPanelTextPositions();
   }
 
   private renderCurrentItem(): void {
+    this.setAgentChatFieldsVisible(false);
+    this.applyPanelTextPositions();
+
     if (!this.panel) {
       this.renderUnpaired();
       return;
@@ -708,6 +782,43 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private setBody(value: string): void {
     if (!isNull(this.bodyText3D)) {
       this.bodyText3D.text = value;
+    }
+  }
+
+  private setTranscript(value: string): void {
+    const target = !isNull(this.transcriptText3D) ? this.transcriptText3D : this.bodyText3D;
+    if (!isNull(target)) {
+      target.text = value;
+    }
+  }
+
+  private setAgentResponse(value: string): void {
+    if (!isNull(this.agentResponseText3D)) {
+      this.agentResponseText3D.text = value;
+    }
+  }
+
+  private setAgentChatFieldsVisible(visible: boolean): void {
+    this.setTextObjectVisible(this.transcriptText3D, visible);
+    this.setTextObjectVisible(this.agentResponseText3D, visible);
+    this.setTextObjectVisible(this.bodyText3D, !visible);
+    if (visible) {
+      this.setBody('');
+    } else {
+      this.setTranscript('');
+      this.setAgentResponse('');
+    }
+  }
+
+  private setTextObjectVisible(text3d: Text3D | null, visible: boolean): void {
+    if (isNull(text3d)) {
+      return;
+    }
+
+    text3d.enabled = visible;
+    const textObject = text3d.getSceneObject();
+    if (!isNull(textObject)) {
+      textObject.enabled = visible;
     }
   }
 

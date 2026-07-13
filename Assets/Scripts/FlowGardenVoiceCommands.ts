@@ -1,3 +1,4 @@
+import { hasWakeFollowUp, parseArvisWakePhrase } from './ArvisWakePhrase';
 import { getSharedArvisAgentChat } from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
@@ -64,9 +65,6 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   @input
   debugLogging: boolean = true;
 
-  @input
-  forwardUnmatchedToAgent: boolean = true;
-
   private lastProcessedFinal = '';
 
   onAwake(): void {
@@ -107,6 +105,12 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       print(`[VoiceCommands] Processing: ${text}`);
     }
 
+    const wake = parseArvisWakePhrase(text);
+    if (wake.triggered) {
+      this.tryAgentWake(wake.message, text);
+      return;
+    }
+
     if (this.tryTodoCommand(text)) {
       return;
     }
@@ -123,18 +127,31 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       return;
     }
 
-    if (this.forwardUnmatchedToAgent) {
-      const agent = getSharedArvisAgentChat();
-      if (!isNull(agent)) {
-        if (this.debugLogging) {
-          print(`[VoiceCommands] Forwarding to agent: ${text}`);
-        }
-        agent.sendUtterance(text);
-        return;
-      }
+    if (this.debugLogging) {
+      print(`[VoiceCommands] Transcript only (no wake phrase): ${text}`);
+    }
+  }
+
+  private tryAgentWake(message: string, rawUtterance: string): void {
+    const agent = getSharedArvisAgentChat();
+    if (isNull(agent)) {
+      this.setStatus('Agent not wired');
+      return;
     }
 
-    this.setStatus(`Heard: "${text}"`);
+    if (hasWakeFollowUp(message)) {
+      const trimmed = String(message || '').trim();
+      if (this.debugLogging) {
+        print(`[VoiceCommands] Wake phrase — agent: ${trimmed}`);
+      }
+      agent.sendUtterance(trimmed);
+      return;
+    }
+
+    if (this.debugLogging) {
+      print(`[VoiceCommands] Wake phrase only — opening agent talk (${rawUtterance})`);
+    }
+    agent.beginWakeListening();
   }
 
   private tryTodoCommand(text: string): boolean {

@@ -60,11 +60,11 @@
       talkInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       agentTts: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       enableSpeechOutput: true
-      agentName: Stephany
+      agentName: Arvis
       useHoldToTalk: true
       maxHistoryTurns: !<float> 8.000000
       debugLogging: true
-      transcriptOnlyMode: true
+      transcriptOnlyMode: false
   ScriptTypes:
     -
       {}
@@ -79,7 +79,7 @@
     - // @input Component.ScriptComponent talkInteractable
     - // @input AssignableType_3 agentTts
     - // @input bool enableSpeechOutput = true
-    - '// @input string agentName = "Stephany"'
+    - '// @input string agentName = "Arvis"'
     - // @input bool useHoldToTalk
     - // @input float maxHistoryTurns = 8
     - // @input bool debugLogging = true

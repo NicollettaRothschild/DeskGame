@@ -26,6 +26,7 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    agentResponseText3D: false
     bodyText3D: false
     bodyWorldScale: false
     debugLogging: false
@@ -42,6 +43,7 @@
     statusText: false
     titleText3D: false
     titleWorldScale: false
+    transcriptText3D: false
     widgetParent: false
   ScriptTypesHidden:
     {}
@@ -58,6 +60,8 @@
       panelRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       titleText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       bodyText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      transcriptText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      agentResponseText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       imageVisual: !<reference.RenderMeshVisual> 00000000-0000-0000-0000-000000000000
       statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       scrollInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
@@ -79,6 +83,8 @@
     - // @input SceneObject panelRoot
     - // @input Component.Text3D titleText3D
     - // @input Component.Text3D bodyText3D
+    - // @input Component.Text3D transcriptText3D
+    - // @input Component.Text3D agentResponseText3D
     - // @input Component.RenderMeshVisual imageVisual
     - // @input Component.Text statusText
     - // @input Component.ScriptComponent scrollInteractable

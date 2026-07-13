@@ -49,7 +49,7 @@
       voiceName: Sasha
       speed: !<float> 1.000000
       preferArvisVoiceWhenPaired: true
-      agentName: Stephany
+      agentName: Arvis
       debugLogging: true
   ScriptTypes:
     -
@@ -61,5 +61,5 @@
     - '// @input string voiceName = "Sasha"'
     - // @input float speed = 1
     - // @input bool preferArvisVoiceWhenPaired = true
-    - '// @input string agentName = "Stephany"'
+    - '// @input string agentName = "Arvis"'
     - // @input bool debugLogging = true

@@ -6,6 +6,7 @@ import {
   getSharedSpeechRecognition,
   registerArvisAgentChat,
 } from './FlowGardenServiceRegistry';
+import { hasWakeFollowUp, parseArvisWakePhrase } from './ArvisWakePhrase';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
@@ -75,7 +76,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   enableSpeechOutput: boolean = true;
 
   @input
-  agentName: string = 'Stephany';
+  agentName: string = 'Arvis';
 
   @input
   useHoldToTalk: boolean = false;
@@ -92,6 +93,8 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private history: AgentHistoryEntry[] = [];
   private listening = false;
   private sending = false;
+  private wakeAwaitingPrompt = false;
+  private consumedWakeFinal = '';
   private interactableBound = false;
   private dependenciesLogged = false;
 
@@ -107,12 +110,69 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   private refreshListeningBoard(): void {
-    if (!this.listening || this.transcriptOnlyMode || isNull(this.speechRecognition)) {
+    if (!this.listening || isNull(this.speechRecognition)) {
+      return;
+    }
+
+    if (this.wakeAwaitingPrompt) {
+      this.trySendWakePrompt();
+    }
+
+    if (this.transcriptOnlyMode) {
       return;
     }
 
     const live = this.speechRecognition.getLiveTranscript();
     this.updateBoard('listening', live, null);
+  }
+
+  public beginWakeListening(): void {
+    if (this.listening || this.sending) {
+      return;
+    }
+
+    this.resolveDependencies();
+    if (isNull(this.speechRecognition)) {
+      this.setStatus('Speech recognition not wired');
+      return;
+    }
+
+    this.listening = true;
+    this.wakeAwaitingPrompt = true;
+    this.consumedWakeFinal = String(this.speechRecognition.finalTranscript || '').trim();
+    this.speechRecognition.beginAgentSession();
+    this.updateBoard('listening', '', null);
+    this.setStatus(this.agentName + ' is listening…');
+  }
+
+  private trySendWakePrompt(): void {
+    if (isNull(this.speechRecognition)) {
+      return;
+    }
+
+    const finalText = String(this.speechRecognition.finalTranscript || '').trim();
+    if (!finalText || finalText === this.consumedWakeFinal) {
+      return;
+    }
+
+    const wake = parseArvisWakePhrase(finalText.toLowerCase());
+    if (wake.triggered && !hasWakeFollowUp(wake.message)) {
+      this.consumedWakeFinal = finalText;
+      return;
+    }
+
+    this.wakeAwaitingPrompt = false;
+    this.listening = false;
+    const transcript = this.speechRecognition.endAgentSessionPreserveListening();
+    this.speechRecognition.clearFinalTranscript();
+    const question = String(transcript || finalText).trim();
+    if (!question) {
+      this.updateBoard('error', '', 'Did not catch that. Try again.');
+      this.setStatus('No speech detected');
+      return;
+    }
+
+    this.sendMessage(question);
   }
 
   public isBusy(): boolean {
@@ -154,6 +214,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     this.listening = true;
+    this.wakeAwaitingPrompt = false;
     this.speechRecognition.beginAgentSession();
     if (this.transcriptOnlyMode) {
       this.setStatus('Speak — tap again when done');
@@ -170,6 +231,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     this.listening = false;
+    this.wakeAwaitingPrompt = false;
     const transcript = this.transcriptOnlyMode
       ? this.speechRecognition.endAgentSessionPreserveListening()
       : this.speechRecognition.endAgentSession();
@@ -189,6 +251,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
   public cancelAgentTalk(): void {
     this.listening = false;
+    this.wakeAwaitingPrompt = false;
     if (!isNull(this.speechRecognition)) {
       this.speechRecognition.cancelAgentSession();
     }

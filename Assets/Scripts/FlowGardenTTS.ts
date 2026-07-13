@@ -30,7 +30,7 @@ export class FlowGardenTTS extends BaseScriptComponent {
   preferArvisVoiceWhenPaired: boolean = true;
 
   @input
-  agentName: string = 'Stephany';
+  agentName: string = 'Arvis';
 
   @input
   debugLogging: boolean = true;

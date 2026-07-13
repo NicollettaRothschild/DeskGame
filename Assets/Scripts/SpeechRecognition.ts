@@ -68,7 +68,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   commandCooldownSec: number = 1.5;
 
   @input
-  mirrorTranscriptToSpacePanel: boolean = false;
+  mirrorTranscriptToSpacePanel: boolean = true;
 
   private voiceMLModule: VoiceMLModuleLike | null = null;
   private listeningOptions: VoiceMLListeningOptions | null = null;
@@ -119,8 +119,20 @@ export class SpeechRecognition extends BaseScriptComponent {
         'berry',
         'grow',
         'garden',
+        'arvis',
+        'avis',
+        'armis',
+        'argos',
+        'harvest',
+        'hey arvis',
+        'hey avis',
+        'hey harvest',
+        'hey armis',
+        'hey argos',
+        'the avis',
+        'hey a',
       ],
-      10
+      12
     );
 
     this.bindVoiceEvents();

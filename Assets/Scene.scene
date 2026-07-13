@@ -2232,6 +2232,7 @@
     autoStartListening: true
     debugLogging: true
     commandCooldownSec: true
+    mirrorTranscriptToSpacePanel: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -2240,6 +2241,7 @@
       autoStartListening: true
       debugLogging: true
       commandCooldownSec: 1.500000
+      mirrorTranscriptToSpacePanel: true
   ScriptTypes:
     "":
       {}
@@ -4685,10 +4687,11 @@
       talkInteractable: !<reference.ScriptComponent> f6a7b8c9-0d1e-4f5a-9b0c-1d2e3f4a5b6d
       agentTts: !<MappingBased.AssignableType_3> a1b2c3d4-e5f6-7890-abcd-ef1234567892
       enableSpeechOutput: true
-      agentName: Stephany
+      agentName: Arvis
       useHoldToTalk: false
       maxHistoryTurns: !<float> 8.000000
       debugLogging: true
+      transcriptOnlyMode: false
   ScriptTypes:
     "":
       {}
@@ -4802,7 +4805,7 @@
       voiceName: Sasha
       speed: !<float> 1.000000
       preferArvisVoiceWhenPaired: true
-      agentName: Stephany
+      agentName: Arvis
       debugLogging: true
   ScriptTypes:
     "":
@@ -5497,6 +5500,8 @@
       panelRoot: !<reference.SceneObject> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
       titleText3D: !<reference.Text3D> 1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
       bodyText3D: !<reference.Text3D> 2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b
+      transcriptText3D: !<reference.Text3D> b7c8d9e0-f1a2-4b3c-8d4e-5f6a7b8c9d0e
+      agentResponseText3D: !<reference.Text3D> c8d9e0f1-a2b3-4c5d-9e6f-7a8b9c0d1e2f
       imageVisual: !<reference.RenderMeshVisual> 3f4a5b6c-7d8e-9f0a-1b2c-3d4e5f6a7b8c
       statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
       scrollInteractable: !<reference.ScriptComponent> f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c
@@ -5955,6 +5960,108 @@
     []
   Components:
     - !<own> 2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b
+- !<SceneObject/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d>
+  PrefabRemaps:
+    []
+  Name: SpaceTranscript
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.500000, z: 0.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 0.900000, y: 0.900000, z: 0.900000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> b7c8d9e0-f1a2-4b3c-8d4e-5f6a7b8c9d0e
+- !<SceneObject/a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d>
+  PrefabRemaps:
+    []
+  Name: SpaceAgentResponse
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -4.500000, z: 0.700000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 0.900000, y: 0.900000, z: 0.900000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> c8d9e0f1-a2b3-4c5d-9e6f-7a8b9c0d1e2f
+- !<Text3D/b7c8d9e0-f1a2-4b3c-8d4e-5f6a7b8c9d0e>
+  PrefabRemaps:
+    []
+  Name: Text3D
+  Enabled: true
+  RenderOrder: 2
+  StretchMode: Stretch
+  VerticalAlignment: Top
+  HorizontalAlignment: Left
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 1c799e17-6e27-46dd-a915-f43c1635c47c
+  Text: 
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 34
+  ExtrusionDepth: 0.350000
+  ExtrudeDirection: Both
+  Font: !<reference> e46c0d03-1d80-497d-aedb-7ad89ee27e57
+  LayoutRect:
+    left: -4.800000
+    bottom: -1.400000
+    right: 4.800000
+    top: 1.400000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Wrap
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.150000
+    CapitalizationOverride: None
+  EnableBatching: false
+- !<Text3D/c8d9e0f1-a2b3-4c5d-9e6f-7a8b9c0d1e2f>
+  PrefabRemaps:
+    []
+  Name: Text3D
+  Enabled: true
+  RenderOrder: 3
+  StretchMode: Stretch
+  VerticalAlignment: Top
+  HorizontalAlignment: Left
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 1c799e17-6e27-46dd-a915-f43c1635c47c
+  Text: 
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 34
+  ExtrusionDepth: 0.350000
+  ExtrudeDirection: Both
+  Font: !<reference> e46c0d03-1d80-497d-aedb-7ad89ee27e57
+  LayoutRect:
+    left: -4.800000
+    bottom: -3.000000
+    right: 4.800000
+    top: 3.000000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Wrap
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.150000
+    CapitalizationOverride: None
+  EnableBatching: false
 - !<SceneObject/c5e6509e-d5dc-47a0-9426-729d77870bd8>
   PrefabRemaps:
     []
@@ -7654,6 +7761,8 @@
     - !<own> b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e
     - !<own> c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f
     - !<own> d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a
+    - !<own> a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+    - !<own> a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d
   Components:
     - !<own> a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d
     - !<own> f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c
