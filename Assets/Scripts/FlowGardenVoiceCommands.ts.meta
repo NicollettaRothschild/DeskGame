@@ -30,6 +30,7 @@
     deviceRegistry: false
     potSource: false
     seedSource: false
+    spacePanel: false
     specsApi: false
     speechRecognition: false
     statusText: false
@@ -52,6 +53,7 @@
       waterSource: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       potSource: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       debugLogging: true
   ScriptTypes:
     -
@@ -65,4 +67,5 @@
     - // @input Component.ScriptComponent waterSource
     - // @input Component.ScriptComponent potSource
     - // @input Component.Text statusText
+    - // @input Component.ScriptComponent spacePanel
     - // @input bool debugLogging = true

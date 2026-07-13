@@ -39,12 +39,12 @@
     []
   DefaultScriptInputs:
     - userIdText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
-      deviceRegistry: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      deviceRegistry: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       debugLogging: true
   ScriptTypes:
     -
       {}
   InputLines:
     - // @input Component.Text3D userIdText3D
-    - // @input Component.ScriptComponent deviceRegistry
+    - // @input AssignableType deviceRegistry
     - // @input bool debugLogging = true

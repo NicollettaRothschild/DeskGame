@@ -26,7 +26,19 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    {}
+    agentName: false
+    agentResponseText: false
+    agentResponseText3D: false
+    agentTts: false
+    debugLogging: false
+    deviceRegistry: false
+    enableSpeechOutput: false
+    maxHistoryTurns: false
+    specsApi: false
+    speechRecognition: false
+    statusText: false
+    talkInteractable: false
+    useHoldToTalk: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -36,10 +48,33 @@
   Attachments:
     []
   DefaultScriptInputs:
-    -
-      {}
+    - speechRecognition: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      specsApi: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      deviceRegistry: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      agentResponseText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      agentResponseText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      talkInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      agentTts: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      enableSpeechOutput: true
+      agentName: Stephany
+      useHoldToTalk: true
+      maxHistoryTurns: !<float> 8.000000
+      debugLogging: true
   ScriptTypes:
     -
       {}
   InputLines:
-    []
+    - // @input AssignableType speechRecognition
+    - // @input AssignableType_1 specsApi
+    - // @input AssignableType_2 deviceRegistry
+    - // @input Component.Text agentResponseText
+    - // @input Component.Text3D agentResponseText3D
+    - // @input Component.Text statusText
+    - // @input Component.ScriptComponent talkInteractable
+    - // @input AssignableType_3 agentTts
+    - // @input bool enableSpeechOutput = true
+    - '// @input string agentName = "Stephany"'
+    - // @input bool useHoldToTalk = true
+    - // @input float maxHistoryTurns = 8
+    - // @input bool debugLogging = true
