@@ -335,6 +335,8 @@ export class AnchorController extends BaseScriptComponent {
       }
 
       maxWaitSec -= getDeltaTime();
+      this.captureAndLockTrashAtDesk();
+      this.lockSpacePanelAtDesk();
       const anchorPos = this.widgetParent.getTransform().getWorldPosition();
       if (
         lastAnchorPos &&
@@ -780,6 +782,16 @@ export class AnchorController extends BaseScriptComponent {
     }
   }
 
+  private tryTrashTrackedOnRelease(): boolean {
+    const trash = this.trashBin as {
+      tryTrashTrackedOnRelease?: () => boolean;
+    };
+    if (!isNull(trash) && typeof trash.tryTrashTrackedOnRelease === 'function') {
+      return trash.tryTrashTrackedOnRelease();
+    }
+    return false;
+  }
+
   private isEditorPreviewSession(): boolean {
     if (!isNull(this.specsApi) && typeof this.specsApi.isEditorMockActive === 'function') {
       return this.specsApi.isEditorMockActive();
@@ -961,6 +973,7 @@ export class AnchorController extends BaseScriptComponent {
 
     this.captureAndLockTrashAtDesk();
     this.lockSpacePanelAtDesk();
+    const trashedOnRelease = this.tryTrashTrackedOnRelease();
 
     if (!this.currentAnchor && !this.anchorCreationInProgress && this.objs.length > 0 && !this.usingWorldSpace) {
       this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
@@ -969,7 +982,7 @@ export class AnchorController extends BaseScriptComponent {
 
     this.restoredFromWorldFallback = false;
     this.persistPlantTransforms();
-    if (!this.anchorCreationInProgress) {
+    if (!this.anchorCreationInProgress && !trashedOnRelease) {
       playInteractionSound((sounds) => sounds.playPlaceObject());
     }
     this.trySaveAnchorOnce();

@@ -65,6 +65,7 @@ export class TrashBin extends BaseScriptComponent {
   private recentDestroyTimes: number[] = [];
   private spawnGraceRoots: SceneObject[] = [];
   private spawnGraceUntilTimes: number[] = [];
+  private trackedTrashOverlapRoots: SceneObject[] = [];
 
   onAwake(): void {
     const collider = this.getTriggerCollider();
@@ -74,6 +75,9 @@ export class TrashBin extends BaseScriptComponent {
       });
       collider.onOverlapStay.add((eventArgs: OverlapStayEventArgs) => {
         this.tryDestroyFromCollider(eventArgs.overlap.collider);
+      });
+      collider.onOverlapExit.add((eventArgs: OverlapExitEventArgs) => {
+        this.clearTrackedTrashOverlap(eventArgs.overlap.collider);
       });
     } else {
       print('TrashBin has no collider; using proximity-only trash detection.');
@@ -148,6 +152,162 @@ export class TrashBin extends BaseScriptComponent {
     const trashCenter = this.getTrashWorldCenter();
     const trashRadius = this.computeTrashAcceptRadius();
     return this.getClosestDistanceToTrash(trashCenter, root) <= trashRadius;
+  }
+
+  public tryTrashTrackedOnRelease(): boolean {
+    const handler = this.getAnchorTrashHandler();
+    if (
+      isNull(handler) ||
+      typeof handler.getTrackedContentRoots !== 'function'
+    ) {
+      return false;
+    }
+
+    const candidates = this.collectTrackedTrashCandidates(handler);
+    const now = getTime();
+    let trashedAny = false;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const root = candidates[i];
+      if (isNull(root) || !root.enabled || this.isBerryObject(root)) {
+        continue;
+      }
+
+      if (!this.isTrackedOverlappingTrash(root) && !this.isSceneObjectInTrash(root)) {
+        continue;
+      }
+
+      const destroyRoot = this.findDestroyRoot(root) || root;
+      this.tryDestroyRoot(destroyRoot, now, true);
+      if (this.wasRecentlyDestroyed(destroyRoot, now)) {
+        trashedAny = true;
+      }
+    }
+
+    this.pruneTrackedTrashOverlapRoots();
+    return trashedAny;
+  }
+
+  private collectTrackedTrashCandidates(handler: AnchorTrashHandler): SceneObject[] {
+    const candidates: SceneObject[] = [];
+    const seen: SceneObject[] = [];
+
+    const addCandidate = (root: SceneObject | null | undefined): void => {
+      if (isNull(root)) {
+        return;
+      }
+      for (let i = 0; i < seen.length; i++) {
+        if (seen[i] === root) {
+          return;
+        }
+      }
+      seen.push(root);
+      candidates.push(root);
+    };
+
+    for (let i = 0; i < this.trackedTrashOverlapRoots.length; i++) {
+      addCandidate(this.trackedTrashOverlapRoots[i]);
+    }
+
+    if (typeof handler.getTrackedContentRoots === 'function') {
+      const contentRoots = handler.getTrackedContentRoots();
+      for (let i = 0; i < contentRoots.length; i++) {
+        addCandidate(contentRoots[i]);
+      }
+    }
+
+    if (typeof handler.getTrackedWrapperRoots === 'function') {
+      const wrapperRoots = handler.getTrackedWrapperRoots();
+      for (let i = 0; i < wrapperRoots.length; i++) {
+        addCandidate(wrapperRoots[i]);
+      }
+    }
+
+    return candidates;
+  }
+
+  private markTrackedTrashOverlap(otherCollider: ColliderComponent): void {
+    if (isNull(otherCollider)) {
+      return;
+    }
+
+    const otherObject = otherCollider.getSceneObject();
+    if (isNull(otherObject) || this.isProtectedHierarchy(otherObject)) {
+      return;
+    }
+
+    const destroyRoot = this.findDestroyRoot(otherObject);
+    if (isNull(destroyRoot) || !this.isAnchorTrackedDestroyRoot(destroyRoot)) {
+      return;
+    }
+
+    const trackedRoot = this.getTrackedContentRoot(destroyRoot) || destroyRoot;
+    for (let i = 0; i < this.trackedTrashOverlapRoots.length; i++) {
+      if (this.trackedTrashOverlapRoots[i] === trackedRoot) {
+        return;
+      }
+    }
+
+    this.trackedTrashOverlapRoots.push(trackedRoot);
+  }
+
+  private clearTrackedTrashOverlap(otherCollider: ColliderComponent): void {
+    if (isNull(otherCollider)) {
+      return;
+    }
+
+    const otherObject = otherCollider.getSceneObject();
+    if (isNull(otherObject)) {
+      return;
+    }
+
+    const destroyRoot = this.findDestroyRoot(otherObject);
+    if (isNull(destroyRoot)) {
+      return;
+    }
+
+    const trackedRoot = this.getTrackedContentRoot(destroyRoot) || destroyRoot;
+    for (let i = this.trackedTrashOverlapRoots.length - 1; i >= 0; i--) {
+      const candidate = this.trackedTrashOverlapRoots[i];
+      if (
+        candidate === trackedRoot ||
+        candidate === destroyRoot ||
+        this.isSameHierarchy(candidate, trackedRoot)
+      ) {
+        this.trackedTrashOverlapRoots.splice(i, 1);
+      }
+    }
+  }
+
+  private isTrackedOverlappingTrash(root: SceneObject): boolean {
+    for (let i = 0; i < this.trackedTrashOverlapRoots.length; i++) {
+      const overlapRoot = this.trackedTrashOverlapRoots[i];
+      if (
+        overlapRoot === root ||
+        this.isSameHierarchy(overlapRoot, root)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private pruneTrackedTrashOverlapRoots(): void {
+    for (let i = this.trackedTrashOverlapRoots.length - 1; i >= 0; i--) {
+      const root = this.trackedTrashOverlapRoots[i];
+      if (isNull(root) || !root.enabled) {
+        this.trackedTrashOverlapRoots.splice(i, 1);
+      }
+    }
+  }
+
+  private removeTrackedTrashOverlapRoot(root: SceneObject): void {
+    for (let i = this.trackedTrashOverlapRoots.length - 1; i >= 0; i--) {
+      const candidate = this.trackedTrashOverlapRoots[i];
+      if (candidate === root || this.isSameHierarchy(candidate, root)) {
+        this.trackedTrashOverlapRoots.splice(i, 1);
+      }
+    }
   }
 
   private checkProximityTrash(): void {
@@ -327,8 +487,12 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
-    const deliberate = this.isAnchorTrackedDestroyRoot(destroyRoot);
-    this.tryDestroyRoot(destroyRoot, getTime(), deliberate);
+    if (this.isAnchorTrackedDestroyRoot(destroyRoot)) {
+      this.markTrackedTrashOverlap(otherCollider);
+      return;
+    }
+
+    this.tryDestroyRoot(destroyRoot, getTime(), false);
   }
 
   private isAnchorTrackedDestroyRoot(destroyRoot: SceneObject): boolean {
@@ -342,6 +506,15 @@ export class TrashBin extends BaseScriptComponent {
       !isNull(handler.getTrackedContentRoot(destroyRoot))
     ) {
       return true;
+    }
+
+    if (typeof handler.getTrackedWrapperRoots === 'function') {
+      const wrappers = handler.getTrackedWrapperRoots();
+      for (let i = 0; i < wrappers.length; i++) {
+        if (wrappers[i] === destroyRoot || this.isSameHierarchy(destroyRoot, wrappers[i])) {
+          return true;
+        }
+      }
     }
 
     if (typeof handler.getTrackedContentRoots === 'function') {
@@ -365,7 +538,7 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
-    if (this.isInSpawnGrace(destroyRoot, now)) {
+    if (!deliberate && this.isInSpawnGrace(destroyRoot, now)) {
       return;
     }
 
@@ -374,17 +547,24 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     const label = destroyRoot.name;
+    const trackedRoot = this.getTrackedContentRoot(destroyRoot);
+    const isTracked =
+      this.isAnchorTrackedDestroyRoot(destroyRoot) || !isNull(trackedRoot);
+    if (isTracked && !deliberate) {
+      return;
+    }
 
     if (deliberate && this.destroyViaAnchor(destroyRoot)) {
       this.recordDestroyed(destroyRoot, now);
+      this.removeTrackedTrashOverlapRoot(destroyRoot);
       playInteractionSound((sounds) => sounds.playPlaceObject());
       this.debugLog(`trashed tracked object ${label}`);
       return;
     }
 
-    const trackedRoot = this.getTrackedContentRoot(destroyRoot);
     if (deliberate && !isNull(trackedRoot) && this.destroyViaAnchor(trackedRoot)) {
       this.recordDestroyed(trackedRoot, now);
+      this.removeTrackedTrashOverlapRoot(trackedRoot);
       playInteractionSound((sounds) => sounds.playPlaceObject());
       this.debugLog(`trashed tracked object ${trackedRoot.name}`);
       return;

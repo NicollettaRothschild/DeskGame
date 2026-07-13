@@ -5,6 +5,7 @@
     - !<own> 0005641c-028d-459a-0000-000000014b4d
     - !<own> e20f44f1-e6f3-4b7b-80be-af6e7ad66f85
     - !<own> 6fef169d-128d-4a95-9464-c9fa0c67699f
+    - !<own> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
     - !<own> c41a3ab5-4451-42ca-8332-990d76bcd69b
     - !<own> d334d6cb-199a-4750-8c76-963feb55c00d
     - !<own> 47017fe2-1eaa-495e-9d1c-dbefdc3951f6
@@ -5918,7 +5919,7 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    - !<own> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
+    []
   Components:
     - !<own> a8ce7f01-e844-458d-a945-b93d4bb1ea05
 - !<SceneObject/c4ca7ade-5e74-49a0-9f67-2b15ec7c3c06>
@@ -7600,8 +7601,8 @@
   ScriptInputs:
     "":
       manipulateRootSceneObject: !<reference.SceneObject> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
-      enableTranslation: true
-      enableRotation: true
+      enableTranslation: false
+      enableRotation: false
       enableScale: false
       minimumScaleFactor: 0.250000
       maximumScaleFactor: !<float> 20.000000
