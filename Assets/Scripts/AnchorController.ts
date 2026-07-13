@@ -1697,15 +1697,15 @@ export class AnchorController extends BaseScriptComponent {
     plant.setAnchorPersistence(this);
     const isPot = this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT;
     if (isPot) {
-      // Planted things should be stable (no accidental re-grabs).
-      plant.setAllowTrashManipulation(false);
-      if (!plant.getIsPlanted()) {
-        plant.setPlanted(true);
-      }
-    } else {
-      // Loose seeds/plants can still be moved to trash or repositioned.
+      // Pots must remain movable after placement. The PlantPot script is responsible for
+      // locking manipulation on the planted seed/plant inside the pot.
       plant.setAllowTrashManipulation(true);
+      return;
     }
+
+    // Loose seeds/plants can still be moved to trash or repositioned, but once a plant is
+    // marked planted we should lock manipulation to prevent accidental re-grabs.
+    plant.setAllowTrashManipulation(!plant.getIsPlanted());
   }
 
   private wirePotPersistence(obj: SceneObject): void {

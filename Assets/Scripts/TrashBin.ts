@@ -480,6 +480,12 @@ export class TrashBin extends BaseScriptComponent {
         return wateringObject.getSceneObject();
       }
 
+      // Some water “droplets” are simple prefabs without a WateringObject script.
+      // If they enter the trash, treat the first water-like object in the hierarchy as the root.
+      if (this.isLooseWaterLikeObject(current)) {
+        return current;
+      }
+
       const freePlant = this.findFreePlantLifecycle(current);
       if (!isNull(freePlant)) {
         return freePlant.getSceneObject();
@@ -502,6 +508,30 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     return null;
+  }
+
+  private isLooseWaterLikeObject(sceneObject: SceneObject): boolean {
+    if (isNull(sceneObject) || this.isProtectedDestroyTarget(sceneObject)) {
+      return false;
+    }
+
+    const name = String(sceneObject.name || '').toLowerCase();
+    if (!name) {
+      return false;
+    }
+
+    // Keep this intentionally conservative: only match obvious water droplet/object names.
+    if (
+      name.indexOf('wateringobject') >= 0 ||
+      name.indexOf('water_droplet') >= 0 ||
+      name.indexOf('waterdroplet') >= 0 ||
+      name.indexOf('water drop') >= 0 ||
+      name.indexOf('droplet') >= 0
+    ) {
+      return true;
+    }
+
+    return false;
   }
 
   private getTrackedContentRoot(candidate: SceneObject): SceneObject | null {
