@@ -1,3 +1,4 @@
+import { getSharedArvisAgentChat } from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
@@ -63,6 +64,9 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   @input
   debugLogging: boolean = true;
 
+  @input
+  forwardUnmatchedToAgent: boolean = true;
+
   private lastProcessedFinal = '';
 
   onAwake(): void {
@@ -75,6 +79,11 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
     }
 
     if (this.speechRecognition.isAgentSessionActive()) {
+      return;
+    }
+
+    const agent = getSharedArvisAgentChat();
+    if (!isNull(agent) && agent.isBusy()) {
       return;
     }
 
@@ -112,6 +121,17 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
     }
     if (this.trySpawnCommand(text)) {
       return;
+    }
+
+    if (this.forwardUnmatchedToAgent) {
+      const agent = getSharedArvisAgentChat();
+      if (!isNull(agent)) {
+        if (this.debugLogging) {
+          print(`[VoiceCommands] Forwarding to agent: ${text}`);
+        }
+        agent.sendUtterance(text);
+        return;
+      }
     }
 
     this.setStatus(`Heard: "${text}"`);

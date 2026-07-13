@@ -114,25 +114,41 @@ export class SpecsEditorMock {
 
   public static chatWithAgent(
     agentName: string,
-    message: string
+    message: string,
+    history: Array<{ role: string; text: string }> = []
   ): { agent: { name: string; role: string }; response: string; model: string } {
     const name = String(agentName || 'Stephany').trim() || 'Stephany';
     const trimmed = String(message || '').trim();
     const lower = trimmed.toLowerCase();
-    let response = `Hi! I'm ${name}. Pair at arvis.space/specs on device for live answers.`;
-    if (/hello|hi|hey/.test(lower)) {
-      response = `Hey! ${name} here. What should we grow or design in Flow Garden today?`;
-    } else if (/todo|task|berry/.test(lower)) {
-      response = 'Say "todo" plus your task — I will sync it as a berry when you are paired.';
-    } else if (/plant|seed|water/.test(lower)) {
-      response = 'Try saying "plant a seed" or "water" while you look at your desk garden.';
+    const lastAssistant = [...history]
+      .reverse()
+      .find((entry) => entry && entry.role === 'assistant');
+    const lastUser = [...history]
+      .reverse()
+      .find((entry) => entry && entry.role === 'user');
+
+    let response = `I'm ${name} on the ARVIS space board. In editor preview I answer locally; on Spectacles I use arvis.space agents.`;
+
+    if (/hello|hi|hey|how are you/.test(lower)) {
+      response = `Hey! ${name} here. I can help with Flow Garden, todos, and your desk space. What do you want to do?`;
+    } else if (/hear me|can you hear/.test(lower)) {
+      response = `Yes — I got "${trimmed}". Speech is working. Ask me anything about your garden or tasks.`;
+    } else if (/todo|task|berry|remember/.test(lower)) {
+      response = 'Try "todo" plus your task and I will sync it as a berry when you are on device.';
+    } else if (/plant|seed|water|pot|garden/.test(lower)) {
+      response = 'Pinch to place pots, spawn seeds from the tray, then water to grow. Want a task for that?';
+    } else if (/who are you|what are you|stephany|ars|avis|arvis/.test(lower)) {
+      response = `I'm ${name}, your ARVIS design agent for Flow Garden on arvis.space.`;
+    } else if (trimmed && lastUser && lastAssistant) {
+      response = `${name}: About "${trimmed}" — still in editor mock. Deploy to Specs for live arvis.space agent replies.`;
     } else if (trimmed) {
-      response = `${name}: I heard "${trimmed}". In editor mock mode — on Spectacles I use arvis.space agents.`;
+      response = `${name}: I heard "${trimmed}". Editor mock is active — pair on Spectacles for live arvis.space chat.`;
     }
+
     return {
       agent: { name, role: 'Designer' },
       response,
-      model: 'editor/mock',
+      model: 'editor/arvis-mock',
     };
   }
 

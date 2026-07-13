@@ -37,6 +37,7 @@
     scrollDragSensitivity: false
     scrollInteractable: false
     specsApi: false
+    speechBodyExtraOffset: false
     startVisible: false
     statusText: false
     titleText3D: false
@@ -67,6 +68,7 @@
       titleWorldScale: 0.220000
       bodyWorldScale: 0.160000
       maxBodyCharacters: !<float> 360.000000
+      speechBodyExtraOffset: !<float> 12.000000
   ScriptTypes:
     -
       {}
@@ -87,3 +89,4 @@
     - // @input float titleWorldScale = 1.2
     - // @input float bodyWorldScale = 0.9
     - // @input float maxBodyCharacters = 360
+    - // @input float speechBodyExtraOffset = 12

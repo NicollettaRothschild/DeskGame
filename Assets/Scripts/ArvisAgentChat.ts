@@ -4,6 +4,7 @@ import {
   getSharedSpecsApi,
   getSharedSpecsDeviceRegistry,
   getSharedSpeechRecognition,
+  registerArvisAgentChat,
 } from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
@@ -86,7 +87,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   debugLogging: boolean = true;
 
   @input
-  transcriptOnlyMode: boolean = true;
+  transcriptOnlyMode: boolean = false;
 
   private history: AgentHistoryEntry[] = [];
   private listening = false;
@@ -95,12 +96,23 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private dependenciesLogged = false;
 
   onAwake(): void {
+    registerArvisAgentChat(this);
     this.setStatus('Tap or pinch UserID to talk to ' + this.agentName);
     this.createEvent('OnStartEvent').bind(() => {
       this.resolveDependencies();
       this.bindTalkInteractable();
     });
+    this.createEvent('UpdateEvent').bind(() => this.refreshListeningBoard());
     this.createEvent('TapEvent').bind(() => this.toggleAgentTalk());
+  }
+
+  private refreshListeningBoard(): void {
+    if (!this.listening || this.transcriptOnlyMode || isNull(this.speechRecognition)) {
+      return;
+    }
+
+    const live = this.speechRecognition.getLiveTranscript();
+    this.updateBoard('listening', live, null);
   }
 
   public isBusy(): boolean {
@@ -114,6 +126,20 @@ export class ArvisAgentChat extends BaseScriptComponent {
       typeof panel.isAgentViewActive === 'function' &&
       panel.isAgentViewActive()
     );
+  }
+
+  public sendUtterance(message: string): void {
+    if (this.listening || this.sending) {
+      return;
+    }
+
+    const trimmed = String(message || '').trim();
+    if (!trimmed) {
+      return;
+    }
+
+    this.resolveDependencies();
+    this.sendMessage(trimmed);
   }
 
   public beginAgentTalk(): void {
@@ -133,8 +159,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
       this.setStatus('Speak — tap again when done');
       return;
     }
+
     this.updateBoard('listening', '', null);
-    this.setStatus('Speak to ' + this.agentName);
+    this.setStatus('Speak to ' + this.agentName + ' (editor uses arvis mock)');
   }
 
   public endAgentTalkAndSend(): void {

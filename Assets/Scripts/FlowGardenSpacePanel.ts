@@ -148,6 +148,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       this.setTitle(`${label} · Thinking`);
       this.setBody(userLine ? `You: ${userLine}\n\n…` : '…');
       this.setStatus('Thinking…');
+      this.applySpeechTextLayout();
       return;
     }
 
@@ -156,6 +157,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       const detail = replyLine || 'Something went wrong.';
       this.setBody(userLine ? `You: ${userLine}\n\n${detail}` : detail);
       this.setStatus(detail);
+      this.applySpeechTextLayout();
       return;
     }
 
@@ -165,6 +167,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       : `${label}:\n${replyLine || '(no response)'}`;
     this.setBody(this.truncateBody(body));
     this.setStatus('');
+    this.applySpeechTextLayout();
   }
 
   public clearAgentView(): void {

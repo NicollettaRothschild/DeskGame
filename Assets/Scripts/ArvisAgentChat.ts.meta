@@ -39,6 +39,7 @@
     speechRecognition: false
     statusText: false
     talkInteractable: false
+    transcriptOnlyMode: false
     useHoldToTalk: false
   ScriptTypesHidden:
     {}
@@ -63,6 +64,7 @@
       useHoldToTalk: true
       maxHistoryTurns: !<float> 8.000000
       debugLogging: true
+      transcriptOnlyMode: true
   ScriptTypes:
     -
       {}
@@ -81,3 +83,4 @@
     - // @input bool useHoldToTalk
     - // @input float maxHistoryTurns = 8
     - // @input bool debugLogging = true
+    - // @input bool transcriptOnlyMode

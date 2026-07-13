@@ -1,3 +1,4 @@
+import { ArvisAgentChat } from './ArvisAgentChat';
 import { FlowGardenSpacePanel } from './FlowGardenSpacePanel';
 import { FlowGardenTTS } from './FlowGardenTTS';
 import { SpecsApiClient } from './SpecsApiClient';
@@ -9,6 +10,7 @@ let specsApi: SpecsApiClient | null = null;
 let deviceRegistry: SpecsDeviceRegistry | null = null;
 let spacePanel: FlowGardenSpacePanel | null = null;
 let agentTts: FlowGardenTTS | null = null;
+let arvisAgentChat: ArvisAgentChat | null = null;
 
 export function registerSpeechRecognition(instance: SpeechRecognition): void {
   speechRecognition = instance;
@@ -48,4 +50,12 @@ export function registerFlowGardenTts(instance: FlowGardenTTS): void {
 
 export function getSharedFlowGardenTts(): FlowGardenTTS | null {
   return agentTts;
+}
+
+export function registerArvisAgentChat(instance: ArvisAgentChat): void {
+  arvisAgentChat = instance;
+}
+
+export function getSharedArvisAgentChat(): ArvisAgentChat | null {
+  return arvisAgentChat;
 }

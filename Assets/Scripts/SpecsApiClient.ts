@@ -281,8 +281,16 @@ export class SpecsApiClient extends BaseScriptComponent {
     const agent = String(agentName || 'Stephany').trim() || 'Stephany';
 
     if (this.isEditorMockActive()) {
-      const mock = SpecsEditorMock.chatWithAgent(agent, trimmed);
-      onDone({ response: mock.response, agentName: mock.agent.name });
+      const mock = SpecsEditorMock.chatWithAgent(agent, trimmed, history);
+      const reply = { response: mock.response, agentName: mock.agent.name };
+      const delayEvent = this.createEvent('DelayedCallbackEvent');
+      delayEvent.bind(() => {
+        if (this.debugLogging) {
+          print(`[SpecsApi] Editor mock agent ${mock.agent.name}: ${mock.response}`);
+        }
+        onDone(reply);
+      });
+      delayEvent.reset(0.4);
       return;
     }
 

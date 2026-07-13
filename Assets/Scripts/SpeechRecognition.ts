@@ -68,7 +68,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   commandCooldownSec: number = 1.5;
 
   @input
-  mirrorTranscriptToSpacePanel: boolean = true;
+  mirrorTranscriptToSpacePanel: boolean = false;
 
   private voiceMLModule: VoiceMLModuleLike | null = null;
   private listeningOptions: VoiceMLListeningOptions | null = null;
@@ -268,7 +268,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   }
 
   private pushTranscriptToSpacePanel(isListening: boolean): void {
-    if (!this.mirrorTranscriptToSpacePanel) {
+    if (!this.mirrorTranscriptToSpacePanel || this.agentSessionActive) {
       return;
     }
 
