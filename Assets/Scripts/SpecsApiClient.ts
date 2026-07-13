@@ -270,7 +270,7 @@ export class SpecsApiClient extends BaseScriptComponent {
     message: string,
     agentName: string,
     history: Array<{ role: string; text: string }>,
-    onDone: (result: { response: string; agentName: string } | null, error?: string) => void
+    onDone: (result: { response: string; agentName: string; imageUrl?: string } | null, error?: string) => void
   ): void {
     const trimmed = String(message || '').trim();
     if (!trimmed) {
@@ -282,7 +282,7 @@ export class SpecsApiClient extends BaseScriptComponent {
 
     if (this.isEditorMockActive()) {
       const mock = SpecsEditorMock.chatWithAgent(agent, trimmed, history);
-      const reply = { response: mock.response, agentName: mock.agent.name };
+      const reply = { response: mock.response, agentName: mock.agent.name, imageUrl: mock.imageUrl };
       const delayEvent = this.createEvent('DelayedCallbackEvent');
       delayEvent.bind(() => {
         if (this.debugLogging) {
@@ -311,11 +311,17 @@ export class SpecsApiClient extends BaseScriptComponent {
         const response = String(data?.response || '').trim();
         const agentRecord = data?.agent as JsonRecord | undefined;
         const resolvedName = String(agentRecord?.name || agent).trim() || agent;
+        const imageUrl = String(
+          (data?.image_url as string) ||
+            (data?.imageUrl as string) ||
+            ((data?.image as JsonRecord | undefined)?.url as string) ||
+            ''
+        ).trim();
         if (!response) {
           onDone(null, 'Empty agent response');
           return;
         }
-        onDone({ response, agentName: resolvedName });
+        onDone({ response, agentName: resolvedName, imageUrl: imageUrl || undefined });
       }
     );
   }

@@ -116,7 +116,7 @@ export class SpecsEditorMock {
     agentName: string,
     message: string,
     history: Array<{ role: string; text: string }> = []
-  ): { agent: { name: string; role: string }; response: string; model: string } {
+  ): { agent: { name: string; role: string }; response: string; model: string; imageUrl?: string } {
     const name = String(agentName || 'Arvis').trim() || 'Arvis';
     const trimmed = String(message || '').trim();
     const lower = trimmed.toLowerCase();
@@ -128,9 +128,19 @@ export class SpecsEditorMock {
       .find((entry) => entry && entry.role === 'user');
 
     let response = `I'm ${name}, your ARVIS assistant on the space board. In editor preview I answer locally; on Spectacles I use arvis.space agents.`;
+    let imageUrl = '';
+
+    const imageCmd = trimmed.match(/^\/(?:image|concept|art)\s+([\s\S]{1,700})$/i);
 
     if (/hello|hi|hey|how are you/.test(lower)) {
       response = `Hey! I'm ${name}, your ARVIS assistant. I can help with Flow Garden, todos, and your desk space. What do you want to do?`;
+    } else if (imageCmd?.[1]) {
+      const subject = String(imageCmd[1] || '').trim().slice(0, 160);
+      response = `Concept art ready (editor preview mock).\n"${subject}"`;
+      // 1x1 PNG (light green). Lets SpacePanel test image rendering without HTTP.
+      imageUrl =
+        'data:image/png;base64,' +
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6mZJtUAAAAASUVORK5CYII=';
     } else if (/hear me|can you hear/.test(lower)) {
       response = `Yes — I got "${trimmed}". Speech is working. Ask me anything about your garden or tasks.`;
     } else if (/\b(news|headline|headlines|current events|today|breaking)\b/.test(lower)) {
@@ -154,6 +164,7 @@ export class SpecsEditorMock {
       agent: { name, role: 'Assistant' },
       response,
       model: 'editor/arvis-mock',
+      imageUrl: imageUrl || undefined,
     };
   }
 

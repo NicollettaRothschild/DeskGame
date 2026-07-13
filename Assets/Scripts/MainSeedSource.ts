@@ -196,6 +196,14 @@ export class MainSeedSource extends BaseScriptComponent {
       this.abandonActivePull();
       return;
     }
+
+    const plant = this.findPlantLifecycle(pull.seedObject);
+    if (!isNull(plant) && typeof plant.getIsPlanted === 'function' && plant.getIsPlanted()) {
+      // A pot just claimed this seed. Stop overriding its position while the user is still holding.
+      this.releaseActivePull();
+      return;
+    }
+
     const interactor = pull.interactor;
     if (!isNull(interactor) && interactor.isActive && !interactor.isActive()) {
       this.releaseActivePull();

@@ -1694,12 +1694,16 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     plant.setAnchorPersistence(this);
-    plant.setAllowTrashManipulation(true);
-    if (
-      this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT &&
-      !plant.getIsPlanted()
-    ) {
-      plant.setPlanted(true);
+    const isPot = this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT;
+    if (isPot) {
+      // Planted things should be stable (no accidental re-grabs).
+      plant.setAllowTrashManipulation(false);
+      if (!plant.getIsPlanted()) {
+        plant.setPlanted(true);
+      }
+    } else {
+      // Loose seeds/plants can still be moved to trash or repositioned.
+      plant.setAllowTrashManipulation(true);
     }
   }
 

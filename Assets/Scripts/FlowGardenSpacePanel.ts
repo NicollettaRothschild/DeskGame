@@ -138,7 +138,8 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     transcript: string,
     response: string | null,
     agentName: string,
-    phase: 'listening' | 'thinking' | 'reply' | 'error'
+    phase: 'listening' | 'thinking' | 'reply' | 'error',
+    imageUrl?: string | null
   ): void {
     this.agentViewActive = true;
     this.setPanelVisible(true);
@@ -184,6 +185,22 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.setAgentResponse(this.truncateBody(replyLine || '(no response)'));
     this.setStatus('');
     this.applyAgentChatLayout();
+
+    const url = String(imageUrl || '').trim();
+    if (url) {
+      this.showAgentImage(url);
+    }
+  }
+
+  public showAgentImage(imageUrl: string): void {
+    this.agentViewActive = true;
+    this.setPanelVisible(true);
+    const url = String(imageUrl || '').trim();
+    if (!url) {
+      this.hideImage();
+      return;
+    }
+    this.loadItemImage(url);
   }
 
   public clearAgentView(): void {
@@ -847,6 +864,72 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       return;
     }
 
+    if (url.startsWith('data:image/')) {
+      const commaIndex = url.indexOf(',');
+      const meta = commaIndex >= 0 ? url.slice(0, commaIndex) : '';
+      const base64 = commaIndex >= 0 ? url.slice(commaIndex + 1) : '';
+      const mimeMatch = meta.match(/^data:(image\/[a-z0-9.+-]+);base64$/i);
+      const mime = mimeMatch?.[1] ? String(mimeMatch[1]) : 'image/png';
+      try {
+        const bytes = this.decodeBase64(base64);
+        if (!bytes || bytes.length === 0) {
+          this.hideImage();
+          return;
+        }
+
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+
+        const resource = (internetModule as InternetModule).makeResourceFromBlob(
+          new Blob([binary], { type: mime })
+        );
+
+        const loader = remoteMediaModule as RemoteMediaModule & {
+          loadResourceAsImageTexture?: (
+            resource: unknown,
+            onSuccess: (texture: Texture) => void,
+            onError: (message: string) => void
+          ) => void;
+        };
+
+        if (typeof loader.loadResourceAsImageTexture !== 'function') {
+          this.hideImage();
+          return;
+        }
+
+        loader.loadResourceAsImageTexture(
+          resource,
+          (texture) => {
+            if (requestId !== this.imageRequestId || isNull(this.imageVisual)) {
+              return;
+            }
+            const material = this.imageVisual.mainMaterial;
+            if (!isNull(material)) {
+              material.mainPass.baseTex = texture;
+            }
+            const imageObject = this.imageVisual.getSceneObject();
+            if (!isNull(imageObject)) {
+              imageObject.enabled = true;
+            }
+            this.imageVisual.enabled = true;
+          },
+          () => {
+            if (requestId === this.imageRequestId) {
+              this.hideImage();
+            }
+          }
+        );
+      } catch (e) {
+        if (this.debugLogging) {
+          print('[SpacePanel] Data URL image load failed: ' + e);
+        }
+        this.hideImage();
+      }
+      return;
+    }
+
     const request = RemoteServiceHttpRequest.create();
     request.url = url;
     request.method = RemoteServiceHttpRequest.HttpRequestMethod.Get;
@@ -905,6 +988,44 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
         this.hideImage();
       }
     });
+  }
+
+  private decodeBase64(base64: string): Uint8Array | null {
+    const cleaned = String(base64 || '').replace(/\s/g, '');
+    if (!cleaned) {
+      return null;
+    }
+
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const lookup: Record<string, number> = {};
+    for (let i = 0; i < alphabet.length; i++) {
+      lookup[alphabet.charAt(i)] = i;
+    }
+
+    const padding = cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0;
+    const outputLength = Math.floor((cleaned.length * 3) / 4) - padding;
+    const bytes = new Uint8Array(outputLength);
+    let byteIndex = 0;
+
+    for (let i = 0; i < cleaned.length; i += 4) {
+      const c1 = lookup[cleaned.charAt(i)] ?? 0;
+      const c2 = lookup[cleaned.charAt(i + 1)] ?? 0;
+      const c3 = lookup[cleaned.charAt(i + 2)] ?? 0;
+      const c4 = lookup[cleaned.charAt(i + 3)] ?? 0;
+
+      const block = (c1 << 18) | (c2 << 12) | (c3 << 6) | c4;
+      if (byteIndex < outputLength) {
+        bytes[byteIndex++] = (block >> 16) & 0xff;
+      }
+      if (byteIndex < outputLength) {
+        bytes[byteIndex++] = (block >> 8) & 0xff;
+      }
+      if (byteIndex < outputLength) {
+        bytes[byteIndex++] = block & 0xff;
+      }
+    }
+
+    return bytes;
   }
 
   private resolveInternetModule(): InternetModule | null {

@@ -73,7 +73,7 @@
     - // @input bool hasBeenWatered
     - '// @input string plantTypeId = "default"'
     - // @input Asset.ObjectPrefab seedPlantPrefab
-    - // @input float seedScale = 0.02
+    - // @input float seedScale = 0.013
     - // @input Asset.ObjectPrefab babyPlantPrefab
     - // @input Asset.ObjectPrefab adultPlantPrefab
     - // @input Asset.Texture plantTexture

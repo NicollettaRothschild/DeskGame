@@ -143,6 +143,8 @@ export class PlantPot extends BaseScriptComponent {
     this.plantedPlant = plant;
     plant.applyPlantedWorldScale(preservedWorldScale);
     plant.applyPlantedWorldRotation(preservedWorldRotation);
+    // Once planted in a pot, prevent accidental re-grabs that offset the seed/plant.
+    plant.setAllowTrashManipulation(false);
     plant.setPlanted(true);
 
     if (

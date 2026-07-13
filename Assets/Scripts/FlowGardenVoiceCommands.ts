@@ -141,10 +141,16 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
 
     if (hasWakeFollowUp(message)) {
       const trimmed = String(message || '').trim();
+      const imageMatch = trimmed.match(
+        /^(?:generate|create|make|draw|render|design|produce|show)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|drawing|sketch|concept(?:\s+art)?)\s+(?:of\s+)?([\s\S]{1,700})$/i
+      );
+      const agentPrompt = imageMatch?.[1]
+        ? `/image ${String(imageMatch[1]).trim().replace(/[.?!]+$/, '')}`
+        : trimmed;
       if (this.debugLogging) {
-        print(`[VoiceCommands] Wake phrase — agent: ${trimmed}`);
+        print(`[VoiceCommands] Wake phrase — agent: ${agentPrompt}`);
       }
-      agent.sendUtterance(trimmed);
+      agent.sendUtterance(agentPrompt);
       return;
     }
 

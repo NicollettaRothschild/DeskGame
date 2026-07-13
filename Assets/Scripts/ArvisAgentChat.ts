@@ -22,9 +22,11 @@ type SpacePanelLike = {
     transcript: string,
     response: string | null,
     agentName: string,
-    phase: 'listening' | 'thinking' | 'reply' | 'error'
+    phase: 'listening' | 'thinking' | 'reply' | 'error',
+    imageUrl?: string | null
   ) => void;
   isAgentViewActive?: () => boolean;
+  showAgentImage?: (imageUrl: string) => void;
 };
 
 type InteractableLike = ScriptComponent & {
@@ -372,7 +374,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
         this.pushHistory('user', trimmed);
         this.pushHistory('assistant', result.response);
         const label = result.agentName || this.agentName;
-        this.updateBoard('reply', trimmed, result.response, label);
+        this.updateBoard('reply', trimmed, result.response, label, result.imageUrl || null);
         this.setStatus('');
         if (this.debugLogging) {
           print(`[ArvisAgentChat] ${label}: ${result.response}`);
@@ -386,12 +388,16 @@ export class ArvisAgentChat extends BaseScriptComponent {
     phase: 'listening' | 'thinking' | 'reply' | 'error',
     transcript: string,
     response: string | null,
-    agentName?: string
+    agentName?: string,
+    imageUrl?: string | null
   ): void {
     const label = agentName || this.agentName;
     const panel = this.getSpacePanel();
     if (!isNull(panel) && typeof panel.showAgentChat === 'function') {
-      panel.showAgentChat(transcript, response, label, phase);
+      panel.showAgentChat(transcript, response, label, phase, imageUrl || null);
+      if (imageUrl && typeof panel.showAgentImage === 'function') {
+        panel.showAgentImage(imageUrl);
+      }
       return;
     }
 

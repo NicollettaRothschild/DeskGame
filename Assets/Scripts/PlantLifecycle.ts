@@ -55,7 +55,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   seedPlantPrefab!: ObjectPrefab;
 
   @input('float')
-  seedScale: number = 0.02;
+  seedScale: number = 0.013;
 
   @input
   babyPlantPrefab!: ObjectPrefab;
@@ -99,6 +99,10 @@ export class PlantLifecycle extends BaseScriptComponent {
   private plantedPreserveWorldRotation: quat | null = null;
   private soilLineOffsetY = 0;
   private visualStateApplied = false;
+  private seedWaterScaleOutActive = false;
+  private seedWaterScaleOutElapsed = 0;
+  private seedWaterScaleOutDuration = 0.18;
+  private seedWaterScaleOutStartScale: vec3 | null = null;
   private static readonly DEFAULT_CONTAINER_WORLD_SCALE = 0.1;
   private static readonly GROWTH_SIZE_DIVISOR = 3;
 
@@ -261,7 +265,11 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.hasBeenWatered = true;
 
     if (this.currentStage === PlantStage.Seed) {
-      this.startGrowth();
+      if (this.isPlanted && !isNull(this.seedInstance)) {
+        this.beginSeedWaterScaleOut();
+      } else {
+        this.startGrowth();
+      }
       playInteractionSound((sounds) => sounds.playWatering());
       print(
         `[PlantLifecycle] ${this.getSceneObject().name}: watered seed -> growing (${this.growthTime.toFixed(1)}s to adult)`
@@ -358,6 +366,10 @@ export class PlantLifecycle extends BaseScriptComponent {
   }
 
   private onUpdate(): void {
+    if (this.seedWaterScaleOutActive) {
+      this.updateSeedWaterScaleOut();
+      return;
+    }
     if (this.currentStage === PlantStage.Adult) {
       return;
     }
@@ -384,6 +396,52 @@ export class PlantLifecycle extends BaseScriptComponent {
         print(`[PlantLifecycle] ${this.getSceneObject().name}: growth complete -> adult`);
       }
     }
+  }
+
+  private beginSeedWaterScaleOut(): void {
+    if (this.seedWaterScaleOutActive) {
+      return;
+    }
+    if (isNull(this.seedInstance)) {
+      this.startGrowth();
+      return;
+    }
+    const seed = this.seedInstance as SceneObject;
+    this.seedWaterScaleOutActive = true;
+    this.seedWaterScaleOutElapsed = 0;
+    this.seedWaterScaleOutStartScale = seed.getTransform().getLocalScale();
+  }
+
+  private updateSeedWaterScaleOut(): void {
+    if (!this.seedWaterScaleOutActive) {
+      return;
+    }
+
+    const seed = this.seedInstance;
+    const start = this.seedWaterScaleOutStartScale;
+    const duration = Math.max(0.001, this.seedWaterScaleOutDuration);
+
+    if (isNull(seed) || isNull(start)) {
+      this.seedWaterScaleOutActive = false;
+      this.seedWaterScaleOutStartScale = null;
+      this.startGrowth();
+      return;
+    }
+
+    this.seedWaterScaleOutElapsed += getDeltaTime();
+    const t = Math.min(1, this.seedWaterScaleOutElapsed / duration);
+    const nextScale = new vec3(start.x * (1 - t), start.y * (1 - t), start.z * (1 - t));
+    (seed as SceneObject).getTransform().setLocalScale(nextScale);
+
+    if (t < 1) {
+      return;
+    }
+
+    this.seedWaterScaleOutActive = false;
+    this.seedWaterScaleOutStartScale = null;
+    (seed as SceneObject).destroy();
+    this.seedInstance = null;
+    this.startGrowth();
   }
 
   private startGrowth(): void {
