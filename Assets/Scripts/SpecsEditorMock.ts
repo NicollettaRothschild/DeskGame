@@ -133,6 +133,11 @@ export class SpecsEditorMock {
       response = `Hey! I'm ${name}, your ARVIS assistant. I can help with Flow Garden, todos, and your desk space. What do you want to do?`;
     } else if (/hear me|can you hear/.test(lower)) {
       response = `Yes — I got "${trimmed}". Speech is working. Ask me anything about your garden or tasks.`;
+    } else if (/\b(news|headline|headlines|current events|today|breaking)\b/.test(lower)) {
+      response =
+        `I can’t fetch live news in Lens Studio editor preview (no internet / HTTP). ` +
+        `On Spectacles (real device), ask again and I’ll use the arvis.space agent to summarize today’s headlines. ` +
+        `For now, I *can* help with Flow Garden, tasks, or your space notes.`;
     } else if (/todo|task|berry|remember/.test(lower)) {
       response = 'Try "todo" plus your task and I will sync it as a berry when you are on device.';
     } else if (/plant|seed|water|pot|garden/.test(lower)) {
