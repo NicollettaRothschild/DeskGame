@@ -33,7 +33,6 @@
     - !<own> d405f969-7eb8-470d-4bb2-ee8c30aabcd4
     - !<own> 6a225653-4e4a-40c7-4ad0-dc4e7ced4b19
     - !<own> 92f5bc54-e331-4c8f-809b-8f5af71b2b19
-    - !<own> f94624fd-5cde-4134-a9bc-fe591b4dd044
 - !<ScriptComponent/0f9e84de-1845-42bf-432e-da0e4af98e06>
   PrefabRemaps:
     []
@@ -86,7 +85,7 @@
   ShadowDensity: 1.000000
   Materials:
     - !<reference> fdca29bc-14fd-403c-95e6-a2ec6e3846a1
-  Mesh: !<reference> 307d6115-af6b-4d90-88eb-a145c1a5f0c5
+  Mesh: !<reference> 9f887bd5-790e-4cc2-a55a-d9e58695f897
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
   BlendNormals: false
@@ -201,23 +200,3 @@
   ForceCompound: false
   Intangible: false
   ShowCollider: false
-- !<RenderMeshVisual/f94624fd-5cde-4134-a9bc-fe591b4dd044>
-  PrefabRemaps:
-    []
-  Name: component_0
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> 7c49ce33-adfb-48c2-9d69-21061c5855a0
-  Mesh: !<reference> f56030f3-63ce-48cf-a1f5-b132c70b71bd
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
