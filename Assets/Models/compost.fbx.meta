@@ -1,0 +1,97 @@
+- !<AssetImportMetadata/a56cd6e2-c760-4170-bd8b-4ad316ecb0f4>
+  ImportedAssetIds:
+    3af9a0b5695ec79a: !<reference> 7ddc319e-93d1-496e-9f84-21a86242c36f
+    4f2cd04548d05644: !<reference> 6267af5a-0092-4011-b637-25ece4e2f095
+    7a0dd5cd69df73fa: !<reference> 789acf74-f281-4055-89d3-bf067dfd22ae
+    Meshes/Compost thing: !<reference> 85c1d2f3-92d7-49e8-943d-8ca7c50c8590
+    Scene: !<reference> 8a1c12f7-9992-41a6-a220-f12317ad4536
+  ImporterName: FbxImporter
+  PrimaryAsset: !<reference> 8a1c12f7-9992-41a6-a220-f12317ad4536
+  PackageType: LegacyPackage
+  LegacyPackagePolicy: CanBeUnpackedTransparent
+  ExtraData:
+    {}
+  AssetDataMap:
+    Scene: !<own> 01cc106e-b50c-4dd7-9625-7c0ec77c5472
+  DependentFiles:
+    []
+  ImporterSettings: !<FbxImporterSettings>
+    UseLegacyImporter: false
+    WithMaterials: true
+    NamingConvention: ByCategorySanitizeV2
+    PersistentIdGenerationAlgorithm: DescriptorBased
+    AnimationCurveOptimization: true
+    CustomAnimationSamplingRate: 30.000000
+    ImportVertexColor: true
+    ImportTangentsAndBinormals: true
+    RegenerateTangentsAndBinormals: false
+    RegenerateNormalsForSkinnedMeshes: true
+    ImportBlendShapeAnimation: true
+    ImportVertexAnimation: true
+    GeneratePivots: true
+    TriangulateNURBS: true
+    UseLegacyFbxLoader: false
+  CompressionSettings: !<ComplexCompressionSettings>
+    Presets:
+      None Compression: !<SingleCompressionSettings>
+        CompressorName: None
+        CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+    ExtensionMappings:
+      mesh: None Compression
+    Overrides:
+      {}
+- !<ObjectPrefabAssetData/01cc106e-b50c-4dd7-9625-7c0ec77c5472>
+  Prototype: !<ObjectOwner/acda2cc7-7d4a-48f0-a0a4-7b89ea708747>
+    PackagePath: ""
+    objects:
+      - !<own> 789acf74-f281-4055-762c-40f98202dd51
+- !<RenderMeshVisual/6267af5a-0092-4011-49c8-da131b1d0f6a>
+  PrefabRemaps:
+    []
+  Name: component_0
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 85c1d2f3-92d7-49e8-943d-8ca7c50c8590
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/789acf74-f281-4055-762c-40f98202dd51>
+  PrefabRemaps:
+    []
+  Name: compost
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 7ddc319e-93d1-496e-607b-de579dbd3c90
+  Components:
+    []
+- !<SceneObject/7ddc319e-93d1-496e-607b-de579dbd3c90>
+  PrefabRemaps:
+    []
+  Name: Compost thing
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 6267af5a-0092-4011-49c8-da131b1d0f6a

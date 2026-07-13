@@ -11,6 +11,7 @@
     - 118f09df-29df-4a5a-93cd-71af334f434a: 118f09df-29df-4a5a-6c32-8e50ccb0bcb5
     - 15d25426-334a-46b6-93c8-ad666ecc4795: 15d25426-334a-46b6-6c37-52999133b86a
     - 6a225653-4e4a-40c7-b52f-23b18312b4e6: 6a225653-4e4a-40c7-4ad0-dc4e7ced4b19
+    - 89b04221-30e5-4e05-b995-b1567b9aeea1: f94624fd-5cde-4134-a9bc-fe591b4dd044
     - cff120b9-d31c-466f-b164-7aeada3a9d8a: 92f5bc54-e331-4c8f-809b-8f5af71b2b19
     - d405f969-7eb8-470d-b44d-1173cf55432b: d405f969-7eb8-470d-4bb2-ee8c30aabcd4
   Name: Pot1
@@ -29,6 +30,7 @@
     - !<own> d405f969-7eb8-470d-b44d-1173cf55432b
     - !<own> 6a225653-4e4a-40c7-b52f-23b18312b4e6
     - !<own> cff120b9-d31c-466f-b164-7aeada3a9d8a
+    - !<own> 89b04221-30e5-4e05-b995-b1567b9aeea1
 - !<ScriptComponent/0f9e84de-1845-42bf-bcd1-25f1b50671f9>
   PrefabRemaps:
     []
@@ -81,7 +83,7 @@
   ShadowDensity: 1.000000
   Materials:
     - !<reference> fdca29bc-14fd-403c-95e6-a2ec6e3846a1
-  Mesh: !<reference> 9f887bd5-790e-4cc2-a55a-d9e58695f897
+  Mesh: !<reference> 307d6115-af6b-4d90-88eb-a145c1a5f0c5
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
   BlendNormals: false
@@ -125,6 +127,26 @@
   ScriptTypes:
     "":
       {}
+- !<RenderMeshVisual/89b04221-30e5-4e05-b995-b1567b9aeea1>
+  PrefabRemaps:
+    []
+  Name: component_0
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 7c49ce33-adfb-48c2-9d69-21061c5855a0
+  Mesh: !<reference> f56030f3-63ce-48cf-a1f5-b132c70b71bd
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
 - !<ScriptComponent/cff120b9-d31c-466f-b164-7aeada3a9d8a>
   PrefabRemaps:
     []
