@@ -132,13 +132,13 @@ export class PlantPot extends BaseScriptComponent {
     const plantRoot = plant.getSceneObject();
     const attachPoint = this.getAttachPoint();
     const plantTransform = plantRoot.getTransform();
-    const worldPos = plantTransform.getWorldPosition();
-    const worldRot = plantTransform.getWorldRotation();
     const preservedWorldScale = plant.getHierarchyWorldScale(plantRoot);
+    const worldRot = plantTransform.getWorldRotation();
 
     plantRoot.setParent(attachPoint);
-    plantTransform.setWorldPosition(worldPos);
-    plantTransform.setWorldRotation(worldRot);
+    const localScale = plantTransform.getLocalScale();
+    plantTransform.setLocalPosition(vec3.zero());
+    plantTransform.setLocalScale(localScale);
 
     this.plantedPlant = plant;
     plant.applyPlantedWorldScale(preservedWorldScale);
