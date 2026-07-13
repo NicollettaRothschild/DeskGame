@@ -81,6 +81,10 @@ export class AnchorController extends BaseScriptComponent {
 
   @input
   @allowUndefined
+  spacePanel!: ScriptComponent;
+
+  @input
+  @allowUndefined
   specsApi!: SpecsApiClient;
 
   private anchorSession?: AnchorSession;
@@ -722,6 +726,14 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     this.captureAndLockTrashAtDesk();
+    this.lockSpacePanelAtDesk();
+  }
+
+  private lockSpacePanelAtDesk(): void {
+    const panel = this.spacePanel as { lockAtDesk?: () => void };
+    if (!isNull(panel) && typeof panel.lockAtDesk === 'function') {
+      panel.lockAtDesk();
+    }
   }
 
   private getTrashSceneObject(): SceneObject | null {
@@ -948,6 +960,7 @@ export class AnchorController extends BaseScriptComponent {
     );
 
     this.captureAndLockTrashAtDesk();
+    this.lockSpacePanelAtDesk();
 
     if (!this.currentAnchor && !this.anchorCreationInProgress && this.objs.length > 0 && !this.usingWorldSpace) {
       this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());

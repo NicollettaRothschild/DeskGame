@@ -79,11 +79,15 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private interactableBound = false;
   private imageRequestId = 0;
   private lastPairedState = false;
+  private panelFixedWorldPosition: vec3 | null = null;
+  private panelFixedWorldRotation: quat | null = null;
 
   onAwake(): void {
     this.resolvePanelRoot();
+    this.lockPanelAtDesk();
     this.setPanelVisible(this.startVisible);
     this.createEvent('OnStartEvent').bind(() => {
+      this.lockPanelAtDesk();
       this.bindScrollInteractable();
       this.applyPanelTypography();
       this.refreshPanel();
@@ -287,6 +291,38 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.lastPairedState = true;
     this.setPanelVisible(true);
     this.refreshPanel();
+  }
+
+  public lockAtDesk(): void {
+    this.lockPanelAtDesk();
+  }
+
+  private findSceneRoot(): SceneObject {
+    let root = this.getSceneObject();
+    while (!isNull(root.getParent())) {
+      root = root.getParent();
+    }
+    return root;
+  }
+
+  private lockPanelAtDesk(): void {
+    if (isNull(this.panelRoot)) {
+      return;
+    }
+
+    const panelTransform = this.panelRoot.getTransform();
+    if (isNull(this.panelFixedWorldPosition)) {
+      this.panelFixedWorldPosition = panelTransform.getWorldPosition();
+      this.panelFixedWorldRotation = panelTransform.getWorldRotation();
+    }
+
+    const parent = this.panelRoot.getParent();
+    if (!isNull(this.widgetParent) && parent === this.widgetParent) {
+      this.panelRoot.setParent(this.findSceneRoot());
+    }
+
+    panelTransform.setWorldPosition(this.panelFixedWorldPosition);
+    panelTransform.setWorldRotation(this.panelFixedWorldRotation);
   }
 
   private resolvePanelRoot(): void {

@@ -2778,6 +2778,7 @@
       spawnWaterTrack: !<reference.AudioTrackAsset> 18682cb4-7f4d-41cb-a3b4-c8074ca2def9
       placeObjectTrack: !<reference.AudioTrackAsset> 0c246528-b9e9-4db2-97d5-46649ae9f36b
       trashBin: !<reference.ScriptComponent> d119e162-8ef7-47b7-9485-da37a530ce5c
+      spacePanel: !<reference.ScriptComponent> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
       specsApi: !<MappingBased.AssignableType_3> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
   ScriptTypes:
     "":

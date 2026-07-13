@@ -39,6 +39,7 @@
     potPrefabs: false
     soundDebugLogging: false
     soundVolume: false
+    spacePanel: false
     spawnPotTrack: false
     spawnSeedTrack: false
     spawnWaterTrack: false
@@ -78,6 +79,7 @@
       spawnWaterTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       placeObjectTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       trashBin: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
@@ -103,4 +105,5 @@
     - // @input Asset.AudioTrackAsset spawnWaterTrack
     - // @input Asset.AudioTrackAsset placeObjectTrack
     - // @input Component.ScriptComponent trashBin
+    - // @input Component.ScriptComponent spacePanel
     - // @input AssignableType_3 specsApi
