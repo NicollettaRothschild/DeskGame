@@ -149,14 +149,8 @@ export class AnchorController extends BaseScriptComponent {
 
     const store = global.persistentStorageSystem.store;
     const editorPreview = this.isEditorPreviewSession();
-    if (editorPreview) {
-      const count = store.has('widget_count') ? store.getInt('widget_count') : 0;
-      if (count > 0) {
-        print(`Editor preview: clearing ${count} persisted plant(s) for a fresh desk`);
-      }
-      this.clearPersistedPlantStorageOnly();
-      this.clearSpawnedObjects();
-    }
+    // Editor preview can't persist world anchors reliably, but we should still allow restoring
+    // saved desk layouts for iteration. Only clear saved data when the user explicitly resets.
 
     if (!editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0) {
       print('Saved plants found, starting fast restore');
@@ -166,6 +160,13 @@ export class AnchorController extends BaseScriptComponent {
       if (usesAnchorSpace && !this.currentAnchor) {
         this.scheduleAnchorScanReminder(ANCHOR_SCAN_REMINDER_SEC);
       }
+    }
+
+    if (editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0) {
+      print('Editor preview: saved plants found, restoring');
+      this.restoreSavedObjects(true);
+      this.hasRestored = true;
+      this.usingWorldSpace = true;
     }
 
     this.startAnchorSaveLoop();

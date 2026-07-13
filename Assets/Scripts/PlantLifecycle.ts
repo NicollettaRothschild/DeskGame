@@ -101,7 +101,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private visualStateApplied = false;
   private seedWaterScaleOutActive = false;
   private seedWaterScaleOutElapsed = 0;
-  private seedWaterScaleOutDuration = 0.18;
+  private seedWaterScaleOutDuration = 0.45;
   private seedWaterScaleOutStartScale: vec3 | null = null;
   private static readonly DEFAULT_CONTAINER_WORLD_SCALE = 0.1;
   private static readonly GROWTH_SIZE_DIVISOR = 3;
@@ -908,8 +908,32 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
   }
 
+  private setManipulationEnabledOnHierarchy(root: SceneObject, enabled: boolean): void {
+    const stack: SceneObject[] = [root];
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i];
+        if (isNull(script) || !this.isManipulationScript(script)) {
+          continue;
+        }
+        script.enabled = enabled;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+  }
+
   private disableManipulationOnHierarchy(root: SceneObject): void {
-    this.setInteractionEnabledOnHierarchy(root, false);
+    this.setManipulationEnabledOnHierarchy(root, false);
   }
 
   private isManipulationScript(script: ScriptComponent): boolean {
@@ -1273,7 +1297,9 @@ export class PlantLifecycle extends BaseScriptComponent {
   private updateInteractionForPlantedState(): void {
     const root = this.getSceneObject() as SceneObject;
     if (this.isPlanted && !this.allowTrashManipulation) {
-      this.setInteractionEnabledOnHierarchy(root, false);
+      // Keep the planted plant stable (no dragging), but allow non-manipulation interactions
+      // like ingredient/harvest pick-ups on fully grown plants.
+      this.setManipulationEnabledOnHierarchy(root, false);
       return;
     }
 
