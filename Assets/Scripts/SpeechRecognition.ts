@@ -62,6 +62,9 @@ export class SpeechRecognition extends BaseScriptComponent {
   autoStartListening: boolean = true;
 
   @input
+  startupListenDelaySec: number = 10;
+
+  @input
   debugLogging: boolean = false;
 
   @input
@@ -138,8 +141,8 @@ export class SpeechRecognition extends BaseScriptComponent {
 
     this.bindVoiceEvents();
 
-    if (this.autoStartListening) {
-      this.createEvent('OnStartEvent').bind(() => this.requestListening());
+    if (this.autoStartListening && this.debugLogging) {
+      print('[SpeechRecognition] Automatic startup disabled for device stability');
     }
 
   }

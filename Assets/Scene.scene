@@ -217,24 +217,6 @@
   ScriptTypes:
     "":
       {}
-- !<ScriptComponent/0197c883-307c-47d9-93b7-c9d66cd87f2b>
-  PrefabRemaps:
-    []
-  Name: InteractableSquishFeedback
-  Enabled: true
-  ScriptAsset: !<reference> 17d0cf2d-c96b-42fd-8a63-cf7e9751e882
-  ScriptInputsDefault:
-    {}
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      squishObject: !<reference.SceneObject> 5c5ebea3-1bcd-4da4-bdd5-d7b058280bb7
-      verticalSquish: 0.920000
-      horizontalSquish: 1.010000
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/0237dccc-cf1e-447e-8d4a-d6c77abd5b0e>
   PrefabRemaps:
     []
@@ -412,7 +394,7 @@
   PrefabRemaps:
     []
   Name: SpecsApiClient
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> f1a343a6-62ec-47eb-bfa3-1c41cb74c1e8
   ScriptInputsDefault:
     internetModule: true
@@ -790,138 +772,6 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<ScriptComponent/1947cd73-d682-41c3-bb92-f7e343fa14bf>
-  PrefabRemaps:
-    []
-  Name: InteractableHelper
-  Enabled: true
-  ScriptAsset: !<reference> 88517298-96b6-4393-a3ce-57aad29969df
-  ScriptInputsDefault:
-    onHoverEnter: true
-    onHoverExit: true
-    onPinchDown: true
-    enableLogging: true
-    enableLoggingLifecycle: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      onHoverEnter:
-        []
-      onHoverExit:
-        []
-      onPinchDown:
-        []
-      onPinchUp_Select:
-        - sceneObject: !<reference.SceneObject> 5c5ebea3-1bcd-4da4-bdd5-d7b058280bb7
-          eventResponseType: !<float> 7.000000
-          state: !<float> 0.000000
-          delay: !<float> 0.000000
-          animations:
-            []
-          customAnimationData:
-            iterateThroughAllClips: true
-            animationName: ""
-          materialProperyData:
-            propertyName: ""
-            valueType: !<float> 0.000000
-            startFloatValue: !<float> 0.000000
-            startVec3Value: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.000000}
-            startVec4Value: !<Vec4> {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
-            endFloatValue: !<float> 0.000000
-            endVec3Value: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.000000}
-            endVec4Value: !<Vec4> {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
-            animationDurationInSeconds: !<float> 1.000000
-            delay: !<float> 0.000000
-            easingData:
-              easing: !<float> 0.000000
-            doOnStart: false
-            onStartAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-            doOnComplete: false
-            onCompleteAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-          colorProperyData:
-            endColor: !<Vec4> {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
-            animationDurationInSeconds: !<float> 1.000000
-            delay: !<float> 0.000000
-            easingData:
-              easing: !<float> 0.000000
-            doOnStart: false
-            onStartAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-            doOnComplete: false
-            onCompleteAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-          script: !<reference.ScriptComponent> 2cbcfdfc-3e27-4493-a540-b6d621dfa24b
-          functionName: buttonController
-          blendShapeData:
-            blenshapeName: ""
-            playOption: !<float> 0.000000
-            endVal: !<float> 0.000000
-            startValue: !<float> 0.000000
-            endValue: !<float> 0.000000
-            a: !<float> 0.000000
-            b: !<float> 0.000000
-            animationDurationInSeconds: !<float> 1.000000
-            delay: !<float> 0.000000
-            easingData:
-              easing: !<float> 0.000000
-            doOnStart: false
-            onStartAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-            doOnComplete: false
-            onCompleteAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-          audioControl:
-            audioControlBehavior: !<float> 0.000000
-            delay: !<float> 0.000000
-          videoTextureControl:
-            videoTextureControlBehavior: !<float> 0.000000
-            delay: !<float> 0.000000
-            doOnStart: false
-            onStartAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-            doOnComplete: false
-            onCompleteAction:
-              actionType: !<float> -1.000000
-              script: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-              functionName: ""
-              targetObjects:
-                []
-      enableLogging: false
-      enableLoggingLifecycle: false
-  ScriptTypes:
-    "":
-      {}
 - !<RenderMeshVisual/1992b1f4-3d17-43d4-8082-62a45bf41fef>
   PrefabRemaps:
     []
@@ -1473,7 +1323,7 @@
   PrefabRemaps:
     []
   Name: TaskBerryManager
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 8f1e933e-b14e-4e42-ad12-3d136deefba5
   ScriptInputsDefault:
     apiBaseUrl: true
@@ -1499,23 +1349,6 @@
       berryHeight: !<float> 2.000000
       useDemoTasksWhenOffline: true
       debugLogging: false
-  ScriptTypes:
-    "":
-      {}
-- !<ScriptComponent/2cbcfdfc-3e27-4493-a540-b6d621dfa24b>
-  PrefabRemaps:
-    []
-  Name: Button Controller
-  Enabled: true
-  ScriptAsset: !<reference> cd1e31ac-9c27-48f6-b651-d138f8646e58
-  ScriptInputsDefault:
-    plantSpawnConfig: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      anchorController: !<MappingBased.AssignableType> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
-      plantSpawnConfig: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":
       {}
@@ -1570,24 +1403,6 @@
     LineSpacing: 1.150000
     CapitalizationOverride: None
   EnableBatching: false
-- !<ColliderComponent/2eed1096-3189-4611-8953-59c6b05640bb>
-  PrefabRemaps:
-    []
-  Name: Physics Collider
-  Enabled: true
-  Shape: !<Box>
-    FitVisual: true
-    Size: {x: 15.000000, y: 15.000000, z: 15.000000}
-  Matter: !<reference> 00000000-0000-0000-0000-000000000000
-  Filter: !<reference> 00000000-0000-0000-0000-000000000000
-  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
-  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
-  EnableSmoothing: false
-  PositionTension: 30.000000
-  RotationTension: 30.000000
-  ForceCompound: false
-  Intangible: false
-  ShowCollider: false
 - !<ScriptComponent/2f1d5633-3cd9-4bab-9a55-14f6f152b6b8>
   PrefabRemaps:
     []
@@ -1903,26 +1718,6 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<RenderMeshVisual/402be5cc-dbb7-4fe2-9ef8-47833d85ad0e>
-  PrefabRemaps:
-    []
-  Name: Render Mesh Visual
-  Enabled: true
-  RenderOrder: 2
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> 6c85f311-2f00-42bf-a887-19a5ef8dc066
-  Mesh: !<reference> e542623c-1432-4bfa-881d-a28905bd9e57
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
 - !<SceneObject/40c764ae-ae6c-484e-bedd-5e54a7f98eed>
   PrefabRemaps:
     []
@@ -2224,11 +2019,12 @@
   PrefabRemaps:
     []
   Name: SpeechRecognition
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 2f847a23-53c2-4432-ba78-20f3f08d5fb1
   ScriptInputsDefault:
     languageCode: true
     autoStartListening: true
+    startupListenDelaySec: true
     commandCooldownSec: true
     mirrorTranscriptToSpacePanel: true
   ScriptTypesDefault:
@@ -2237,6 +2033,7 @@
     "":
       languageCode: en_US
       autoStartListening: true
+      startupListenDelaySec: !<float> 10.000000
       debugLogging: false
       commandCooldownSec: 1.500000
       mirrorTranscriptToSpacePanel: true
@@ -2631,28 +2428,6 @@
     - !<own> 9463db5a-bac8-4e47-8658-b945490a4546
   Components:
     []
-- !<SceneObject/5c5ebea3-1bcd-4da4-bdd5-d7b058280bb7>
-  PrefabRemaps:
-    []
-  Name: Btn Anemone
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 12.000000, y: -4.609230, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 8.000000, y: 8.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 402be5cc-dbb7-4fe2-9ef8-47833d85ad0e
-    - !<own> 2eed1096-3189-4611-8953-59c6b05640bb
-    - !<own> d78ec78d-4451-4e90-b027-531793ce7e49
-    - !<own> d8b85711-e2b1-4b96-bc86-2cf83d724507
-    - !<own> d2bb775b-7b69-47ea-b531-88234808d3bd
-    - !<own> 0197c883-307c-47d9-93b7-c9d66cd87f2b
-    - !<own> 1947cd73-d682-41c3-bb92-f7e343fa14bf
-    - !<own> 2cbcfdfc-3e27-4493-a540-b6d621dfa24b
 - !<SceneObject/5cc19d3e-9f41-49a8-9318-4e2733ccc74f>
   PrefabRemaps:
     []
@@ -2672,7 +2447,7 @@
   PrefabRemaps:
     []
   Name: FlowGardenVoiceCommands
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> e86285e0-3c97-44fc-b74e-0016e7872331
   ScriptInputsDefault:
     spacePanel: true
@@ -3102,7 +2877,7 @@
   PrefabRemaps:
     []
   Name: AnchorModule
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
@@ -3182,7 +2957,7 @@
   PrefabRemaps:
     []
   Name: Text3D UserID
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 27.054745, y: 0.000000, z: -72.451370}
@@ -4653,7 +4428,7 @@
   PrefabRemaps:
     []
   Name: ArvisAgentChat
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 0f4a6303-5205-42a6-b0cd-0455ebca40bf
   ScriptInputsDefault:
     agentResponseText: true
@@ -4775,7 +4550,7 @@
   PrefabRemaps:
     []
   Name: AITranscript
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 1.500000, z: 0.200000}
@@ -4790,7 +4565,7 @@
   PrefabRemaps:
     []
   Name: FlowGardenTTS
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> b4c5d6e7-f8a9-4013-a456-789abcdef012
   ScriptInputsDefault:
     ttsModule: true
@@ -5560,7 +5335,7 @@
   PrefabRemaps:
     []
   Name: FlowGardenSpacePanel
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> d4eb7915-4ff7-423d-9880-b2dc9f586e5f
   ScriptInputsDefault:
     refreshIntervalSec: true
@@ -5569,6 +5344,7 @@
     speechBodyExtraOffset: true
     agentChatInnerWidth: true
     agentChatInnerHeight: true
+    agentChatBackgroundAlpha: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -5596,6 +5372,7 @@
       speechBodyExtraOffset: !<float> 12.000000
       agentChatInnerWidth: !<float> 32.000000
       agentChatInnerHeight: !<float> 15.000000
+      agentChatBackgroundAlpha: 0.500000
   ScriptTypes:
     "":
       {}
@@ -5965,7 +5742,7 @@
   PrefabRemaps:
     []
   Name: SpecsDeviceRegistry
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 1913c950-c77f-4843-8d15-c562e49b1c89
   ScriptInputsDefault:
     {}
@@ -6063,7 +5840,7 @@
   PrefabRemaps:
     []
   Name: AIChatBackground
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.350000}
@@ -6278,7 +6055,7 @@
   PrefabRemaps:
     []
   Name: PlantBtns
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
@@ -6288,7 +6065,6 @@
   Children:
     - !<own> 9f8f18b8-733d-490e-8ba2-b7e7806b48b4
     - !<own> 8942ae59-00dd-499b-a2bf-0cbf5dda3564
-    - !<own> 5c5ebea3-1bcd-4da4-bdd5-d7b058280bb7
     - !<own> 06acd950-99a1-4ee0-a669-c728280f108a
     - !<own> 21b4b879-f66c-4c4a-96f4-58e4f6fce3ea
     - !<own> 33897585-2d79-438d-8758-092a87bf8e09
@@ -6566,27 +6342,6 @@
     - !<own> 314c7a92-ec66-4b54-8a41-df4934290eca
   Components:
     []
-- !<ScriptComponent/d2bb775b-7b69-47ea-b531-88234808d3bd>
-  PrefabRemaps:
-    []
-  Name: InteractableColorFeedback
-  Enabled: true
-  ScriptAsset: !<reference> ad94751b-0846-4ee3-af41-7b0eb49b2e2c
-  ScriptInputsDefault:
-    disabledColor: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      defaultColor: !<Vec4> {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-      hoverColor: !<Vec4> {x: 1.000000, y: 1.000000, z: 0.000000, w: 1.000000}
-      pinchedColor: !<Vec4> {x: 1.000000, y: 1.000000, z: 0.000000, w: 1.000000}
-      disabledColor: !<Vec4> {x: 1.000000, y: 1.000000, z: 1.000000, w: 0.000000}
-      meshVisuals: !<reference.RenderMeshVisual[]>
-        - !<reference> 402be5cc-dbb7-4fe2-9ef8-47833d85ad0e
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/d3196994-5e9d-4fcf-b93f-28c336515415>
   PrefabRemaps:
     []
@@ -7197,32 +6952,6 @@
     - !<own> ad18794d-15d8-4b69-a9e5-3a7ceba19080
   Components:
     []
-- !<ScriptComponent/d78ec78d-4451-4e90-b027-531793ce7e49>
-  PrefabRemaps:
-    []
-  Name: InteractableAudioFeedback
-  Enabled: true
-  ScriptAsset: !<reference> 1ad7da86-2c32-418c-bdf1-b7150c07c912
-  ScriptInputsDefault:
-    _playAudioOnHover: true
-    _hoverAudioTrack: true
-    _playAudioOnTriggerStart: true
-    _triggerStartAudioTrack: true
-    _playAudioOnTriggerEnd: true
-    _triggerEndAudioTrack: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      _playAudioOnHover: false
-      _hoverAudioTrack: !<reference.AudioTrackAsset> 97bf97ae-b2da-47d7-bde6-003f597fe888
-      _playAudioOnTriggerStart: true
-      _triggerStartAudioTrack: !<reference.AudioTrackAsset> edad7d53-55da-40b1-9025-fad0e7207862
-      _playAudioOnTriggerEnd: true
-      _triggerEndAudioTrack: !<reference.AudioTrackAsset> 82028831-1631-4d7b-b548-ff6be4e0a2ba
-  ScriptTypes:
-    "":
-      {}
 - !<ScriptComponent/d8530748-4910-4ceb-afa4-40d3eeec328d>
   PrefabRemaps:
     []
@@ -7241,44 +6970,6 @@
       timeAsBaby: !<float> 30.000000
       growthTime: !<float> 30.000000
       scaleUpSize: !<float> 2.000000
-  ScriptTypes:
-    "":
-      {}
-- !<ScriptComponent/d8b85711-e2b1-4b96-bc86-2cf83d724507>
-  PrefabRemaps:
-    []
-  Name: Interactable
-  Enabled: true
-  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
-  ScriptInputsDefault:
-    targetingMode: true
-    targetingVisual: true
-    ignoreInteractionPlane: true
-    keepHoverOnTrigger: true
-    enableInstantDrag: true
-    isScrollable: true
-    allowMultipleInteractors: true
-    enablePokeDirectionality: true
-    acceptableXDirections: true
-    acceptableYDirections: true
-    acceptableZDirections: true
-    useFilteredPinch: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      targetingMode: !<float> 3.000000
-      targetingVisual: !<float> 1.000000
-      ignoreInteractionPlane: false
-      keepHoverOnTrigger: false
-      enableInstantDrag: false
-      isScrollable: false
-      allowMultipleInteractors: true
-      enablePokeDirectionality: false
-      acceptableXDirections: !<float> 0.000000
-      acceptableYDirections: !<float> 0.000000
-      acceptableZDirections: !<float> 1.000000
-      useFilteredPinch: false
   ScriptTypes:
     "":
       {}
@@ -8401,7 +8092,7 @@
   PrefabRemaps:
     []
   Name: AIChatTitle
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 6.000000, z: 0.200000}
@@ -8600,7 +8291,7 @@
   PrefabRemaps:
     []
   Name: Interactable
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
   ScriptInputsDefault:
     targetingMode: true

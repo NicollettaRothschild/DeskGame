@@ -12,7 +12,9 @@ import { InteractionSoundRegistry, playInteractionSound } from './InteractionSou
 import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
 import { SpecsApiClient } from './SpecsApiClient';
 
-const ANCHOR_CONTROLLER_VERSION = 'v11';
+const ANCHOR_CONTROLLER_VERSION = 'v14-recovery';
+const STARTUP_REBIND_DELAY_SEC = 0.35;
+const STARTUP_PERSIST_DELAY_SEC = 0.5;
 const PLANT_LIFECYCLE_SAVE_VERSION = 4;
 const OBJECT_KIND_PLANT = 'plant';
 const OBJECT_KIND_POT = 'pot';
@@ -105,6 +107,11 @@ export class AnchorController extends BaseScriptComponent {
   private anchorCreationInProgress = false;
   private skipStartupWorldFallback = false;
   private pendingCreatedAnchorId?: string;
+  private lockedAnchorId: string | null = null;
+  private anchorBindingComplete = false;
+  private startupRebindInProgress = false;
+  private aiContainerPersistencePaused = false;
+  private startupWorldOnlySession = false;
   private isResetting = false;
   private sessionEpoch = 0;
   private anchorSettleEvent?: UpdateEvent;
@@ -150,25 +157,48 @@ export class AnchorController extends BaseScriptComponent {
   async onStart() {
     this.setupInteractionSounds();
     print(`AnchorController ${ANCHOR_CONTROLLER_VERSION} starting`);
+
+    const store = global.persistentStorageSystem.store;
+    const editorPreview = this.isEditorPreviewSession();
+    const hasSavedPlants =
+      !editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0;
+
+    if (hasSavedPlants) {
+      print('Recovery boot: restoring saved plants without anchors or background systems');
+      this.startupWorldOnlySession = true;
+      this.aiContainerPersistencePaused = true;
+      this.usingWorldSpace = true;
+      this.restoredFromWorldFallback = true;
+      this.anchorComponent.enabled = false;
+      this.restoreSavedObjects(false);
+      this.usingWorldSpace = true;
+      this.restoredFromWorldFallback = true;
+      this.anchorComponent.enabled = false;
+      this.menuRoot.enabled = true;
+      const recoveryAIPosition = this.camera
+        .getTransform()
+        .getWorldTransform()
+        .multiplyPoint(new vec3(0, -10, -80));
+      this.menuRoot.getTransform().setWorldPosition(recoveryAIPosition);
+      this.menuRoot.getTransform().setWorldRotation(
+        this.camera.getTransform().getWorldRotation()
+      );
+      this.aiContainerFixedWorldPosition = recoveryAIPosition;
+      this.hasRestored = true;
+      this.textlog.text = 'Recovery mode: saved garden restored';
+      print(
+        `Recovery boot complete (restored ${store.getInt('widget_count')} saved object record(s))`
+      );
+      return;
+    }
+
     const anchorSessionOptions = new AnchorSessionOptions();
     anchorSessionOptions.scanForWorldAnchors = true;
     this.anchorSession = await this.anchorModule.openSession(anchorSessionOptions);
     this.anchorSession.onAnchorNearby.add(this.onAnchorNearby.bind(this));
 
-    const store = global.persistentStorageSystem.store;
-    const editorPreview = this.isEditorPreviewSession();
     // Editor preview can't persist world anchors reliably, but we should still allow restoring
     // saved desk layouts for iteration. Only clear saved data when the user explicitly resets.
-
-    if (!editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0) {
-      print('Saved plants found, starting fast restore');
-      this.runFastStartupRestore();
-      const usesAnchorSpace =
-        store.has('uses_anchor_space') && store.getBool('uses_anchor_space');
-      if (usesAnchorSpace && !this.currentAnchor) {
-        this.scheduleAnchorScanReminder(ANCHOR_SCAN_REMINDER_SEC);
-      }
-    }
 
     if (editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0) {
       print('Editor preview: saved plants found, restoring');
@@ -185,8 +215,96 @@ export class AnchorController extends BaseScriptComponent {
     }
     this.applyAIContainerSavedPose();
     this.maintainAIContainerAnchorBinding();
-    this.persistAIContainerTransform();
+    if (!hasSavedPlants) {
+      this.persistAIContainerTransform();
+    }
     this.startAIContainerPersistenceLoop();
+  }
+
+  private usesSavedAnchorSpace(): boolean {
+    const store = global.persistentStorageSystem.store;
+    return store.has('uses_anchor_space') && store.getBool('uses_anchor_space');
+  }
+
+  private getPreferredAnchorId(): string {
+    const store = global.persistentStorageSystem.store;
+    return store.has('preferred_anchor_id') ? store.getString('preferred_anchor_id') : '';
+  }
+
+  private rememberPreferredAnchor(anchorId: string): void {
+    if (!anchorId) {
+      return;
+    }
+    global.persistentStorageSystem.store.putString('preferred_anchor_id', anchorId);
+    this.lockedAnchorId = anchorId;
+  }
+
+  private shouldIgnoreNearbyAnchor(anchorId: string): boolean {
+    if (this.lockedAnchorId && anchorId !== this.lockedAnchorId) {
+      print(`Ignoring nearby anchor ${anchorId}; waiting to lock ${this.lockedAnchorId}`);
+      return true;
+    }
+
+    const preferredId = this.getPreferredAnchorId();
+    if (
+      this.usesSavedAnchorSpace() &&
+      preferredId &&
+      anchorId !== preferredId &&
+      this.pendingCreatedAnchorId !== anchorId
+    ) {
+      if (!this.lockedAnchorId) {
+        this.lockedAnchorId = preferredId;
+      }
+      print(`Ignoring nearby anchor ${anchorId}; waiting to lock ${preferredId}`);
+      return true;
+    }
+
+    if (
+      this.anchorRestorePending &&
+      this.currentAnchor &&
+      String(this.currentAnchor.id) !== anchorId
+    ) {
+      print(
+        `Ignoring nearby anchor ${anchorId}; restore pending for ${this.currentAnchor.id}`
+      );
+      return true;
+    }
+
+    if (this.anchorBindingComplete && this.currentAnchor?.id !== anchorId) {
+      print(`Ignoring nearby anchor ${anchorId}; already bound to ${this.currentAnchor?.id}`);
+      return true;
+    }
+
+    return false;
+  }
+
+  private finishStartupRebind(
+    worldSnapshots: { pos: vec3; rot: quat }[],
+    label: string
+  ): void {
+    this.startupRebindInProgress = true;
+    this.aiContainerPersistencePaused = true;
+    this.scheduleDelayed(() => {
+      if (this.isResetting) {
+        return;
+      }
+      print(`${label}: reparenting ${this.objs.length} object(s)`);
+      this.reparentPlantsToAnchor();
+      this.reapplyPlantWorldTransforms(worldSnapshots);
+      this.scheduleDelayed(() => {
+        if (this.isResetting) {
+          return;
+        }
+        this.persistPlantTransforms(true);
+        this.aiContainerPersistencePaused = false;
+        this.startupRebindInProgress = false;
+        this.anchorBindingComplete = true;
+        if (this.currentAnchor) {
+          this.rememberPreferredAnchor(String(this.currentAnchor.id || ''));
+        }
+        print(`Startup anchor rebind complete (${this.objs.length} object(s))`);
+      }, STARTUP_PERSIST_DELAY_SEC);
+    }, STARTUP_REBIND_DELAY_SEC);
   }
 
   public onAnchorNearby(anchor: Anchor) {
@@ -194,15 +312,42 @@ export class AnchorController extends BaseScriptComponent {
       print('Ignoring nearby anchor during reset');
       return;
     }
-    print(`Anchor found: ${anchor.id}`);
+
+    const anchorId = String(anchor.id || '');
+    if (!anchorId) {
+      return;
+    }
+
+    if (this.startupWorldOnlySession) {
+      print(`Crash-safe startup: ignoring nearby anchor ${anchorId}`);
+      return;
+    }
+
+    if (this.shouldIgnoreNearbyAnchor(anchorId)) {
+      return;
+    }
+
+    const isAlreadyTracking = this.currentAnchor?.id === anchorId;
+    if (isAlreadyTracking && this.anchorBindingComplete) {
+      return;
+    }
+
+    if (!this.lockedAnchorId && (this.usesSavedAnchorSpace() || this.hasRestored)) {
+      this.lockedAnchorId = this.getPreferredAnchorId() || anchorId;
+      if (this.lockedAnchorId !== anchorId) {
+        print(`Ignoring nearby anchor ${anchorId}; waiting to lock ${this.lockedAnchorId}`);
+        return;
+      }
+    }
+
+    print(`Anchor found: ${anchorId}`);
     this.textlog.text = 'Anchor found';
     const hadWorldFallback = this.hasRestored && this.restoredFromWorldFallback;
     const worldSnapshots =
       this.objs.length > 0 ? this.capturePlantWorldTransforms() : [];
 
-    const isAlreadyTracking = this.currentAnchor?.id === anchor.id;
     const isUnsavedSessionAnchor =
-      this.pendingCreatedAnchorId === anchor.id && !this.anchorPersisted;
+      this.pendingCreatedAnchorId === anchorId && !this.anchorPersisted;
     this.anchorComponent.enabled = true;
     this.anchorComponent.anchor = anchor;
     this.currentAnchor = anchor;
@@ -219,11 +364,8 @@ export class AnchorController extends BaseScriptComponent {
       if (hadWorldFallback) {
         print('Upgrading world preview to anchor space without respawn');
         this.restoredFromWorldFallback = false;
-        this.reparentPlantsToAnchor();
-        this.reapplyPlantWorldTransforms(worldSnapshots);
-        this.persistPlantTransforms();
+        this.finishStartupRebind(worldSnapshots, 'World preview upgrade');
         this.hasRestored = true;
-        this.usingWorldSpace = false;
         return;
       }
 
@@ -231,20 +373,15 @@ export class AnchorController extends BaseScriptComponent {
 
       if (this.objs.length > 0 && !this.hasRestored) {
         print('Attaching existing plants to anchor');
-        this.reparentPlantsToAnchor();
-        this.persistPlantTransforms();
+        this.finishStartupRebind(worldSnapshots, 'Attach existing plants');
         this.hasRestored = true;
-        this.usingWorldSpace = false;
-        this.restoredFromWorldFallback = false;
         this.skipStartupWorldFallback = true;
         this.textlog.text = `Restored ${this.objs.length} plant(s)`;
         return;
       }
 
       if (this.hasRestored && !hadWorldFallback) {
-        this.reparentPlantsToAnchor();
-        this.reapplyPlantWorldTransforms(worldSnapshots);
-        this.persistPlantTransforms();
+        this.finishStartupRebind(worldSnapshots, 'Rebind restored plants');
         return;
       }
 
@@ -356,9 +493,6 @@ export class AnchorController extends BaseScriptComponent {
       }
 
       maxWaitSec -= getDeltaTime();
-      this.captureAndLockTrashAtDesk();
-      this.maintainAIContainerAnchorBinding();
-      this.lockSpacePanelAtDesk();
       const anchorPos = this.widgetParent.getTransform().getWorldPosition();
       if (
         lastAnchorPos &&
@@ -377,6 +511,9 @@ export class AnchorController extends BaseScriptComponent {
             ? 'Anchor pose stable, restoring plants'
             : 'Anchor restore timeout, applying saved offsets'
         );
+        this.captureAndLockTrashAtDesk();
+        this.maintainAIContainerAnchorBinding();
+        this.lockSpacePanelAtDesk();
         callback();
       }
     });
@@ -423,9 +560,7 @@ export class AnchorController extends BaseScriptComponent {
         this.textlog.text = 'Mapping desk... look around slowly';
         print('World anchor created at desk contact, waiting to persist');
         this.scheduleAnchorStableRestore(() => {
-          this.reparentPlantsToAnchor();
-          this.reapplyPlantWorldTransforms(worldSnapshots);
-          this.persistPlantTransforms();
+          this.finishStartupRebind(worldSnapshots, 'New session anchor');
           this.trySaveAnchorOnce();
         });
       })
@@ -470,6 +605,9 @@ export class AnchorController extends BaseScriptComponent {
         this.anchorPersisted = true;
         this.pendingCreatedAnchorId = undefined;
         global.persistentStorageSystem.store.putBool('uses_anchor_space', true);
+        if (this.currentAnchor) {
+          this.rememberPreferredAnchor(String(this.currentAnchor.id || ''));
+        }
         this.textlog.text = 'Anchor saved';
         print('Anchor saved successfully');
         this.persistPlantTransforms();
@@ -501,9 +639,24 @@ export class AnchorController extends BaseScriptComponent {
     this.textlog.text = 'Restoring saved plants...';
     this.restoreSavedObjects(false);
     if (this.objs.length > 0) {
-      this.ensureDeskAnchorForRestoredPlants();
+      if (this.startupWorldOnlySession) {
+        this.usingWorldSpace = true;
+        this.restoredFromWorldFallback = true;
+        this.anchorComponent.enabled = false;
+        this.scheduleDelayed(() => {
+          if (this.isResetting) {
+            return;
+          }
+          this.aiContainerPersistencePaused = false;
+          this.textlog.text = `Restored ${this.objs.length} object(s)`;
+          print(`Crash-safe startup complete (${this.objs.length} object(s), world-only)`);
+        }, STARTUP_PERSIST_DELAY_SEC);
+      } else {
+        this.ensureDeskAnchorForRestoredPlants();
+      }
     } else {
       this.textlog.text = 'Could not restore saved plants';
+      this.aiContainerPersistencePaused = false;
     }
   }
 
@@ -551,7 +704,13 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
-    print('Saved Snap anchor not loaded yet; creating session anchor at restored plants');
+    if (this.usesSavedAnchorSpace()) {
+      print('Saved Snap anchor expected; waiting for scan without creating new session anchor');
+      this.textlog.text = 'Look at your desk slowly to lock saved anchor';
+      return;
+    }
+
+    print('No saved Snap anchor on device; creating session anchor at restored plants');
     this.textlog.text = `Anchoring ${this.objs.length} restored plant(s) to desk...`;
     this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
   }
@@ -877,6 +1036,9 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private persistAIContainerTransform(): void {
+    if (this.aiContainerPersistencePaused || this.startupRebindInProgress) {
+      return;
+    }
     if (isNull(this.menuRoot)) {
       return;
     }
@@ -1355,7 +1517,11 @@ export class AnchorController extends BaseScriptComponent {
     this.trySaveAnchorOnce();
   }
 
-  private persistPlantTransforms() {
+  private persistPlantTransforms(silent = false) {
+    if (this.startupRebindInProgress && !silent) {
+      return;
+    }
+
     const store = global.persistentStorageSystem.store;
 
     for (let i = 0; i < this.objs.length; i++) {
@@ -1391,15 +1557,19 @@ export class AnchorController extends BaseScriptComponent {
       store.putInt(`w${i}_prefab`, this.objectPrefabIndices[i]);
       this.persistPlantState(store, i, obj);
 
-      print(`Saved ${this.objectKinds[i] || OBJECT_KIND_PLANT} ${i} local: ${pos.toString()} world: ${worldPos.toString()}`);
-      this.textlog.text = `Saved ${this.objs.length} object(s)`;
+      if (!silent) {
+        print(`Saved ${this.objectKinds[i] || OBJECT_KIND_PLANT} ${i} local: ${pos.toString()} world: ${worldPos.toString()}`);
+        this.textlog.text = `Saved ${this.objs.length} object(s)`;
+      }
     }
 
     store.putBool('has_world_data', true);
     if (this.hasActiveAnchorTracking()) {
       store.putBool('uses_anchor_space', true);
     }
-    this.persistAIContainerTransform();
+    if (!this.aiContainerPersistencePaused && !this.startupRebindInProgress) {
+      this.persistAIContainerTransform();
+    }
   }
 
   private hasActiveAnchorTracking(): boolean {
@@ -1601,6 +1771,11 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorRestorePending = false;
     this.anchorSaveInProgress = true;
     this.anchorCreationInProgress = false;
+    this.aiContainerPersistencePaused = false;
+    this.startupRebindInProgress = false;
+    this.anchorBindingComplete = false;
+    this.lockedAnchorId = null;
+    this.startupWorldOnlySession = false;
 
     if (this.anchorSettleEvent) {
       this.anchorSettleEvent.enabled = false;
@@ -1622,6 +1797,7 @@ export class AnchorController extends BaseScriptComponent {
     store.remove('widget_count');
     store.remove('has_world_data');
     store.remove('uses_anchor_space');
+    store.remove('preferred_anchor_id');
 
     this.clearSpawnedObjects();
     if (this.floatingRoot) {

@@ -31,6 +31,7 @@
     debugLogging: false
     languageCode: false
     mirrorTranscriptToSpacePanel: false
+    startupListenDelaySec: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -42,6 +43,7 @@
   DefaultScriptInputs:
     - languageCode: en_US
       autoStartListening: true
+      startupListenDelaySec: !<float> 10.000000
       debugLogging: true
       commandCooldownSec: 1.500000
       mirrorTranscriptToSpacePanel: true
@@ -51,6 +53,7 @@
   InputLines:
     - '// @input string languageCode = "en_US"'
     - // @input bool autoStartListening = true
+    - // @input float startupListenDelaySec = 10
     - // @input bool debugLogging
     - // @input float commandCooldownSec = 1.5
     - // @input bool mirrorTranscriptToSpacePanel = true
