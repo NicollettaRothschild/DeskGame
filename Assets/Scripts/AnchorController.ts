@@ -1919,23 +1919,65 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private wirePlantLifecycle(obj: SceneObject): void {
+    const index = this.findTrackedObjectIndex(obj);
+    const isPot = index >= 0 && this.objectKinds[index] === OBJECT_KIND_POT;
+    if (isPot) {
+      const planted = this.findPlantedLifecycleInPot(obj);
+      if (!isNull(planted)) {
+        if (!planted.getIsPlanted()) {
+          planted.setPlanted(true);
+        } else {
+          planted.setAllowTrashManipulation(false);
+        }
+      }
+      return;
+    }
+
     const plant = this.findPlantLifecycle(obj);
     if (isNull(plant)) {
       return;
     }
 
     plant.setAnchorPersistence(this);
-    const isPot = this.objectKinds[this.findTrackedObjectIndex(obj)] === OBJECT_KIND_POT;
-    if (isPot) {
-      // Pots must remain movable after placement. The PlantPot script is responsible for
-      // locking manipulation on the planted seed/plant inside the pot.
-      plant.setAllowTrashManipulation(true);
-      return;
-    }
-
     // Loose seeds/plants can still be moved to trash or repositioned, but once a plant is
     // marked planted we should lock manipulation to prevent accidental re-grabs.
     plant.setAllowTrashManipulation(!plant.getIsPlanted());
+  }
+
+  private findPlantedLifecycleInPot(potRoot: SceneObject): PlantLifecycle | null {
+    const pot = this.findPotScript(potRoot);
+    if (!isNull(pot) && typeof pot.getPlantedLifecycle === 'function') {
+      const planted = pot.getPlantedLifecycle();
+      if (!isNull(planted)) {
+        return planted as PlantLifecycle;
+      }
+    }
+
+    const stack: SceneObject[] = [potRoot];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const plant = scripts[i] as unknown as PlantLifecycle;
+        if (
+          !isNull(plant) &&
+          typeof plant.getIsPlanted === 'function' &&
+          plant.getIsPlanted()
+        ) {
+          return plant;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
   }
 
   private wirePotPersistence(obj: SceneObject): void {
@@ -1994,6 +2036,7 @@ export class AnchorController extends BaseScriptComponent {
   private findPotScript(root: SceneObject): {
     setAnchorPersistence?: (persistence: AnchorController) => void;
     createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
+    getPlantedLifecycle?: () => PlantLifecycle | null;
   } {
     const stack: SceneObject[] = [root];
     while (stack.length > 0) {
@@ -2007,12 +2050,14 @@ export class AnchorController extends BaseScriptComponent {
         const candidate = scripts[i] as unknown as {
           setAnchorPersistence?: (persistence: AnchorController) => void;
           createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
+          getPlantedLifecycle?: () => PlantLifecycle | null;
         };
         if (
           !isNull(candidate) &&
           (
             typeof candidate.setAnchorPersistence === 'function' ||
-            typeof candidate.createRestoredPlant === 'function'
+            typeof candidate.createRestoredPlant === 'function' ||
+            typeof candidate.getPlantedLifecycle === 'function'
           )
         ) {
           return candidate;

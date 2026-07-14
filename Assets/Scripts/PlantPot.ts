@@ -81,6 +81,8 @@ export class PlantPot extends BaseScriptComponent {
 
     this.plantedPlant = plant;
     plant.applyDefaultPlantedWorldScale();
+    plant.setAllowTrashManipulation(false);
+    plant.setPlanted(true);
 
     if (this.disablePlantInteractionWhenPlanted) {
       this.setPlantInteractionEnabled(plantRoot, false);

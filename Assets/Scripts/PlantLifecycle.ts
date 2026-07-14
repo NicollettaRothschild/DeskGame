@@ -348,6 +348,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     if (this.isPlanted) {
+      this.allowTrashManipulation = false;
       if (isNull(this.plantedPreserveWorldScale)) {
         this.applyDefaultPlantedWorldScale();
       }
@@ -366,6 +367,10 @@ export class PlantLifecycle extends BaseScriptComponent {
   }
 
   private onUpdate(): void {
+    if (this.isPlanted && !this.allowTrashManipulation) {
+      this.enforcePlantedAnchor();
+    }
+
     if (this.seedWaterScaleOutActive) {
       this.updateSeedWaterScaleOut();
       return;
@@ -573,9 +578,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     this.resetAlignmentForPot();
-    if (this.allowTrashManipulation) {
-      this.updateInteractionForPlantedState();
-    }
+    this.updateInteractionForPlantedState();
   }
 
   private showAdultAtGrowthScale(): void {
@@ -594,6 +597,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.applyGrowthScale();
     if (this.isPlanted) {
       this.finalizePlantedPlacement({ preserveContainerPlacement: true });
+      this.updateInteractionForPlantedState();
       return;
     }
     if (!this.isPlanted) {
@@ -613,6 +617,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.applyAdultScale();
     if (this.isPlanted) {
       this.finalizePlantedPlacement({ preserveContainerPlacement: true });
+      this.updateInteractionForPlantedState();
       return;
     }
     if (!this.isPlanted) {
@@ -992,6 +997,22 @@ export class PlantLifecycle extends BaseScriptComponent {
     transform.setLocalScale(scale);
   }
 
+  private enforcePlantedAnchor(): void {
+    if (!this.isPlanted || this.allowTrashManipulation) {
+      return;
+    }
+
+    const parent = this.getSceneObject().getParent();
+    if (isNull(parent)) {
+      return;
+    }
+
+    const localPos = this.getSceneObject().getTransform().getLocalPosition();
+    if (localPos.distance(vec3.zero()) > 0.01) {
+      this.alignPlantedRootToParent();
+    }
+  }
+
   private getActiveStageModel(): SceneObject | null {
     if (!isNull(this.seedInstance)) {
       return this.seedInstance;
@@ -1297,9 +1318,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private updateInteractionForPlantedState(): void {
     const root = this.getSceneObject() as SceneObject;
     if (this.isPlanted && !this.allowTrashManipulation) {
-      // Keep the planted plant stable (no dragging), but allow non-manipulation interactions
-      // like ingredient/harvest pick-ups on fully grown plants.
-      this.setManipulationEnabledOnHierarchy(root, false);
+      this.setInteractionEnabledOnHierarchy(root, false);
       return;
     }
 
