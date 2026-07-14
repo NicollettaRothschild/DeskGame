@@ -111,6 +111,14 @@ export class AnchorController extends BaseScriptComponent {
   private nextPlantSpawnIndex = 0;
   private trashFixedWorldPosition: vec3 | null = null;
   private trashFixedWorldRotation: quat | null = null;
+  private aiContainerFixedWorldPosition: vec3 | null = null;
+  private aiContainerSceneDefaultLocalRotation: quat | null = null;
+  private aiContainerRestoreApplied = false;
+  private aiContainerWatchEvent: UpdateEvent | null = null;
+  private lastPersistedAIContainerWorld: vec3 | null = null;
+  private aiContainerPersistCooldown = 0;
+  private readonly aiContainerPersistIntervalSec = 0.35;
+  private readonly aiContainerMoveEpsilon = 0.5;
   private activeManipulatedRoot: SceneObject | null = null;
   private lastSaveObjectPositionAt = -1;
   private readonly saveObjectPositionCooldownSec = 0.1;
@@ -171,6 +179,14 @@ export class AnchorController extends BaseScriptComponent {
 
     this.startAnchorSaveLoop();
     this.captureAndLockTrashAtDesk();
+    this.captureAIContainerSceneDefaults();
+    if (!this.aiContainerRestoreApplied) {
+      this.restoreAIContainerFromStorage();
+    }
+    this.applyAIContainerSavedPose();
+    this.maintainAIContainerAnchorBinding();
+    this.persistAIContainerTransform();
+    this.startAIContainerPersistenceLoop();
   }
 
   public onAnchorNearby(anchor: Anchor) {
@@ -341,6 +357,7 @@ export class AnchorController extends BaseScriptComponent {
 
       maxWaitSec -= getDeltaTime();
       this.captureAndLockTrashAtDesk();
+      this.maintainAIContainerAnchorBinding();
       this.lockSpacePanelAtDesk();
       const anchorPos = this.widgetParent.getTransform().getWorldPosition();
       if (
@@ -733,7 +750,212 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     this.captureAndLockTrashAtDesk();
+    this.reparentAIContainerToAnchor();
     this.lockSpacePanelAtDesk();
+  }
+
+  private captureAIContainerSceneDefaults(): void {
+    if (isNull(this.menuRoot) || !isNull(this.aiContainerSceneDefaultLocalRotation)) {
+      return;
+    }
+
+    this.aiContainerSceneDefaultLocalRotation =
+      this.menuRoot.getTransform().getLocalRotation();
+  }
+
+  private applyAIContainerSceneRotation(): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    const rotation = this.aiContainerSceneDefaultLocalRotation || quat.quatIdentity();
+    this.menuRoot.getTransform().setLocalRotation(rotation);
+  }
+
+  private captureAIContainerWorldTransform(): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    if (isNull(this.aiContainerFixedWorldPosition)) {
+      this.aiContainerFixedWorldPosition = this.menuRoot.getTransform().getWorldPosition();
+    }
+  }
+
+  private reparentAIContainerToAnchor(): void {
+    if (isNull(this.menuRoot) || !this.hasActiveAnchorTracking()) {
+      return;
+    }
+
+    const worldPos = this.menuRoot.getTransform().getWorldPosition();
+    this.menuRoot.setParent(this.widgetParent);
+    this.menuRoot.getTransform().setWorldPosition(worldPos);
+    this.applyAIContainerSceneRotation();
+    this.persistAIContainerTransform();
+  }
+
+  private shouldRestoreAIContainerInWorldSpace(): boolean {
+    if (this.usingWorldSpace || this.restoredFromWorldFallback) {
+      return true;
+    }
+    if (!this.hasActiveAnchorTracking()) {
+      return true;
+    }
+    if (this.isEditorPreviewSession()) {
+      return true;
+    }
+    return false;
+  }
+
+  private restoreAIContainerFromStorage(): void {
+    this.restoreAIContainerTransform(this.shouldRestoreAIContainerInWorldSpace());
+    this.aiContainerRestoreApplied = true;
+  }
+
+  private applyAIContainerSavedPose(): void {
+    if (isNull(this.menuRoot) || isNull(this.aiContainerFixedWorldPosition)) {
+      return;
+    }
+
+    this.menuRoot.getTransform().setWorldPosition(this.aiContainerFixedWorldPosition);
+    this.applyAIContainerSceneRotation();
+  }
+
+  private maintainAIContainerAnchorBinding(): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    if (this.hasActiveAnchorTracking()) {
+      const parent = this.menuRoot.getParent();
+      if (isNull(parent) || parent !== this.widgetParent) {
+        this.reparentAIContainerToAnchor();
+      }
+      return;
+    }
+
+    const parent = this.menuRoot.getParent();
+    if (!isNull(parent) && parent === this.widgetParent) {
+      const worldPos = this.menuRoot.getTransform().getWorldPosition();
+      this.menuRoot.setParent(this.findSceneRoot());
+      this.menuRoot.getTransform().setWorldPosition(worldPos);
+      this.applyAIContainerSceneRotation();
+    }
+  }
+
+  private startAIContainerPersistenceLoop(): void {
+    if (!isNull(this.aiContainerWatchEvent)) {
+      return;
+    }
+
+    this.aiContainerWatchEvent = this.createEvent('UpdateEvent');
+    this.aiContainerWatchEvent.bind(() => {
+      this.maintainAIContainerAnchorBinding();
+      this.maybePersistAIContainerMove();
+    });
+  }
+
+  private maybePersistAIContainerMove(): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    this.aiContainerPersistCooldown -= getDeltaTime();
+    if (this.aiContainerPersistCooldown > 0) {
+      return;
+    }
+
+    const worldPos = this.menuRoot.getTransform().getWorldPosition();
+    if (!isNull(this.lastPersistedAIContainerWorld)) {
+      if (worldPos.distance(this.lastPersistedAIContainerWorld) <= this.aiContainerMoveEpsilon) {
+        return;
+      }
+    }
+
+    this.aiContainerPersistCooldown = this.aiContainerPersistIntervalSec;
+    this.persistAIContainerTransform();
+  }
+
+  private persistAIContainerTransform(): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    const store = global.persistentStorageSystem.store;
+    const worldPos = this.menuRoot.getTransform().getWorldPosition();
+    const anchorLocal = this.hasActiveAnchorTracking()
+      ? this.worldToWidgetLocal(worldPos, quat.quatIdentity())
+      : {
+          pos: this.menuRoot.getTransform().getLocalPosition(),
+        };
+
+    store.putFloat('ai_container_x', anchorLocal.pos.x);
+    store.putFloat('ai_container_y', anchorLocal.pos.y);
+    store.putFloat('ai_container_z', anchorLocal.pos.z);
+    store.putFloat('ai_container_wx', worldPos.x);
+    store.putFloat('ai_container_wy', worldPos.y);
+    store.putFloat('ai_container_wz', worldPos.z);
+    store.putBool('ai_container_has_data', true);
+
+    this.aiContainerFixedWorldPosition = worldPos;
+    this.lastPersistedAIContainerWorld = worldPos;
+    print(
+      `Saved AIContainer local: ${anchorLocal.pos.toString()} world: ${worldPos.toString()}`
+    );
+  }
+
+  private restoreAIContainerTransform(useWorldSpace: boolean): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    const store = global.persistentStorageSystem.store;
+    if (!store.has('ai_container_has_data') || !store.getBool('ai_container_has_data')) {
+      this.captureAIContainerWorldTransform();
+      this.lastPersistedAIContainerWorld = this.aiContainerFixedWorldPosition;
+      return;
+    }
+
+    const useWorld =
+      useWorldSpace || !this.hasActiveAnchorTracking() || !store.has('ai_container_x');
+    if (useWorld && store.has('ai_container_wx')) {
+      const worldPos = new vec3(
+        store.getFloat('ai_container_wx'),
+        store.getFloat('ai_container_wy'),
+        store.getFloat('ai_container_wz')
+      );
+      const parent = this.menuRoot.getParent();
+      if (!isNull(parent) && parent === this.widgetParent) {
+        this.menuRoot.setParent(this.findSceneRoot());
+      }
+      this.menuRoot.getTransform().setWorldPosition(worldPos);
+      this.applyAIContainerSceneRotation();
+      this.aiContainerFixedWorldPosition = worldPos;
+      this.lastPersistedAIContainerWorld = worldPos;
+      print(`Restored AIContainer (world) at ${worldPos.toString()}`);
+      return;
+    }
+
+    if (!store.has('ai_container_x')) {
+      this.captureAIContainerWorldTransform();
+      this.lastPersistedAIContainerWorld = this.aiContainerFixedWorldPosition;
+      print('Restored AIContainer from scene default (no saved data)');
+      return;
+    }
+
+    const localPos = new vec3(
+      store.getFloat('ai_container_x'),
+      store.getFloat('ai_container_y'),
+      store.getFloat('ai_container_z')
+    );
+    this.menuRoot.setParent(this.widgetParent);
+    this.menuRoot.getTransform().setLocalPosition(localPos);
+    this.applyAIContainerSceneRotation();
+
+    const worldPos = this.menuRoot.getTransform().getWorldPosition();
+    this.aiContainerFixedWorldPosition = worldPos;
+    this.lastPersistedAIContainerWorld = worldPos;
+    print(`Restored AIContainer (anchor-local) at world: ${worldPos.toString()}`);
   }
 
   private lockSpacePanelAtDesk(): void {
@@ -1114,6 +1336,7 @@ export class AnchorController extends BaseScriptComponent {
     );
 
     this.captureAndLockTrashAtDesk();
+    this.maintainAIContainerAnchorBinding();
     this.lockSpacePanelAtDesk();
     const releaseRoot = this.resolveReleasedTrackedRoot();
     this.activeManipulatedRoot = null;
@@ -1176,6 +1399,7 @@ export class AnchorController extends BaseScriptComponent {
     if (this.hasActiveAnchorTracking()) {
       store.putBool('uses_anchor_space', true);
     }
+    this.persistAIContainerTransform();
   }
 
   private hasActiveAnchorTracking(): boolean {
@@ -1190,6 +1414,9 @@ export class AnchorController extends BaseScriptComponent {
     const store = global.persistentStorageSystem.store;
     if (!store.has('widget_count') || store.getInt('widget_count') <= 0) {
       print('No saved plants to restore');
+      if (!this.aiContainerRestoreApplied) {
+        this.restoreAIContainerFromStorage();
+      }
       return;
     }
 
@@ -1211,14 +1438,17 @@ export class AnchorController extends BaseScriptComponent {
         this.restoredFromWorldFallback = true;
         this.restoreAllObjects(true);
         this.ensureDeskAnchorForRestoredPlants();
+        this.restoreAIContainerFromStorage();
       } else {
         this.reparentPlantsToAnchor();
+        this.restoreAIContainerFromStorage();
       }
     } else {
       this.usingWorldSpace = true;
       this.restoredFromWorldFallback = true;
       this.anchorComponent.enabled = true;
       this.restoreAllObjects(true);
+      this.restoreAIContainerFromStorage();
     }
   }
 
