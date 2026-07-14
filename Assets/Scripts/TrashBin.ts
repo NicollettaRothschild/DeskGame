@@ -176,16 +176,24 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   private isTrackedRootInTrashVolume(root: SceneObject): boolean {
-    const trashCenter = this.getTrashWorldCenter();
-    const trashRadius = this.computeTrashAcceptRadius();
-    const rootPos = root.getTransform().getWorldPosition();
-    if (rootPos.distance(trashCenter) <= trashRadius) {
+    if (this.isSceneObjectInTrash(root)) {
       return true;
     }
 
-    const parent = root.getParent();
-    if (!isNull(parent)) {
-      return parent.getTransform().getWorldPosition().distance(trashCenter) <= trashRadius;
+    const handler = this.getAnchorTrashHandler();
+    if (isNull(handler) || typeof handler.getTrackedWrapperRoots !== 'function') {
+      return false;
+    }
+
+    const wrappers = handler.getTrackedWrapperRoots();
+    for (let i = 0; i < wrappers.length; i++) {
+      const wrapper = wrappers[i];
+      if (isNull(wrapper)) {
+        continue;
+      }
+      if (wrapper === root || this.isDescendantOf(root, wrapper) || this.isDescendantOf(wrapper, root)) {
+        return this.isSceneObjectInTrash(wrapper);
+      }
     }
 
     return false;
@@ -368,7 +376,10 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
-    if (this.isAnchorTrackedDestroyRoot(destroyRoot)) {
+    if (
+      this.isAnchorTrackedDestroyRoot(destroyRoot) &&
+      !this.isTrashableLooseTrackedPlant(destroyRoot)
+    ) {
       return;
     }
 
@@ -430,22 +441,29 @@ export class TrashBin extends BaseScriptComponent {
     const trackedRoot = this.getTrackedContentRoot(destroyRoot);
     const isTracked =
       this.isAnchorTrackedDestroyRoot(destroyRoot) || !isNull(trackedRoot);
-    if (isTracked && !deliberate) {
+    const isLooseTrackedPlant = this.isTrashableLooseTrackedPlant(destroyRoot);
+    if (isTracked && !deliberate && !isLooseTrackedPlant) {
       return;
     }
 
-    if (deliberate && this.destroyViaAnchor(destroyRoot)) {
-      this.recordDestroyed(destroyRoot, now);
-      playInteractionSound((sounds) => sounds.playPlaceObject());
-      this.debugLog(`trashed tracked object ${label}`);
-      return;
-    }
+    if (isTracked) {
+      if (this.destroyViaAnchor(destroyRoot)) {
+        this.recordDestroyed(destroyRoot, now);
+        playInteractionSound((sounds) => sounds.playPlaceObject());
+        this.debugLog(`trashed tracked object ${label}`);
+        return;
+      }
 
-    if (deliberate && !isNull(trackedRoot) && this.destroyViaAnchor(trackedRoot)) {
-      this.recordDestroyed(trackedRoot, now);
-      playInteractionSound((sounds) => sounds.playPlaceObject());
-      this.debugLog(`trashed tracked object ${trackedRoot.name}`);
-      return;
+      if (!isNull(trackedRoot) && this.destroyViaAnchor(trackedRoot)) {
+        this.recordDestroyed(trackedRoot, now);
+        playInteractionSound((sounds) => sounds.playPlaceObject());
+        this.debugLog(`trashed tracked object ${trackedRoot.name}`);
+        return;
+      }
+
+      if (!isLooseTrackedPlant) {
+        return;
+      }
     }
 
     const isWater = !isNull(this.findWateringObject(destroyRoot));
@@ -540,6 +558,14 @@ export class TrashBin extends BaseScriptComponent {
       return null;
     }
     return handler.getTrackedContentRoot(candidate);
+  }
+
+  private isTrashableLooseTrackedPlant(destroyRoot: SceneObject): boolean {
+    if (!this.isAnchorTrackedDestroyRoot(destroyRoot)) {
+      return false;
+    }
+
+    return !isNull(this.findFreePlantLifecycle(destroyRoot));
   }
 
   private findFreePlantLifecycle(sceneObject: SceneObject): PlantLifecycleLike | null {

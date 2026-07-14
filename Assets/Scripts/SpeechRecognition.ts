@@ -62,7 +62,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   autoStartListening: boolean = true;
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   @input
   commandCooldownSec: number = 1.5;
@@ -80,6 +80,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   public interimTranscript: string = '';
 
   private agentSessionActive = false;
+  private lastLoggedHeard = '';
 
   onAwake(): void {
     const globals = global as unknown as Record<string, boolean>;
@@ -169,6 +170,7 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   public endAgentSessionPreserveListening(): string {
     this.agentSessionActive = false;
+    this.lastPushedTranscriptKey = '';
     const text = this.getLiveTranscript();
     this.pushTranscriptToSpacePanel(false);
     return text;
@@ -180,12 +182,14 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   public beginAgentSession(): void {
     this.agentSessionActive = true;
+    this.lastPushedTranscriptKey = '';
     this.clearFinalTranscript();
     this.requestListening();
   }
 
   public endAgentSession(): string {
     this.agentSessionActive = false;
+    this.lastPushedTranscriptKey = '';
     const text = String(this.finalTranscript || this.interimTranscript || this.lastHeard || '').trim();
     this.stopListeningNow();
     this.clearFinalTranscript();
@@ -194,6 +198,7 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   public cancelAgentSession(): void {
     this.agentSessionActive = false;
+    this.lastPushedTranscriptKey = '';
     this.stopListeningNow();
     this.clearFinalTranscript();
   }
@@ -257,15 +262,14 @@ export class SpeechRecognition extends BaseScriptComponent {
       if (!eventArgs.isFinalTranscription) {
         this.interimTranscript = text;
       }
-      if (this.debugLogging) {
-        print(`[SpeechRecognition] Heard: ${text}`);
+      if (this.debugLogging && text !== this.lastLoggedHeard) {
+        this.lastLoggedHeard = text;
+        const suffix = eventArgs.isFinalTranscription ? ' (final)' : '';
+        print(`[SpeechRecognition] Heard: ${text}${suffix}`);
       }
 
       if (eventArgs.isFinalTranscription) {
         this.finalTranscript = text;
-        if (this.debugLogging) {
-          print(`[SpeechRecognition] FINAL: ${text}`);
-        }
       }
 
       this.pushTranscriptToSpacePanel(true);
@@ -279,6 +283,8 @@ export class SpeechRecognition extends BaseScriptComponent {
     });
   }
 
+  private lastPushedTranscriptKey = '';
+
   private pushTranscriptToSpacePanel(isListening: boolean): void {
     if (!this.mirrorTranscriptToSpacePanel || this.agentSessionActive) {
       return;
@@ -289,6 +295,12 @@ export class SpeechRecognition extends BaseScriptComponent {
       return;
     }
 
-    panel.showSpeechTranscript(this.getLiveTranscript(), isListening);
+    const transcript = this.getLiveTranscript();
+    const key = `${isListening ? 1 : 0}|${transcript}`;
+    if (key === this.lastPushedTranscriptKey) {
+      return;
+    }
+    this.lastPushedTranscriptKey = key;
+    panel.showSpeechTranscript(transcript, isListening);
   }
 }

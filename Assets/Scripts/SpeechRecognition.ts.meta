@@ -51,6 +51,6 @@
   InputLines:
     - '// @input string languageCode = "en_US"'
     - // @input bool autoStartListening = true
-    - // @input bool debugLogging = true
+    - // @input bool debugLogging
     - // @input float commandCooldownSec = 1.5
     - // @input bool mirrorTranscriptToSpacePanel = true

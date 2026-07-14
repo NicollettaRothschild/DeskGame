@@ -97,6 +97,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private sending = false;
   private wakeAwaitingPrompt = false;
   private consumedWakeFinal = '';
+  private lastListeningBoardTranscript = '';
   private interactableBound = false;
   private dependenciesLogged = false;
 
@@ -125,7 +126,15 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     const live = this.speechRecognition.getLiveTranscript();
+    if (live === this.lastListeningBoardTranscript) {
+      return;
+    }
+    this.lastListeningBoardTranscript = live;
     this.updateBoard('listening', live, null);
+  }
+
+  private resetListeningBoardCache(): void {
+    this.lastListeningBoardTranscript = '';
   }
 
   public beginWakeListening(): void {
@@ -141,6 +150,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     this.listening = true;
     this.wakeAwaitingPrompt = true;
+    this.resetListeningBoardCache();
     this.consumedWakeFinal = String(this.speechRecognition.finalTranscript || '').trim();
     this.speechRecognition.beginAgentSession();
     this.updateBoard('listening', '', null);
@@ -165,6 +175,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     this.wakeAwaitingPrompt = false;
     this.listening = false;
+    this.resetListeningBoardCache();
     const transcript = this.speechRecognition.endAgentSessionPreserveListening();
     this.speechRecognition.clearFinalTranscript();
     const question = String(transcript || finalText).trim();
@@ -217,6 +228,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     this.listening = true;
     this.wakeAwaitingPrompt = false;
+    this.resetListeningBoardCache();
     this.speechRecognition.beginAgentSession();
     if (this.transcriptOnlyMode) {
       this.setStatus('Speak — tap again when done');
@@ -234,6 +246,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     this.listening = false;
     this.wakeAwaitingPrompt = false;
+    this.resetListeningBoardCache();
     const transcript = this.transcriptOnlyMode
       ? this.speechRecognition.endAgentSessionPreserveListening()
       : this.speechRecognition.endAgentSession();
@@ -254,6 +267,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   public cancelAgentTalk(): void {
     this.listening = false;
     this.wakeAwaitingPrompt = false;
+    this.resetListeningBoardCache();
     if (!isNull(this.speechRecognition)) {
       this.speechRecognition.cancelAgentSession();
     }

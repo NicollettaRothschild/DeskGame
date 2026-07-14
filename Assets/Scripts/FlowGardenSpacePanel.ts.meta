@@ -26,6 +26,11 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    agentChatBackgroundAlpha: false
+    agentChatInnerHeight: false
+    agentChatInnerWidth: false
+    agentChatRoot: false
+    agentChatTitleText3D: false
     agentResponseText3D: false
     bodyText3D: false
     bodyWorldScale: false
@@ -58,6 +63,8 @@
       deviceRegistry: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       widgetParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       panelRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      agentChatRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      agentChatTitleText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       titleText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       bodyText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       transcriptText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
@@ -73,6 +80,9 @@
       bodyWorldScale: 0.160000
       maxBodyCharacters: !<float> 360.000000
       speechBodyExtraOffset: !<float> 12.000000
+      agentChatInnerWidth: !<float> 32.000000
+      agentChatInnerHeight: !<float> 15.000000
+      agentChatBackgroundAlpha: 0.500000
   ScriptTypes:
     -
       {}
@@ -81,6 +91,8 @@
     - // @input AssignableType_1 deviceRegistry
     - // @input SceneObject widgetParent
     - // @input SceneObject panelRoot
+    - // @input SceneObject agentChatRoot
+    - // @input Component.Text3D agentChatTitleText3D
     - // @input Component.Text3D titleText3D
     - // @input Component.Text3D bodyText3D
     - // @input Component.Text3D transcriptText3D
@@ -90,9 +102,12 @@
     - // @input Component.ScriptComponent scrollInteractable
     - // @input float refreshIntervalSec = 30
     - // @input float scrollDragSensitivity = 0.35
-    - // @input bool startVisible = true
-    - // @input bool debugLogging = true
+    - // @input bool startVisible
+    - // @input bool debugLogging
     - // @input float titleWorldScale = 1.2
     - // @input float bodyWorldScale = 0.9
     - // @input float maxBodyCharacters = 360
     - // @input float speechBodyExtraOffset = 12
+    - // @input float agentChatInnerWidth = 32
+    - // @input float agentChatInnerHeight = 15
+    - // @input float agentChatBackgroundAlpha = 0.5
