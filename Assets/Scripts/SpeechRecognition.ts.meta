@@ -30,8 +30,11 @@
     commandCooldownSec: false
     debugLogging: false
     languageCode: false
+    listeningStatusText: false
     mirrorTranscriptToSpacePanel: false
+    startupDisabled: false
     startupListenDelaySec: false
+    transcriptText: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -41,19 +44,25 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - languageCode: en_US
+    - startupDisabled: true
+      languageCode: en_US
       autoStartListening: true
       startupListenDelaySec: !<float> 10.000000
       debugLogging: true
       commandCooldownSec: 1.500000
       mirrorTranscriptToSpacePanel: true
+      transcriptText: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      listeningStatusText: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
   InputLines:
+    - // @input bool startupDisabled = true
     - '// @input string languageCode = "en_US"'
     - // @input bool autoStartListening = true
     - // @input float startupListenDelaySec = 10
     - // @input bool debugLogging
     - // @input float commandCooldownSec = 1.5
     - // @input bool mirrorTranscriptToSpacePanel = true
+    - // @input Component.Text3D transcriptText
+    - // @input Component.Text3D listeningStatusText

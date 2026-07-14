@@ -39,6 +39,7 @@ type AnchorPotSpawner = {
   ): SceneObject | null;
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
+  notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
 };
 
 type PullState = {
@@ -367,12 +368,14 @@ export class MainPotSource extends BaseScriptComponent {
   private releaseActivePull(): void {
     if (!isNull(this.activePull)) {
       this.debugLog('released active pot pull.');
+      const releasedPot = this.activePull.potObject;
       const anchorSpawner = this.getAnchorPotSpawner();
       if (!isNull(anchorSpawner)) {
         const spawner = anchorSpawner as AnchorPotSpawner;
         if (typeof spawner.setActiveManipulatedRoot === 'function') {
-          spawner.setActiveManipulatedRoot(this.activePull.potObject);
+          spawner.setActiveManipulatedRoot(releasedPot);
         }
+        this.notifyTrashSpawnGrace(releasedPot, 1.5);
         if (typeof spawner.saveObjectPosition === 'function') {
           spawner.saveObjectPosition();
         }
@@ -381,6 +384,18 @@ export class MainPotSource extends BaseScriptComponent {
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
       (this.updateEvent as UpdateEvent).enabled = false;
+    }
+  }
+
+  private notifyTrashSpawnGrace(root: SceneObject, graceSeconds: number): void {
+    const anchorSpawner = this.getAnchorPotSpawner();
+    if (isNull(anchorSpawner)) {
+      return;
+    }
+
+    const spawner = anchorSpawner as AnchorPotSpawner;
+    if (typeof spawner.notifyTrashSpawnGrace === 'function') {
+      spawner.notifyTrashSpawnGrace(root, graceSeconds);
     }
   }
 

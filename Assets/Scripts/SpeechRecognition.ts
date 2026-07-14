@@ -56,6 +56,9 @@ const GLOBAL_SPEECH_KEY = '__flowGardenSpeechRecognizerActive';
 @component
 export class SpeechRecognition extends BaseScriptComponent {
   @input
+  startupDisabled: boolean = true;
+
+  @input
   languageCode: string = 'en_US';
 
   @input
@@ -65,6 +68,12 @@ export class SpeechRecognition extends BaseScriptComponent {
   startupListenDelaySec: number = 10;
 
   @input
+  tapToListen: boolean = true;
+
+  @input
+  listeningWindowSec: number = 8;
+
+  @input
   debugLogging: boolean = false;
 
   @input
@@ -72,6 +81,14 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   @input
   mirrorTranscriptToSpacePanel: boolean = true;
+
+  @input
+  @allowUndefined
+  transcriptText!: Text3D;
+
+  @input
+  @allowUndefined
+  listeningStatusText!: Text3D;
 
   private voiceMLModule: VoiceMLModuleLike | null = null;
   private listeningOptions: VoiceMLListeningOptions | null = null;
@@ -84,8 +101,16 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   private agentSessionActive = false;
   private lastLoggedHeard = '';
+  private isListening = false;
+  private listeningWindowEvent: DelayedCallbackEvent | null = null;
 
   onAwake(): void {
+    if (this.startupDisabled) {
+      this.setListeningStatus('Voice disabled for stability');
+      this.setTranscriptText('Speech unavailable in recovery mode');
+      return;
+    }
+
     const globals = global as unknown as Record<string, boolean>;
     if (globals[GLOBAL_SPEECH_KEY]) {
       print(`[SpeechRecognition] Duplicate instance detected — disabling (${this.instanceId})`);
@@ -99,6 +124,7 @@ export class SpeechRecognition extends BaseScriptComponent {
       this.voiceMLModule = require('LensStudio:VoiceMLModule') as VoiceMLModuleLike;
     } catch (e) {
       print('[SpeechRecognition] VoiceMLModule unavailable: ' + e);
+      this.setListeningStatus('Microphone unavailable');
       return;
     }
 
@@ -141,10 +167,24 @@ export class SpeechRecognition extends BaseScriptComponent {
 
     this.bindVoiceEvents();
 
-    if (this.autoStartListening && this.debugLogging) {
-      print('[SpeechRecognition] Automatic startup disabled for device stability');
+    this.setListeningStatus(this.autoStartListening ? 'Microphone starting...' : 'Tap to speak');
+    if (this.autoStartListening) {
+      const startupEvent = this.createEvent('DelayedCallbackEvent');
+      startupEvent.bind(() => this.requestListening());
+      startupEvent.reset(Math.max(0, this.startupListenDelaySec));
     }
+  }
 
+  private setListeningStatus(text: string): void {
+    if (!isNull(this.listeningStatusText)) {
+      this.listeningStatusText.text = text;
+    }
+  }
+
+  private setTranscriptText(text: string): void {
+    if (!isNull(this.transcriptText)) {
+      this.transcriptText.text = text;
+    }
   }
 
   public requestListening(): void {
@@ -236,13 +276,21 @@ export class SpeechRecognition extends BaseScriptComponent {
     const options = this.listeningOptions;
 
     module.onListeningEnabled.add(() => {
+      if (this.isListening) {
+        return;
+      }
+      this.isListening = true;
+      this.setListeningStatus('Listening...');
       if (this.debugLogging) {
         print(`[SpeechRecognition] Listening started (${this.instanceId})`);
       }
       module.startListening(options);
+      this.startListeningWindowTimer();
     });
 
     module.onListeningDisabled.add(() => {
+      this.isListening = false;
+      this.setListeningStatus('Microphone paused');
       if (this.debugLogging) {
         print(`[SpeechRecognition] Listening stopped (${this.instanceId})`);
       }
@@ -250,6 +298,8 @@ export class SpeechRecognition extends BaseScriptComponent {
     });
 
     module.onListeningError.add((eventErrorArgs) => {
+      this.isListening = false;
+      this.setListeningStatus('Microphone error');
       print(
         `[SpeechRecognition] Error: ${eventErrorArgs.error} | ${eventErrorArgs.description}`
       );
@@ -262,6 +312,7 @@ export class SpeechRecognition extends BaseScriptComponent {
       }
 
       this.lastHeard = text;
+      this.setTranscriptText(text);
       if (!eventArgs.isFinalTranscription) {
         this.interimTranscript = text;
       }
@@ -279,11 +330,29 @@ export class SpeechRecognition extends BaseScriptComponent {
     });
 
     this.createEvent('TapEvent').bind(() => {
+      if (!this.tapToListen || this.isListening) {
+        return;
+      }
+      this.setListeningStatus('Starting microphone...');
       if (this.debugLogging) {
         print('[SpeechRecognition] Tap — requesting microphone');
       }
       this.requestListening();
     });
+  }
+
+  private startListeningWindowTimer(): void {
+    if (!isNull(this.listeningWindowEvent)) {
+      this.listeningWindowEvent.enabled = false;
+    }
+
+    this.listeningWindowEvent = this.createEvent('DelayedCallbackEvent');
+    this.listeningWindowEvent.bind(() => {
+      this.stopListeningNow();
+      this.isListening = false;
+      this.setListeningStatus('Tap to speak');
+    });
+    this.listeningWindowEvent.reset(Math.max(1, this.listeningWindowSec));
   }
 
   private lastPushedTranscriptKey = '';

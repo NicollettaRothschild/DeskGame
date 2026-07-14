@@ -6,6 +6,26 @@ type AnchorTrashHandler = {
   getTrackedContentRoots?: () => SceneObject[];
   getTrackedWrapperRoots?: () => SceneObject[];
   destroyTrackedObject?: (candidate: SceneObject) => boolean;
+  persistTrashTransform?: () => void;
+};
+
+type InteractableLike = ScriptComponent & {
+  onDragStart?: { add: (cb: () => void) => void };
+  onDragEnd?: { add: (cb: () => void) => void };
+  onTriggerStart?: { add: (cb: () => void) => void };
+  onTriggerEnd?: { add: (cb: () => void) => void };
+  onTriggerEndOutside?: { add: (cb: () => void) => void };
+  onInteractorTriggerStart?: { add: (cb: () => void) => void };
+  onInteractorTriggerEnd?: { add: (cb: () => void) => void };
+  onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
+  targetingMode?: number;
+};
+
+type InteractableManipulationLike = ScriptComponent & {
+  manipulateRootSceneObject?: SceneObject;
+  enableTranslation?: boolean;
+  enableRotation?: boolean;
+  enableScale?: boolean;
 };
 
 type WateringObjectLike = ScriptComponent & {
@@ -65,6 +85,8 @@ export class TrashBin extends BaseScriptComponent {
   private recentDestroyTimes: number[] = [];
   private spawnGraceRoots: SceneObject[] = [];
   private spawnGraceUntilTimes: number[] = [];
+  private moveInteractionWired = false;
+  private bindAttempts = 0;
 
   onAwake(): void {
     const collider = this.getTriggerCollider();
@@ -80,6 +102,141 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     this.createEvent('UpdateEvent').bind(() => this.checkProximityTrash());
+    this.createEvent('OnStartEvent').bind(() => this.tryWireMoveInteraction());
+  }
+
+  public wireMoveInteraction(): void {
+    this.tryWireMoveInteraction();
+  }
+
+  public containsTrashBinObject(candidate: SceneObject): boolean {
+    if (isNull(candidate)) {
+      return false;
+    }
+
+    const trashRoot = this.getSceneObject();
+    let current = candidate;
+    while (!isNull(current)) {
+      if (current === trashRoot) {
+        return true;
+      }
+      current = current.getParent();
+    }
+    return false;
+  }
+
+  private tryWireMoveInteraction(): void {
+    if (this.moveInteractionWired) {
+      return;
+    }
+
+    const root = this.getSceneObject();
+    const manipulation = this.findManipulationScript(root);
+    const interactable = this.findInteractableScript(root);
+    if (isNull(manipulation) || isNull(interactable)) {
+      this.bindAttempts++;
+      if (this.bindAttempts >= 30) {
+        print(
+          'TrashBin could not bind move interaction. Add Interactable and InteractableManipulation to the trash can.'
+        );
+        return;
+      }
+
+      const retryEvent = this.createEvent('DelayedCallbackEvent');
+      retryEvent.bind(() => this.tryWireMoveInteraction());
+      retryEvent.reset(0.1);
+      return;
+    }
+
+    manipulation.manipulateRootSceneObject = root;
+    manipulation.enableTranslation = true;
+    manipulation.enableRotation = false;
+    manipulation.enableScale = false;
+    (manipulation as ScriptComponent).enabled = true;
+    (interactable as ScriptComponent).enabled = true;
+
+    const onRelease = (): void => {
+      this.persistTrashAnchorTransform();
+    };
+
+    if (interactable.onDragEnd) {
+      interactable.onDragEnd.add(onRelease);
+    }
+    if (interactable.onTriggerEnd) {
+      interactable.onTriggerEnd.add(onRelease);
+    }
+    if (interactable.onTriggerEndOutside) {
+      interactable.onTriggerEndOutside.add(onRelease);
+    }
+    if (interactable.onInteractorTriggerEnd) {
+      interactable.onInteractorTriggerEnd.add(onRelease);
+    }
+    if (interactable.onInteractorTriggerEndOutside) {
+      interactable.onInteractorTriggerEndOutside.add(onRelease);
+    }
+
+    this.moveInteractionWired = true;
+    this.debugLog('move interaction wired');
+  }
+
+  private persistTrashAnchorTransform(): void {
+    const handler = this.getAnchorTrashHandler();
+    if (!isNull(handler) && typeof handler.persistTrashTransform === 'function') {
+      handler.persistTrashTransform();
+    }
+  }
+
+  private findInteractableScript(root: SceneObject): InteractableLike | null {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as InteractableLike;
+        if (
+          !isNull(candidate) &&
+          candidate.targetingMode !== undefined &&
+          (candidate.onTriggerStart !== undefined ||
+            candidate.onInteractorTriggerStart !== undefined)
+        ) {
+          return candidate;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
+  }
+
+  private findManipulationScript(root: SceneObject): InteractableManipulationLike | null {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as InteractableManipulationLike;
+        if (!isNull(candidate) && candidate.manipulateRootSceneObject !== undefined) {
+          return candidate;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
   }
 
   private getTriggerCollider(): ColliderComponent {
@@ -151,7 +308,7 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   public tryTrashTrackedOnRelease(releasedRoot?: SceneObject | null): boolean {
-    if (isNull(releasedRoot)) {
+    if (isNull(releasedRoot) || this.containsTrashBinObject(releasedRoot)) {
       return false;
     }
 
@@ -164,19 +321,32 @@ export class TrashBin extends BaseScriptComponent {
     if (
       isNull(trackedRoot) ||
       !trackedRoot.enabled ||
-      this.isBerryObject(trackedRoot) ||
-      !this.isTrackedRootInTrashVolume(trackedRoot)
+      this.isBerryObject(trackedRoot)
     ) {
       return false;
     }
 
     const now = getTime();
+    if (this.isInSpawnGrace(trackedRoot, now) || this.isInSpawnGrace(destroyRoot, now)) {
+      return false;
+    }
+
+    const releaseRadius = this.computeReleaseTrashRadius();
+    if (!this.isTrackedRootWithinTrashRadius(trackedRoot, releaseRadius)) {
+      return false;
+    }
+
     this.tryDestroyRoot(destroyRoot, now, true);
     return this.wasRecentlyDestroyed(destroyRoot, now);
   }
 
   private isTrackedRootInTrashVolume(root: SceneObject): boolean {
-    if (this.isSceneObjectInTrash(root)) {
+    return this.isTrackedRootWithinTrashRadius(root, this.computeTrashAcceptRadius());
+  }
+
+  private isTrackedRootWithinTrashRadius(root: SceneObject, trashRadius: number): boolean {
+    const trashCenter = this.getTrashWorldCenter();
+    if (this.getClosestDistanceToTrash(trashCenter, root) <= trashRadius) {
       return true;
     }
 
@@ -192,7 +362,7 @@ export class TrashBin extends BaseScriptComponent {
         continue;
       }
       if (wrapper === root || this.isDescendantOf(root, wrapper) || this.isDescendantOf(wrapper, root)) {
-        return this.isSceneObjectInTrash(wrapper);
+        return this.getClosestDistanceToTrash(trashCenter, wrapper) <= trashRadius;
       }
     }
 
@@ -249,7 +419,17 @@ export class TrashBin extends BaseScriptComponent {
     return this.getSceneObject().getTransform().getWorldPosition();
   }
 
+  /** Collider overlap / proximity checks — includes FitVisual padding. */
   private computeTrashAcceptRadius(): number {
+    return this.computeColliderTrashRadius(true);
+  }
+
+  /** Pinch-release trash — physical bin only, no FitVisual inflation. */
+  private computeReleaseTrashRadius(): number {
+    return this.computeColliderTrashRadius(false);
+  }
+
+  private computeColliderTrashRadius(includeVisualFit: boolean): number {
     const collider = this.getTriggerCollider();
     if (isNull(collider)) {
       return Math.max(1, this.trashRadius);
@@ -275,7 +455,7 @@ export class TrashBin extends BaseScriptComponent {
         Math.sqrt(size.x * size.x + size.y * size.y + size.z * size.z) * 0.5 * scale;
     }
 
-    if (shape && shape.FitVisual) {
+    if (includeVisualFit && shape && shape.FitVisual) {
       shapeRadius *= Math.max(1, this.fitVisualRadiusMultiplier);
     }
 

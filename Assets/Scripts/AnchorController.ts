@@ -12,9 +12,14 @@ import { InteractionSoundRegistry, playInteractionSound } from './InteractionSou
 import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
 import { SpecsApiClient } from './SpecsApiClient';
 
-const ANCHOR_CONTROLLER_VERSION = 'v14-recovery';
+const ANCHOR_CONTROLLER_VERSION = 'v19-stable-no-voice';
 const STARTUP_REBIND_DELAY_SEC = 0.35;
 const STARTUP_PERSIST_DELAY_SEC = 0.5;
+const WORLD_PREVIEW_REBIND_DELAY_SEC = 1;
+const ANCHOR_SESSION_BOOT_DELAY_SEC = 0.75;
+const ANCHOR_SESSION_BOOT_DELAY_SAVED_SEC = 2;
+const ANCHOR_CREATE_GRACE_SEC = 4;
+const ANCHOR_BIND_TIMEOUT_SEC = 12;
 const PLANT_LIFECYCLE_SAVE_VERSION = 4;
 const OBJECT_KIND_PLANT = 'plant';
 const OBJECT_KIND_POT = 'pot';
@@ -117,7 +122,11 @@ export class AnchorController extends BaseScriptComponent {
   private anchorSettleEvent?: UpdateEvent;
   private nextPlantSpawnIndex = 0;
   private trashFixedWorldPosition: vec3 | null = null;
-  private trashFixedWorldRotation: quat | null = null;
+  private trashRestoreApplied = false;
+  private lastPersistedTrashWorld: vec3 | null = null;
+  private trashPersistCooldown = 0;
+  private readonly trashPersistIntervalSec = 0.35;
+  private readonly trashMoveEpsilon = 0.5;
   private aiContainerFixedWorldPosition: vec3 | null = null;
   private aiContainerSceneDefaultLocalRotation: quat | null = null;
   private aiContainerRestoreApplied = false;
@@ -163,39 +172,37 @@ export class AnchorController extends BaseScriptComponent {
     const hasSavedPlants =
       !editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0;
 
-    if (hasSavedPlants) {
-      print('Recovery boot: restoring saved plants without anchors or background systems');
-      this.startupWorldOnlySession = true;
-      this.aiContainerPersistencePaused = true;
-      this.usingWorldSpace = true;
-      this.restoredFromWorldFallback = true;
-      this.anchorComponent.enabled = false;
-      this.restoreSavedObjects(false);
-      this.usingWorldSpace = true;
-      this.restoredFromWorldFallback = true;
-      this.anchorComponent.enabled = false;
+    if (!isNull(this.menuRoot)) {
       this.menuRoot.enabled = true;
-      const recoveryAIPosition = this.camera
-        .getTransform()
-        .getWorldTransform()
-        .multiplyPoint(new vec3(0, -10, -80));
-      this.menuRoot.getTransform().setWorldPosition(recoveryAIPosition);
-      this.menuRoot.getTransform().setWorldRotation(
-        this.camera.getTransform().getWorldRotation()
-      );
-      this.aiContainerFixedWorldPosition = recoveryAIPosition;
-      this.hasRestored = true;
-      this.textlog.text = 'Recovery mode: saved garden restored';
-      print(
-        `Recovery boot complete (restored ${store.getInt('widget_count')} saved object record(s))`
-      );
-      return;
     }
 
-    const anchorSessionOptions = new AnchorSessionOptions();
-    anchorSessionOptions.scanForWorldAnchors = true;
-    this.anchorSession = await this.anchorModule.openSession(anchorSessionOptions);
-    this.anchorSession.onAnchorNearby.add(this.onAnchorNearby.bind(this));
+    if (hasSavedPlants) {
+      print('Saved plants found: minimal boot (no anchor or background loops)');
+      this.startupWorldOnlySession = true;
+      this.usingWorldSpace = true;
+      this.restoredFromWorldFallback = true;
+      this.anchorBindingComplete = true;
+      this.aiContainerPersistencePaused = true;
+      this.anchorComponent.enabled = false;
+      this.runFastStartupRestore(true);
+      this.captureTrashInitialTransform();
+      if (!this.trashRestoreApplied) {
+        this.restoreTrashFromStorage();
+      }
+      this.applyTrashSavedPose();
+      this.captureAIContainerSceneDefaults();
+      if (!this.aiContainerRestoreApplied) {
+        this.restoreAIContainerFromStorage();
+      }
+      this.applyAIContainerSavedPose();
+      this.hasRestored = true;
+      this.textlog.text =
+        this.objs.length > 0
+          ? `Restored ${this.objs.length} object(s)`
+          : 'Garden restored';
+      print(`Minimal boot complete (${this.objs.length} object(s))`);
+      return;
+    }
 
     // Editor preview can't persist world anchors reliably, but we should still allow restoring
     // saved desk layouts for iteration. Only clear saved data when the user explicitly resets.
@@ -207,18 +214,149 @@ export class AnchorController extends BaseScriptComponent {
       this.usingWorldSpace = true;
     }
 
+    if (!hasSavedPlants) {
+      this.initTrashAndAIContainerFromStorage();
+      if (this.hasActiveAnchorTracking()) {
+        this.persistAIContainerTransform();
+        this.persistTrashTransform();
+      }
+    }
+
     this.startAnchorSaveLoop();
-    this.captureAndLockTrashAtDesk();
+    this.wireTrashBinMovement();
+    this.wireAIContainerMovement();
+    this.startAIContainerPersistenceLoop();
+
+    this.scheduleDelayed(() => {
+      void this.bootAnchorSession(false);
+    }, ANCHOR_SESSION_BOOT_DELAY_SEC);
+    print(
+      `AnchorController startup complete (anchor session in ${ANCHOR_SESSION_BOOT_DELAY_SEC.toFixed(1)}s)`
+    );
+  }
+
+  private disableAnchorModuleForSession(): void {
+    if (isNull(this.anchorModule)) {
+      return;
+    }
+
+    const moduleComponent = this.anchorModule as unknown as ScriptComponent;
+    if (isNull(moduleComponent)) {
+      return;
+    }
+
+    moduleComponent.enabled = false;
+    const moduleObject = moduleComponent.getSceneObject();
+    if (!isNull(moduleObject)) {
+      moduleObject.enabled = false;
+    }
+    print('AnchorModule disabled for minimal boot session');
+  }
+
+  private initTrashAndAIContainerFromStorage(): void {
+    this.captureTrashInitialTransform();
+    if (!this.trashRestoreApplied) {
+      this.restoreTrashFromStorage();
+    }
+    this.applyTrashSavedPose();
+    this.maintainTrashAnchorBinding();
     this.captureAIContainerSceneDefaults();
     if (!this.aiContainerRestoreApplied) {
       this.restoreAIContainerFromStorage();
     }
     this.applyAIContainerSavedPose();
     this.maintainAIContainerAnchorBinding();
-    if (!hasSavedPlants) {
-      this.persistAIContainerTransform();
+  }
+
+  private async bootAnchorSession(hasSavedPlants: boolean): Promise<void> {
+    if (this.isResetting || this.anchorSession) {
+      return;
     }
-    this.startAIContainerPersistenceLoop();
+
+    if (!this.ensureAnchorModuleActive()) {
+      print('Anchor session skipped: AnchorModule unavailable');
+      this.textlog.text = 'Desk anchor unavailable';
+      this.usingWorldSpace = true;
+      this.aiContainerPersistencePaused = false;
+      return;
+    }
+
+    try {
+      print('Opening anchor session...');
+      const anchorSessionOptions = new AnchorSessionOptions();
+      anchorSessionOptions.scanForWorldAnchors = true;
+      this.anchorSession = await this.anchorModule.openSession(anchorSessionOptions);
+      this.anchorSession.onAnchorNearby.add(this.onAnchorNearby.bind(this));
+      print('Anchor session ready');
+    } catch (error) {
+      print('Anchor session unavailable: ' + error);
+      this.textlog.text = 'Desk anchor unavailable';
+      this.usingWorldSpace = true;
+      this.aiContainerPersistencePaused = false;
+      return;
+    }
+
+    if (hasSavedPlants) {
+      const store = global.persistentStorageSystem.store;
+      const usesAnchorSpace =
+        store.has('uses_anchor_space') && store.getBool('uses_anchor_space');
+      if (usesAnchorSpace && !this.currentAnchor) {
+        this.scheduleAnchorScanReminder(ANCHOR_SCAN_REMINDER_SEC);
+      }
+      if (this.objs.length > 0) {
+        this.ensureDeskAnchorForRestoredPlants();
+      }
+      this.maintainTrashAnchorBinding();
+      this.maintainAIContainerAnchorBinding();
+      this.scheduleAnchorBindTimeout();
+    }
+  }
+
+  private scheduleAnchorBindTimeout(): void {
+    this.scheduleDelayed(() => {
+      if (this.isResetting || this.anchorBindingComplete) {
+        return;
+      }
+      this.aiContainerPersistencePaused = false;
+      this.startupRebindInProgress = false;
+      this.anchorRestorePending = false;
+      print('Anchor bind timeout; continuing in world space');
+      this.textlog.text = this.hasRestored
+        ? `Restored ${this.objs.length} object(s)`
+        : 'Desk anchor unavailable';
+    }, ANCHOR_BIND_TIMEOUT_SEC);
+  }
+
+  private canPersistLayout(): boolean {
+    return (
+      !this.aiContainerPersistencePaused &&
+      !this.startupRebindInProgress &&
+      !this.anchorRestorePending &&
+      (this.anchorBindingComplete || !this.hasRestored)
+    );
+  }
+
+  private ensureAnchorModuleActive(): boolean {
+    if (isNull(this.anchorModule)) {
+      print('AnchorModule input is not wired on AnchorController');
+      return false;
+    }
+
+    const moduleComponent = this.anchorModule as unknown as ScriptComponent;
+    if (isNull(moduleComponent)) {
+      return false;
+    }
+
+    const moduleObject = moduleComponent.getSceneObject();
+    if (!isNull(moduleObject) && !moduleObject.enabled) {
+      print('Enabling disabled AnchorModule scene object');
+      moduleObject.enabled = true;
+    }
+    if (!moduleComponent.enabled) {
+      moduleComponent.enabled = true;
+    }
+
+    return true;
   }
 
   private usesSavedAnchorSpace(): boolean {
@@ -247,10 +385,10 @@ export class AnchorController extends BaseScriptComponent {
 
     const preferredId = this.getPreferredAnchorId();
     if (
-      this.usesSavedAnchorSpace() &&
       preferredId &&
       anchorId !== preferredId &&
-      this.pendingCreatedAnchorId !== anchorId
+      this.pendingCreatedAnchorId !== anchorId &&
+      (this.usesSavedAnchorSpace() || this.hasRestored)
     ) {
       if (!this.lockedAnchorId) {
         this.lockedAnchorId = preferredId;
@@ -296,6 +434,8 @@ export class AnchorController extends BaseScriptComponent {
           return;
         }
         this.persistPlantTransforms(true);
+        this.applyAIContainerSavedPose();
+        this.applyTrashSavedPose();
         this.aiContainerPersistencePaused = false;
         this.startupRebindInProgress = false;
         this.anchorBindingComplete = true;
@@ -308,8 +448,7 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   public onAnchorNearby(anchor: Anchor) {
-    if (this.isResetting) {
-      print('Ignoring nearby anchor during reset');
+    if (this.isResetting || this.startupWorldOnlySession) {
       return;
     }
 
@@ -318,13 +457,13 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
-    if (this.startupWorldOnlySession) {
-      print(`Crash-safe startup: ignoring nearby anchor ${anchorId}`);
+    if (this.shouldIgnoreNearbyAnchor(anchorId)) {
       return;
     }
 
-    if (this.shouldIgnoreNearbyAnchor(anchorId)) {
-      return;
+    if (this.anchorCreationInProgress) {
+      print(`Canceling in-flight session anchor; using nearby anchor ${anchorId}`);
+      this.anchorCreationInProgress = false;
     }
 
     const isAlreadyTracking = this.currentAnchor?.id === anchorId;
@@ -357,6 +496,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     this.anchorRestorePending = true;
+    const skipSettleWait = hadWorldFallback;
     this.scheduleAnchorStableRestore(() => {
       this.anchorRestorePending = false;
       this.usingWorldSpace = false;
@@ -388,7 +528,7 @@ export class AnchorController extends BaseScriptComponent {
       if (!this.hasRestored) {
         this.restoreSavedObjects(true);
       }
-    });
+    }, skipSettleWait);
   }
 
   async createAnchor() {
@@ -472,7 +612,13 @@ export class AnchorController extends BaseScriptComponent {
     delayedEvent.reset(delaySec);
   }
 
-  private scheduleAnchorStableRestore(callback: () => void) {
+  private scheduleAnchorStableRestore(callback: () => void, skipSettleWait = false) {
+    if (skipSettleWait) {
+      print('Skipping anchor settle wait; using timed rebind');
+      this.scheduleDelayed(callback, WORLD_PREVIEW_REBIND_DELAY_SEC);
+      return;
+    }
+
     if (this.anchorSettleEvent) {
       this.anchorSettleEvent.enabled = false;
     }
@@ -511,7 +657,7 @@ export class AnchorController extends BaseScriptComponent {
             ? 'Anchor pose stable, restoring plants'
             : 'Anchor restore timeout, applying saved offsets'
         );
-        this.captureAndLockTrashAtDesk();
+        this.maintainTrashAnchorBinding();
         this.maintainAIContainerAnchorBinding();
         this.lockSpacePanelAtDesk();
         callback();
@@ -538,7 +684,12 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private startWorldAnchorCreation(spawnWorldMat: mat4) {
-    if (this.anchorCreationInProgress || this.currentAnchor) {
+    if (
+      this.startupWorldOnlySession ||
+      !this.anchorSession ||
+      this.anchorCreationInProgress ||
+      this.currentAnchor
+    ) {
       return;
     }
     this.markSessionPlantsActive();
@@ -550,6 +701,25 @@ export class AnchorController extends BaseScriptComponent {
     print('Creating desk anchor');
     this.anchorSession!.createWorldAnchor(spawnWorldMat)
       .then((anchor) => {
+        if (this.isResetting) {
+          return;
+        }
+
+        const newAnchorId = String(anchor.id || '');
+        const activeAnchorId = String(this.currentAnchor?.id || '');
+        const preferredId = this.getPreferredAnchorId();
+        if (
+          (activeAnchorId && activeAnchorId !== newAnchorId) ||
+          (preferredId && preferredId !== newAnchorId) ||
+          this.anchorRestorePending
+        ) {
+          print(
+            `Discarding new session anchor ${newAnchorId}; tracking ${activeAnchorId || preferredId}`
+          );
+          this.anchorCreationInProgress = false;
+          return;
+        }
+
         const worldSnapshots = this.capturePlantWorldTransforms();
         this.pendingCreatedAnchorId = anchor.id;
         this.currentAnchor = anchor;
@@ -620,7 +790,7 @@ export class AnchorController extends BaseScriptComponent {
       });
   }
 
-  private runFastStartupRestore(): void {
+  private runFastStartupRestore(deferAnchorCreation = false): void {
     if (this.shouldSkipStartupWorldFallback()) {
       print('Skipping startup restore: session already has anchor or plants');
       return;
@@ -631,7 +801,7 @@ export class AnchorController extends BaseScriptComponent {
     if (!hasWorldData) {
       print('No world preview data yet, deferring restore');
       this.textlog.text = 'Scanning for desk anchor...';
-      this.scheduleWorldFallbackRestore(WORLD_PREVIEW_FALLBACK_SEC);
+      this.scheduleWorldFallbackRestore(WORLD_PREVIEW_FALLBACK_SEC, deferAnchorCreation);
       return;
     }
 
@@ -639,18 +809,8 @@ export class AnchorController extends BaseScriptComponent {
     this.textlog.text = 'Restoring saved plants...';
     this.restoreSavedObjects(false);
     if (this.objs.length > 0) {
-      if (this.startupWorldOnlySession) {
-        this.usingWorldSpace = true;
-        this.restoredFromWorldFallback = true;
-        this.anchorComponent.enabled = false;
-        this.scheduleDelayed(() => {
-          if (this.isResetting) {
-            return;
-          }
-          this.aiContainerPersistencePaused = false;
-          this.textlog.text = `Restored ${this.objs.length} object(s)`;
-          print(`Crash-safe startup complete (${this.objs.length} object(s), world-only)`);
-        }, STARTUP_PERSIST_DELAY_SEC);
+      if (deferAnchorCreation) {
+        this.textlog.text = `Restored ${this.objs.length} object(s)`;
       } else {
         this.ensureDeskAnchorForRestoredPlants();
       }
@@ -660,7 +820,7 @@ export class AnchorController extends BaseScriptComponent {
     }
   }
 
-  private scheduleWorldFallbackRestore(delaySec: number) {
+  private scheduleWorldFallbackRestore(delaySec: number, deferAnchorCreation = false) {
     this.scheduleDelayed(() => {
       if (this.shouldSkipStartupWorldFallback()) {
         print('Skipping world preview: session already has anchor or plants');
@@ -669,7 +829,11 @@ export class AnchorController extends BaseScriptComponent {
       print('No saved Snap anchor nearby, restoring plants from world preview');
       this.restoreSavedObjects(false);
       if (this.objs.length > 0) {
-        this.ensureDeskAnchorForRestoredPlants();
+        if (deferAnchorCreation && !this.anchorSession) {
+          this.textlog.text = `Restored ${this.objs.length} object(s)`;
+        } else {
+          this.ensureDeskAnchorForRestoredPlants();
+        }
       } else {
         this.textlog.text = 'Could not restore saved plants';
       }
@@ -704,15 +868,40 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
-    if (this.usesSavedAnchorSpace()) {
+    if (!this.anchorSession) {
+      print('Deferring desk anchor until anchor session is ready');
+      return;
+    }
+
+    const preferredId = this.getPreferredAnchorId();
+    if (this.usesSavedAnchorSpace() || preferredId) {
       print('Saved Snap anchor expected; waiting for scan without creating new session anchor');
       this.textlog.text = 'Look at your desk slowly to lock saved anchor';
       return;
     }
 
-    print('No saved Snap anchor on device; creating session anchor at restored plants');
-    this.textlog.text = `Anchoring ${this.objs.length} restored plant(s) to desk...`;
-    this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
+    print(
+      `Waiting ${ANCHOR_CREATE_GRACE_SEC}s for nearby anchor scan before creating session anchor`
+    );
+    this.textlog.text = 'Scanning for saved desk anchor...';
+    this.scheduleDelayed(() => {
+      if (
+        this.isResetting ||
+        this.currentAnchor ||
+        this.anchorCreationInProgress ||
+        this.objs.length === 0
+      ) {
+        return;
+      }
+      if (this.getPreferredAnchorId() || this.lockedAnchorId) {
+        print('Nearby saved anchor detected during scan; skipping new session anchor');
+        return;
+      }
+
+      print('No saved Snap anchor on device; creating session anchor at restored plants');
+      this.textlog.text = `Anchoring ${this.objs.length} restored plant(s) to desk...`;
+      this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
+    }, ANCHOR_CREATE_GRACE_SEC);
   }
 
   private spawnObjectAtWorld(worldPos: vec3): SceneObject | null {
@@ -908,9 +1097,35 @@ export class AnchorController extends BaseScriptComponent {
       this.floatingRoot = undefined;
     }
 
-    this.captureAndLockTrashAtDesk();
-    this.reparentAIContainerToAnchor();
     this.lockSpacePanelAtDesk();
+  }
+
+  private shouldKeepAIContainerInWorldRoot(): boolean {
+    const store = global.persistentStorageSystem.store;
+    const storedInAnchorSpace =
+      store.has('ai_container_uses_anchor_space') &&
+      store.getBool('ai_container_uses_anchor_space');
+    return (
+      this.startupWorldOnlySession ||
+      !storedInAnchorSpace ||
+      this.usingWorldSpace ||
+      this.restoredFromWorldFallback ||
+      !this.anchorBindingComplete
+    );
+  }
+
+  private shouldKeepTrashInWorldRoot(): boolean {
+    const store = global.persistentStorageSystem.store;
+    const storedInAnchorSpace =
+      store.has('trash_bin_uses_anchor_space') &&
+      store.getBool('trash_bin_uses_anchor_space');
+    return (
+      this.startupWorldOnlySession ||
+      !storedInAnchorSpace ||
+      this.usingWorldSpace ||
+      this.restoredFromWorldFallback ||
+      !this.anchorBindingComplete
+    );
   }
 
   private captureAIContainerSceneDefaults(): void {
@@ -950,7 +1165,11 @@ export class AnchorController extends BaseScriptComponent {
     this.menuRoot.setParent(this.widgetParent);
     this.menuRoot.getTransform().setWorldPosition(worldPos);
     this.applyAIContainerSceneRotation();
-    this.persistAIContainerTransform();
+    this.aiContainerFixedWorldPosition = worldPos;
+    this.lastPersistedAIContainerWorld = worldPos;
+    if (this.canPersistLayout()) {
+      this.persistAIContainerTransform();
+    }
   }
 
   private shouldRestoreAIContainerInWorldSpace(): boolean {
@@ -985,6 +1204,21 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
+    if (this.anchorRestorePending || this.startupRebindInProgress) {
+      return;
+    }
+
+    if (this.shouldKeepAIContainerInWorldRoot()) {
+      const parent = this.menuRoot.getParent();
+      if (!isNull(parent) && parent === this.widgetParent) {
+        const worldPos = this.menuRoot.getTransform().getWorldPosition();
+        this.menuRoot.setParent(this.findSceneRoot());
+        this.menuRoot.getTransform().setWorldPosition(worldPos);
+        this.applyAIContainerSceneRotation();
+      }
+      return;
+    }
+
     if (this.hasActiveAnchorTracking()) {
       const parent = this.menuRoot.getParent();
       if (isNull(parent) || parent !== this.widgetParent) {
@@ -1010,12 +1244,14 @@ export class AnchorController extends BaseScriptComponent {
     this.aiContainerWatchEvent = this.createEvent('UpdateEvent');
     this.aiContainerWatchEvent.bind(() => {
       this.maintainAIContainerAnchorBinding();
+      this.maintainTrashAnchorBinding();
       this.maybePersistAIContainerMove();
+      this.maybePersistTrashMove();
     });
   }
 
   private maybePersistAIContainerMove(): void {
-    if (isNull(this.menuRoot)) {
+    if (isNull(this.menuRoot) || !this.canPersistLayout()) {
       return;
     }
 
@@ -1036,7 +1272,7 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private persistAIContainerTransform(): void {
-    if (this.aiContainerPersistencePaused || this.startupRebindInProgress) {
+    if (!this.canPersistLayout()) {
       return;
     }
     if (isNull(this.menuRoot)) {
@@ -1045,24 +1281,32 @@ export class AnchorController extends BaseScriptComponent {
 
     const store = global.persistentStorageSystem.store;
     const worldPos = this.menuRoot.getTransform().getWorldPosition();
-    const anchorLocal = this.hasActiveAnchorTracking()
-      ? this.worldToWidgetLocal(worldPos, quat.quatIdentity())
-      : {
-          pos: this.menuRoot.getTransform().getLocalPosition(),
-        };
 
-    store.putFloat('ai_container_x', anchorLocal.pos.x);
-    store.putFloat('ai_container_y', anchorLocal.pos.y);
-    store.putFloat('ai_container_z', anchorLocal.pos.z);
     store.putFloat('ai_container_wx', worldPos.x);
     store.putFloat('ai_container_wy', worldPos.y);
     store.putFloat('ai_container_wz', worldPos.z);
     store.putBool('ai_container_has_data', true);
 
+    if (this.hasActiveAnchorTracking()) {
+      const anchorLocal = this.worldToWidgetLocal(worldPos, quat.quatIdentity());
+      store.putFloat('ai_container_x', anchorLocal.pos.x);
+      store.putFloat('ai_container_y', anchorLocal.pos.y);
+      store.putFloat('ai_container_z', anchorLocal.pos.z);
+      store.putBool('ai_container_uses_anchor_space', true);
+    }
+
     this.aiContainerFixedWorldPosition = worldPos;
     this.lastPersistedAIContainerWorld = worldPos;
     print(
-      `Saved AIContainer local: ${anchorLocal.pos.toString()} world: ${worldPos.toString()}`
+      `Saved AIContainer local: ${
+        this.hasActiveAnchorTracking()
+          ? new vec3(
+              store.getFloat('ai_container_x'),
+              store.getFloat('ai_container_y'),
+              store.getFloat('ai_container_z')
+            ).toString()
+          : '(world-only)'
+      } world: ${worldPos.toString()}`
     );
   }
 
@@ -1078,8 +1322,16 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
+    const storedInAnchorSpace =
+      store.has('ai_container_uses_anchor_space') &&
+      store.getBool('ai_container_uses_anchor_space');
+
     const useWorld =
-      useWorldSpace || !this.hasActiveAnchorTracking() || !store.has('ai_container_x');
+      useWorldSpace ||
+      !this.hasActiveAnchorTracking() ||
+      !storedInAnchorSpace ||
+      !store.has('ai_container_x');
+
     if (useWorld && store.has('ai_container_wx')) {
       const worldPos = new vec3(
         store.getFloat('ai_container_wx'),
@@ -1142,32 +1394,263 @@ export class AnchorController extends BaseScriptComponent {
     return root;
   }
 
-  private captureAndLockTrashAtDesk(): void {
+  private captureTrashInitialTransform(): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject) || !isNull(this.trashFixedWorldPosition)) {
+      return;
+    }
+
+    this.trashFixedWorldPosition = trashObject.getTransform().getWorldPosition();
+  }
+
+  private restoreTrashFromStorage(): void {
+    this.restoreTrashTransform(this.shouldRestoreAIContainerInWorldSpace());
+    this.trashRestoreApplied = true;
+  }
+
+  private applyTrashSavedPose(): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject) || isNull(this.trashFixedWorldPosition)) {
+      return;
+    }
+
+    trashObject.getTransform().setWorldPosition(this.trashFixedWorldPosition);
+  }
+
+  private maintainTrashAnchorBinding(): void {
     const trashObject = this.getTrashSceneObject();
     if (isNull(trashObject)) {
       return;
     }
 
-    if (isNull(this.trashFixedWorldPosition)) {
-      this.trashFixedWorldPosition = trashObject.getTransform().getWorldPosition();
-      this.trashFixedWorldRotation = trashObject.getTransform().getWorldRotation();
+    if (this.anchorRestorePending || this.startupRebindInProgress) {
+      return;
+    }
+
+    if (this.shouldKeepTrashInWorldRoot()) {
+      const parent = trashObject.getParent();
+      if (!isNull(parent) && parent === this.widgetParent) {
+        const worldPos = trashObject.getTransform().getWorldPosition();
+        trashObject.setParent(this.findSceneRoot());
+        trashObject.getTransform().setWorldPosition(worldPos);
+      }
+      return;
+    }
+
+    if (this.hasActiveAnchorTracking()) {
+      const parent = trashObject.getParent();
+      if (isNull(parent) || parent !== this.widgetParent) {
+        this.reparentTrashToAnchor();
+      }
+      return;
     }
 
     const parent = trashObject.getParent();
     if (!isNull(parent) && parent === this.widgetParent) {
+      const worldPos = trashObject.getTransform().getWorldPosition();
       trashObject.setParent(this.findSceneRoot());
+      trashObject.getTransform().setWorldPosition(worldPos);
     }
-
-    trashObject.getTransform().setWorldPosition(this.trashFixedWorldPosition);
-    trashObject.getTransform().setWorldRotation(this.trashFixedWorldRotation);
   }
 
-  private notifyTrashSpawnGrace(content: SceneObject): void {
+  private reparentTrashToAnchor(): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject) || !this.hasActiveAnchorTracking()) {
+      return;
+    }
+
+    const worldPos = trashObject.getTransform().getWorldPosition();
+    trashObject.setParent(this.widgetParent);
+    trashObject.getTransform().setWorldPosition(worldPos);
+    if (this.canPersistLayout()) {
+      this.persistTrashTransform();
+    }
+  }
+
+  private maybePersistTrashMove(): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject) || !this.canPersistLayout()) {
+      return;
+    }
+
+    this.trashPersistCooldown -= getDeltaTime();
+    if (this.trashPersistCooldown > 0) {
+      return;
+    }
+
+    const worldPos = trashObject.getTransform().getWorldPosition();
+    if (
+      !isNull(this.lastPersistedTrashWorld) &&
+      worldPos.distance(this.lastPersistedTrashWorld) <= this.trashMoveEpsilon
+    ) {
+      return;
+    }
+
+    this.trashPersistCooldown = this.trashPersistIntervalSec;
+    this.persistTrashTransform();
+  }
+
+  public persistTrashTransform(): void {
+    if (!this.canPersistLayout()) {
+      return;
+    }
+
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject)) {
+      return;
+    }
+
+    const store = global.persistentStorageSystem.store;
+    const worldPos = trashObject.getTransform().getWorldPosition();
+
+    store.putFloat('trash_bin_wx', worldPos.x);
+    store.putFloat('trash_bin_wy', worldPos.y);
+    store.putFloat('trash_bin_wz', worldPos.z);
+    store.putBool('trash_bin_has_data', true);
+
+    if (this.hasActiveAnchorTracking()) {
+      const anchorLocal = this.worldToWidgetLocal(worldPos, quat.quatIdentity());
+      store.putFloat('trash_bin_x', anchorLocal.pos.x);
+      store.putFloat('trash_bin_y', anchorLocal.pos.y);
+      store.putFloat('trash_bin_z', anchorLocal.pos.z);
+      store.putBool('trash_bin_uses_anchor_space', true);
+    }
+
+    this.trashFixedWorldPosition = worldPos;
+    this.lastPersistedTrashWorld = worldPos;
+    print(
+      `Saved TrashBin local: ${
+        this.hasActiveAnchorTracking()
+          ? new vec3(
+              store.getFloat('trash_bin_x'),
+              store.getFloat('trash_bin_y'),
+              store.getFloat('trash_bin_z')
+            ).toString()
+          : '(world-only)'
+      } world: ${worldPos.toString()}`
+    );
+  }
+
+  private restoreTrashTransform(useWorldSpace: boolean): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject)) {
+      return;
+    }
+
+    const store = global.persistentStorageSystem.store;
+    if (!store.has('trash_bin_has_data') || !store.getBool('trash_bin_has_data')) {
+      this.captureTrashInitialTransform();
+      this.lastPersistedTrashWorld = this.trashFixedWorldPosition;
+      return;
+    }
+
+    const storedInAnchorSpace =
+      store.has('trash_bin_uses_anchor_space') &&
+      store.getBool('trash_bin_uses_anchor_space');
+
+    const useWorld =
+      useWorldSpace || !this.hasActiveAnchorTracking() || !storedInAnchorSpace || !store.has('trash_bin_x');
+    if (useWorld && store.has('trash_bin_wx')) {
+      const worldPos = new vec3(
+        store.getFloat('trash_bin_wx'),
+        store.getFloat('trash_bin_wy'),
+        store.getFloat('trash_bin_wz')
+      );
+      const parent = trashObject.getParent();
+      if (!isNull(parent) && parent === this.widgetParent) {
+        trashObject.setParent(this.findSceneRoot());
+      }
+      trashObject.getTransform().setWorldPosition(worldPos);
+      this.trashFixedWorldPosition = worldPos;
+      this.lastPersistedTrashWorld = worldPos;
+      print(`Restored TrashBin (world) at ${worldPos.toString()}`);
+      return;
+    }
+
+    if (!store.has('trash_bin_x')) {
+      this.captureTrashInitialTransform();
+      this.lastPersistedTrashWorld = this.trashFixedWorldPosition;
+      print('Restored TrashBin from scene default (no saved data)');
+      return;
+    }
+
+    const localPos = new vec3(
+      store.getFloat('trash_bin_x'),
+      store.getFloat('trash_bin_y'),
+      store.getFloat('trash_bin_z')
+    );
+    trashObject.setParent(this.widgetParent);
+    trashObject.getTransform().setLocalPosition(localPos);
+
+    const worldPos = trashObject.getTransform().getWorldPosition();
+    this.trashFixedWorldPosition = worldPos;
+    this.lastPersistedTrashWorld = worldPos;
+    print(`Restored TrashBin (anchor-local) at world: ${worldPos.toString()}`);
+  }
+
+  private wireTrashBinMovement(): void {
+    const trash = this.trashBin as {
+      wireMoveInteraction?: () => void;
+    };
+    if (!isNull(trash) && typeof trash.wireMoveInteraction === 'function') {
+      trash.wireMoveInteraction();
+    }
+  }
+
+  private wireAIContainerMovement(): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    const persist = (): void => {
+      this.persistAIContainerTransform();
+    };
+
+    const scripts = this.menuRoot.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i] as ScriptComponent & {
+        onDragEnd?: { add: (cb: () => void) => void };
+        onTriggerEnd?: { add: (cb: () => void) => void };
+        onTriggerEndOutside?: { add: (cb: () => void) => void };
+        onInteractorTriggerEnd?: { add: (cb: () => void) => void };
+        onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
+        onTranslationEnd?: { add: (cb: () => void) => void };
+        onMoveEnd?: { add: (cb: () => void) => void };
+      };
+      if (isNull(script)) {
+        continue;
+      }
+
+      if (script.onTranslationEnd) {
+        script.onTranslationEnd.add(persist);
+      }
+      if (script.onMoveEnd) {
+        script.onMoveEnd.add(persist);
+      }
+      if (script.onDragEnd) {
+        script.onDragEnd.add(persist);
+      }
+      if (script.onTriggerEnd) {
+        script.onTriggerEnd.add(persist);
+      }
+      if (script.onTriggerEndOutside) {
+        script.onTriggerEndOutside.add(persist);
+      }
+      if (script.onInteractorTriggerEnd) {
+        script.onInteractorTriggerEnd.add(persist);
+      }
+      if (script.onInteractorTriggerEndOutside) {
+        script.onInteractorTriggerEndOutside.add(persist);
+      }
+    }
+  }
+
+  public notifyTrashSpawnGrace(content: SceneObject, graceSeconds = 2): void {
     const trash = this.trashBin as {
       notifySpawned?: (root: SceneObject, graceSeconds?: number) => void;
     };
     if (!isNull(trash) && typeof trash.notifySpawned === 'function') {
-      trash.notifySpawned(content, 2);
+      trash.notifySpawned(content, graceSeconds);
     }
   }
 
@@ -1437,8 +1920,9 @@ export class AnchorController extends BaseScriptComponent {
     if (objectKind === OBJECT_KIND_PLANT) {
       playInteractionSound((sounds) => sounds.playSpawnSeed());
     }
-    this.notifyTrashSpawnGrace(wrapper);
-    this.notifyTrashSpawnGrace(obj);
+    const spawnGraceSeconds = objectKind === OBJECT_KIND_POT ? 4 : 2;
+    this.notifyTrashSpawnGrace(wrapper, spawnGraceSeconds);
+    this.notifyTrashSpawnGrace(obj, spawnGraceSeconds);
     return obj;
   }
 
@@ -1497,19 +1981,32 @@ export class AnchorController extends BaseScriptComponent {
       `pinch up ${ANCHOR_CONTROLLER_VERSION} anchor=${!!this.currentAnchor} worldOnly=${this.usingWorldSpace} creating=${this.anchorCreationInProgress}`
     );
 
-    this.captureAndLockTrashAtDesk();
-    this.maintainAIContainerAnchorBinding();
+    if (!this.startupWorldOnlySession) {
+      this.maintainTrashAnchorBinding();
+      this.maintainAIContainerAnchorBinding();
+    }
     this.lockSpacePanelAtDesk();
     const releaseRoot = this.resolveReleasedTrackedRoot();
     this.activeManipulatedRoot = null;
     const trashedOnRelease = this.tryTrashTrackedOnRelease(releaseRoot);
 
-    if (!this.currentAnchor && !this.anchorCreationInProgress && this.objs.length > 0 && !this.usingWorldSpace) {
+    if (
+      !this.startupWorldOnlySession &&
+      !this.currentAnchor &&
+      !this.anchorCreationInProgress &&
+      this.objs.length > 0 &&
+      !this.usingWorldSpace
+    ) {
       this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
       return;
     }
 
-    this.restoredFromWorldFallback = false;
+    if (this.startupWorldOnlySession) {
+      this.usingWorldSpace = true;
+      this.restoredFromWorldFallback = true;
+    } else {
+      this.restoredFromWorldFallback = false;
+    }
     this.persistPlantTransforms();
     if (!this.anchorCreationInProgress && !trashedOnRelease) {
       playInteractionSound((sounds) => sounds.playPlaceObject());
@@ -1608,17 +2105,14 @@ export class AnchorController extends BaseScriptComponent {
         this.restoredFromWorldFallback = true;
         this.restoreAllObjects(true);
         this.ensureDeskAnchorForRestoredPlants();
-        this.restoreAIContainerFromStorage();
       } else {
         this.reparentPlantsToAnchor();
-        this.restoreAIContainerFromStorage();
       }
     } else {
       this.usingWorldSpace = true;
       this.restoredFromWorldFallback = true;
       this.anchorComponent.enabled = true;
       this.restoreAllObjects(true);
-      this.restoreAIContainerFromStorage();
     }
   }
 
@@ -1628,6 +2122,51 @@ export class AnchorController extends BaseScriptComponent {
     this.objs = [];
     this.objectKinds = [];
     this.objectPrefabIndices = [];
+  }
+
+  private deferSceneObjectDestruction(objects: SceneObject[]) {
+    objects.forEach((object) => {
+      if (!isNull(object)) {
+        object.enabled = false;
+      }
+    });
+
+    const destroyEvent = this.createEvent('DelayedCallbackEvent');
+    destroyEvent.bind(() => {
+      objects.forEach((object) => {
+        if (!isNull(object)) {
+          object.destroy();
+        }
+      });
+    });
+    destroyEvent.reset(0.5);
+  }
+
+  private keepAIControlButtonsVisible() {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+
+    this.menuRoot.enabled = true;
+    const stack: SceneObject[] = [this.menuRoot];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      if (
+        current.name === 'PlantBtns' ||
+        current.name === 'Btn Undo' ||
+        current.name === 'Btn Reset'
+      ) {
+        current.enabled = true;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
   }
 
   private restoreAllObjects(useWorldSpace: boolean): number {
@@ -1749,7 +2288,7 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${lastIndex}_object_kind`);
     store.putInt('widget_count', lastIndex);
 
-    this.wrappers[lastIndex].destroy();
+    this.deferSceneObjectDestruction([this.wrappers[lastIndex]]);
     this.wrappers.pop();
     this.objs.pop();
     this.objectKinds.pop();
@@ -1766,6 +2305,7 @@ export class AnchorController extends BaseScriptComponent {
 
   async resetAnchor() {
     print('Reset: deleting all anchors and clearing saved plants');
+    this.keepAIControlButtonsVisible();
     this.isResetting = true;
     this.sessionEpoch++;
     this.anchorRestorePending = false;
@@ -1799,11 +2339,16 @@ export class AnchorController extends BaseScriptComponent {
     store.remove('uses_anchor_space');
     store.remove('preferred_anchor_id');
 
-    this.clearSpawnedObjects();
+    const objectsToDestroy = this.wrappers.slice();
+    this.wrappers = [];
+    this.objs = [];
+    this.objectKinds = [];
+    this.objectPrefabIndices = [];
     if (this.floatingRoot) {
-      this.floatingRoot.destroy();
+      objectsToDestroy.push(this.floatingRoot);
       this.floatingRoot = undefined;
     }
+    this.deferSceneObjectDestruction(objectsToDestroy);
 
     if (this.anchorSession) {
       const worldAnchor = anchorToDelete as WorldAnchor | undefined;
@@ -1838,6 +2383,10 @@ export class AnchorController extends BaseScriptComponent {
     this.isResetting = false;
     this.anchorSaveInProgress = false;
     this.textlog.text = 'Desk reset';
+    this.keepAIControlButtonsVisible();
+    const restoreControlsEvent = this.createEvent('DelayedCallbackEvent');
+    restoreControlsEvent.bind(() => this.keepAIControlButtonsVisible());
+    restoreControlsEvent.reset(0.2);
   }
 
   private persistPlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
