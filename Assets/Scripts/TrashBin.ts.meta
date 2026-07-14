@@ -30,6 +30,7 @@
     debugLogging: false
     destroyOverlapCooldown: false
     fitVisualRadiusMultiplier: false
+    grabCollider: false
     trashColliderRadius: false
     trashRadius: false
     triggerCollider: false
@@ -44,6 +45,7 @@
     []
   DefaultScriptInputs:
     - triggerCollider: !<reference.ColliderComponent> 00000000-0000-0000-0000-000000000000
+      grabCollider: !<reference.ColliderComponent> 00000000-0000-0000-0000-000000000000
       anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       trashRadius: !<float> 14.000000
       trashColliderRadius: !<float> 26.000000
@@ -56,6 +58,7 @@
       {}
   InputLines:
     - // @input Component.ColliderComponent triggerCollider
+    - // @input Component.ColliderComponent grabCollider
     - // @input Component.ScriptComponent anchorController
     - // @input float trashRadius = 12
     - // @input float trashColliderRadius = 1

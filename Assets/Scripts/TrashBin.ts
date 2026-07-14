@@ -19,6 +19,7 @@ type InteractableLike = ScriptComponent & {
   onInteractorTriggerEnd?: { add: (cb: () => void) => void };
   onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
   targetingMode?: number;
+  ignoreInteractionPlane?: boolean;
 };
 
 type InteractableManipulationLike = ScriptComponent & {
@@ -46,6 +47,10 @@ export class TrashBin extends BaseScriptComponent {
   @input
   @allowUndefined
   triggerCollider!: ColliderComponent;
+
+  @input
+  @allowUndefined
+  grabCollider!: ColliderComponent;
 
   @input
   @allowUndefined
@@ -89,6 +94,7 @@ export class TrashBin extends BaseScriptComponent {
   private bindAttempts = 0;
 
   onAwake(): void {
+    this.ensureGrabCollider();
     const collider = this.getTriggerCollider();
     if (!isNull(collider)) {
       collider.onOverlapEnter.add((eventArgs: OverlapEnterEventArgs) => {
@@ -106,6 +112,9 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   public wireMoveInteraction(): void {
+    this.moveInteractionWired = false;
+    this.bindAttempts = 0;
+    this.ensureGrabCollider();
     this.tryWireMoveInteraction();
   }
 
@@ -125,12 +134,134 @@ export class TrashBin extends BaseScriptComponent {
     return false;
   }
 
+  private ensureGrabCollider(): ColliderComponent | null {
+    const existing = this.getGrabCollider();
+    if (!isNull(existing)) {
+      this.configureGrabCollider(existing);
+      return existing;
+    }
+
+    const root = this.getSceneObject();
+    let grabCollider = root.getComponent('Component.ColliderComponent');
+    const trigger = this.getTriggerCollider();
+    if (!isNull(grabCollider) && grabCollider === trigger) {
+      grabCollider = null;
+    }
+
+    if (isNull(grabCollider)) {
+      const colliders = root.getComponents('Component.ColliderComponent');
+      for (let i = 0; i < colliders.length; i++) {
+        const candidate = colliders[i];
+        if (isNull(candidate) || candidate === trigger) {
+          continue;
+        }
+        grabCollider = candidate;
+        break;
+      }
+    }
+
+    if (isNull(grabCollider)) {
+      grabCollider = root.createComponent('Component.ColliderComponent');
+    }
+
+    this.grabCollider = grabCollider;
+    this.configureGrabCollider(grabCollider);
+    this.debugLog('configured tangible grab collider on trash root');
+    return grabCollider;
+  }
+
+  private configureGrabCollider(collider: ColliderComponent): void {
+    if (isNull(collider)) {
+      return;
+    }
+
+    const colliderLike = collider as unknown as {
+      intangible?: boolean;
+      forceCompound?: boolean;
+      shape?: { radius?: number; FitVisual?: boolean };
+    };
+    colliderLike.intangible = false;
+    colliderLike.forceCompound = true;
+
+    const trigger = this.getTriggerCollider();
+    if (!isNull(trigger)) {
+      const triggerLike = trigger as unknown as { forceCompound?: boolean };
+      triggerLike.forceCompound = true;
+    }
+
+    if (!colliderLike.shape) {
+      colliderLike.shape = { radius: 40, FitVisual: false };
+    } else {
+      colliderLike.shape.FitVisual = false;
+      if (!colliderLike.shape.radius || colliderLike.shape.radius < 20) {
+        colliderLike.shape.radius = 40;
+      }
+    }
+  }
+
+  private getGrabCollider(): ColliderComponent | null {
+    if (!isNull(this.grabCollider)) {
+      return this.grabCollider;
+    }
+
+    const trigger = this.getTriggerCollider();
+    const root = this.getSceneObject();
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const colliders = current.getComponents('Component.ColliderComponent');
+      for (let i = 0; i < colliders.length; i++) {
+        const collider = colliders[i];
+        if (isNull(collider) || collider === trigger) {
+          continue;
+        }
+
+        const intangible = (collider as unknown as { intangible?: boolean }).intangible;
+        if (intangible === false) {
+          this.grabCollider = collider;
+          return collider;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
+  }
+
+  private findChildByName(root: SceneObject, name: string): SceneObject | null {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      if (String(current.name) === name) {
+        return current;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
+  }
+
   private tryWireMoveInteraction(): void {
     if (this.moveInteractionWired) {
       return;
     }
 
     const root = this.getSceneObject();
+    this.ensureGrabCollider();
     const manipulation = this.findManipulationScript(root);
     const interactable = this.findInteractableScript(root);
     if (isNull(manipulation) || isNull(interactable)) {
@@ -159,6 +290,16 @@ export class TrashBin extends BaseScriptComponent {
       this.persistTrashAnchorTransform();
     };
 
+    if (interactable.onDragStart) {
+      interactable.onDragStart.add(() => this.markTrashBeingMoved(root));
+    }
+    if (interactable.onTriggerStart) {
+      interactable.onTriggerStart.add(() => this.markTrashBeingMoved(root));
+    }
+    if (interactable.onInteractorTriggerStart) {
+      interactable.onInteractorTriggerStart.add(() => this.markTrashBeingMoved(root));
+    }
+
     if (interactable.onDragEnd) {
       interactable.onDragEnd.add(onRelease);
     }
@@ -175,7 +316,22 @@ export class TrashBin extends BaseScriptComponent {
       interactable.onInteractorTriggerEndOutside.add(onRelease);
     }
 
+    interactable.targetingMode = 7;
+    interactable.ignoreInteractionPlane = true;
+
     this.moveInteractionWired = true;
+    const grabCollider = this.getGrabCollider();
+    const grabScale = !isNull(grabCollider)
+      ? grabCollider.getSceneObject().getTransform().getWorldScale()
+      : root.getTransform().getWorldScale();
+    const grabScaleMax = Math.max(grabScale.x, grabScale.y, grabScale.z);
+    const grabShape = !isNull(grabCollider)
+      ? (grabCollider as unknown as { shape?: { radius?: number } }).shape
+      : undefined;
+    const grabRadius = grabShape && grabShape.radius ? grabShape.radius * grabScaleMax : 0;
+    print(
+      `TrashBin move interaction wired (grab radius ~${grabRadius.toFixed(1)} world units)`
+    );
     this.debugLog('move interaction wired');
   }
 
@@ -183,6 +339,15 @@ export class TrashBin extends BaseScriptComponent {
     const handler = this.getAnchorTrashHandler();
     if (!isNull(handler) && typeof handler.persistTrashTransform === 'function') {
       handler.persistTrashTransform();
+    }
+  }
+
+  private markTrashBeingMoved(root: SceneObject): void {
+    const handler = this.getAnchorTrashHandler() as {
+      setActiveManipulatedRoot?: (root: SceneObject | null) => void;
+    };
+    if (!isNull(handler) && typeof handler.setActiveManipulatedRoot === 'function') {
+      handler.setActiveManipulatedRoot(root);
     }
   }
 
@@ -201,7 +366,8 @@ export class TrashBin extends BaseScriptComponent {
           !isNull(candidate) &&
           candidate.targetingMode !== undefined &&
           (candidate.onTriggerStart !== undefined ||
-            candidate.onInteractorTriggerStart !== undefined)
+            candidate.onInteractorTriggerStart !== undefined ||
+            candidate.onDragStart !== undefined)
         ) {
           return candidate;
         }
@@ -552,7 +718,7 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     const destroyRoot = this.findDestroyRoot(otherObject);
-    if (isNull(destroyRoot)) {
+    if (isNull(destroyRoot) || this.isWaterDestroyRoot(destroyRoot)) {
       return;
     }
 
@@ -617,6 +783,10 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
+    if (!deliberate && this.isWaterDestroyRoot(destroyRoot)) {
+      return;
+    }
+
     const label = destroyRoot.name;
     const trackedRoot = this.getTrackedContentRoot(destroyRoot);
     const isTracked =
@@ -663,6 +833,18 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     return handler.destroyTrackedObject(candidate);
+  }
+
+  private isWaterDestroyRoot(destroyRoot: SceneObject): boolean {
+    if (isNull(destroyRoot)) {
+      return false;
+    }
+
+    if (!isNull(this.findWateringObject(destroyRoot))) {
+      return true;
+    }
+
+    return this.isLooseWaterLikeObject(destroyRoot);
   }
 
   private findDestroyRoot(sceneObject: SceneObject): SceneObject | null {

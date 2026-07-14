@@ -36,7 +36,9 @@
     plantConfigs: false
     plantPrefab: false
     plantSeedTrack: false
+    planterRoot: false
     potPrefabs: false
+    seedsRoot: false
     soundDebugLogging: false
     soundVolume: false
     spacePanel: false
@@ -46,6 +48,7 @@
     specsApi: false
     textlog: false
     trashBin: false
+    waterSourceRoot: false
     wateringTrack: false
     widgetParent: false
   ScriptTypesHidden:
@@ -79,6 +82,9 @@
       spawnWaterTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       placeObjectTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       trashBin: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      waterSourceRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      planterRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      seedsRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
@@ -105,5 +111,8 @@
     - // @input Asset.AudioTrackAsset spawnWaterTrack
     - // @input Asset.AudioTrackAsset placeObjectTrack
     - // @input Component.ScriptComponent trashBin
+    - // @input SceneObject waterSourceRoot
+    - // @input SceneObject planterRoot
+    - // @input SceneObject seedsRoot
     - // @input Component.ScriptComponent spacePanel
     - // @input AssignableType_3 specsApi

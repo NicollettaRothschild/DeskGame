@@ -2563,6 +2563,9 @@
       spawnWaterTrack: !<reference.AudioTrackAsset> 18682cb4-7f4d-41cb-a3b4-c8074ca2def9
       placeObjectTrack: !<reference.AudioTrackAsset> 0c246528-b9e9-4db2-97d5-46649ae9f36b
       trashBin: !<reference.ScriptComponent> d119e162-8ef7-47b7-9485-da37a530ce5c
+      waterSourceRoot: !<reference.SceneObject> bcbb9be7-d298-4132-a5c8-1ef0b9e78dab
+      planterRoot: !<reference.SceneObject> 7c7350dc-41a2-4426-a5bb-047d14525a11
+      seedsRoot: !<reference.SceneObject> 8ee0f565-368b-4fd9-957d-8e90c5fb48d2
       spacePanel: !<reference.ScriptComponent> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
       specsApi: !<MappingBased.AssignableType_3> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
   ScriptTypes:
@@ -4960,7 +4963,6 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    - !<own> c7d8e9f0-a1b2-4c3d-8e9f-0a1b2c3d4e5f
     - !<own> f0a1b2c3-d4e5-4f6a-8b9c-0d1e2f3a4b5c
     - !<own> a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
     - !<own> a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d
@@ -5225,8 +5227,8 @@
   Name: Physics Collider
   Enabled: true
   Shape: !<Sphere>
-    FitVisual: true
-    Radius: 2.000000
+    FitVisual: false
+    Radius: 12.000000
   Matter: !<reference> 00000000-0000-0000-0000-000000000000
   Filter: !<reference> 00000000-0000-0000-0000-000000000000
   OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
@@ -5234,8 +5236,26 @@
   EnableSmoothing: false
   PositionTension: 30.000000
   RotationTension: 30.000000
-  ForceCompound: false
+  ForceCompound: true
   Intangible: true
+  ShowCollider: false
+- !<ColliderComponent/a2e09784-8c9c-4646-adb4-47507bebbe14>
+  PrefabRemaps:
+    []
+  Name: Grab Collider
+  Enabled: true
+  Shape: !<Sphere>
+    FitVisual: false
+    Radius: 40.000000
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: true
+  Intangible: false
   ShowCollider: false
 - !<SceneObject/b6e328d0-13c3-46af-9bbf-962fcc24f472>
   PrefabRemaps:
@@ -5291,26 +5311,6 @@
     LineSpacing: 1.150000
     CapitalizationOverride: None
   EnableBatching: false
-- !<RenderMeshVisual/b8c9d0e1-f2a3-4b5c-8d9e-0f1a2b3c4d5e>
-  PrefabRemaps:
-    []
-  Name: Render Mesh Visual
-  Enabled: true
-  RenderOrder: -5
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> a9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d
-  Mesh: !<reference> 3799b093-633d-48bc-842e-fc20750539b9
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
 - !<SceneObject/b8fb477f-8bd7-47a3-bfb9-ea5f540cc57b>
   PrefabRemaps:
     []
@@ -5846,21 +5846,6 @@
     - !<own> d66ceeee-d0b3-4a42-8873-f6b93eb79967
   Components:
     []
-- !<SceneObject/c7d8e9f0-a1b2-4c3d-8e9f-0a1b2c3d4e5f>
-  PrefabRemaps:
-    []
-  Name: AIChatBackground
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.350000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 32.000000, y: 15.000000, z: 0.200000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> b8c9d0e1-f2a3-4b5c-8d9e-0f1a2b3c4d5e
 - !<SceneObject/c817f8c8-9a78-4af5-9cd1-3d065547a941>
   PrefabRemaps:
     []
@@ -6211,10 +6196,11 @@
   ScriptInputs:
     "":
       triggerCollider: !<reference.ColliderComponent> b6c77a4d-f512-4ac7-b655-81504f93fe0c
+      grabCollider: !<reference.ColliderComponent> a2e09784-8c9c-4646-adb4-47507bebbe14
       anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
       trashRadius: !<float> 12.000000
       trashColliderRadius: !<float> 1.000000
-      fitVisualRadiusMultiplier: !<float> 3.000000
+      fitVisualRadiusMultiplier: !<float> 1.200000
       useProximityTrash: false
       destroyOverlapCooldown: 0.350000
       debugLogging: false
@@ -8279,6 +8265,7 @@
     - !<own> d119e162-8ef7-47b7-9485-da37a530ce5c
     - !<own> 8f4e2a11-6b3c-4d5e-9f01-000000000001
     - !<own> 9a5f3b22-7c4d-5e6f-a012-000000000002
+    - !<own> a2e09784-8c9c-4646-adb4-47507bebbe14
 - !<ScriptComponent/8f4e2a11-6b3c-4d5e-9f01-000000000001>
   PrefabRemaps:
     []
@@ -8302,10 +8289,10 @@
     {}
   ScriptInputs:
     "":
-      targetingMode: !<float> 3.000000
+      targetingMode: !<float> 7.000000
       targetingVisual: !<float> 1.000000
-      ignoreInteractionPlane: false
-      keepHoverOnTrigger: false
+      ignoreInteractionPlane: true
+      keepHoverOnTrigger: true
       enableInstantDrag: true
       isScrollable: false
       allowMultipleInteractors: true
@@ -8354,7 +8341,7 @@
       enableStretchZ: false
       zStretchFactorMin: !<float> 1.000000
       zStretchFactorMax: !<float> 12.000000
-      useFilter: true
+      useFilter: false
       showTranslationProperties: false
       _enableXTranslation: true
       _enableYTranslation: true

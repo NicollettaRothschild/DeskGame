@@ -1031,7 +1031,6 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.setTextObjectVisible(this.transcriptText3D, visible);
     this.setTextObjectVisible(this.agentResponseText3D, visible);
     this.setTextObjectVisible(this.agentChatTitleText3D, visible);
-    this.hideAgentChatBackgroundQuad();
     if (visible) {
       this.setNotesBody('');
       this.setNotesTitle('');
@@ -1054,20 +1053,6 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     const textObject = text3d.getSceneObject();
     if (!isNull(textObject)) {
       textObject.enabled = visible;
-    }
-  }
-
-  private hideAgentChatBackgroundQuad(): void {
-    if (isNull(this.agentChatRoot)) {
-      return;
-    }
-
-    for (let i = 0; i < this.agentChatRoot.getChildrenCount(); i++) {
-      const child = this.agentChatRoot.getChild(i);
-      if (!isNull(child) && String(child.name) === 'AIChatBackground') {
-        child.enabled = false;
-        return;
-      }
     }
   }
 

@@ -12,7 +12,28 @@ import { InteractionSoundRegistry, playInteractionSound } from './InteractionSou
 import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
 import { SpecsApiClient } from './SpecsApiClient';
 
-const ANCHOR_CONTROLLER_VERSION = 'v19-stable-no-voice';
+const ANCHOR_CONTROLLER_VERSION = 'v25-trash-grab-root';
+const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
+const GARDEN_SOURCE_SCENE_DEFAULTS: Record<
+  string,
+  { pos: vec3; rot: quat; scale: vec3 }
+> = {
+  'Water Source': {
+    pos: new vec3(14.318802, -20.641001, -79.9077),
+    rot: quat.quatIdentity(),
+    scale: new vec3(10, 10, 10),
+  },
+  Planter: {
+    pos: new vec3(34.397942, -20.640976, -79.907722),
+    rot: quat.quatIdentity(),
+    scale: new vec3(8, 8, 8),
+  },
+  Seeds: {
+    pos: new vec3(55.521027, -20.640976, -79.907722),
+    rot: quat.quatIdentity(),
+    scale: new vec3(8, 8, 8),
+  },
+};
 const STARTUP_REBIND_DELAY_SEC = 0.35;
 const STARTUP_PERSIST_DELAY_SEC = 0.5;
 const WORLD_PREVIEW_REBIND_DELAY_SEC = 1;
@@ -88,6 +109,18 @@ export class AnchorController extends BaseScriptComponent {
 
   @input
   @allowUndefined
+  waterSourceRoot!: SceneObject;
+
+  @input
+  @allowUndefined
+  planterRoot!: SceneObject;
+
+  @input
+  @allowUndefined
+  seedsRoot!: SceneObject;
+
+  @input
+  @allowUndefined
   spacePanel!: ScriptComponent;
 
   @input
@@ -139,6 +172,10 @@ export class AnchorController extends BaseScriptComponent {
   private lastSaveObjectPositionAt = -1;
   private readonly saveObjectPositionCooldownSec = 0.1;
   private trashReleaseWiredObjects: SceneObject[] = [];
+  private gardenSpawnSourceDefaults = new Map<
+    string,
+    { pos: vec3; rot: quat; scale: vec3 }
+  >();
 
   onAwake() {
     this.setupInteractionSounds();
@@ -166,6 +203,8 @@ export class AnchorController extends BaseScriptComponent {
   async onStart() {
     this.setupInteractionSounds();
     print(`AnchorController ${ANCHOR_CONTROLLER_VERSION} starting`);
+    this.captureGardenSpawnSourceDefaults();
+    this.restoreGardenSpawnSourcesLayout('startup');
 
     const store = global.persistentStorageSystem.store;
     const editorPreview = this.isEditorPreviewSession();
@@ -195,6 +234,8 @@ export class AnchorController extends BaseScriptComponent {
         this.restoreAIContainerFromStorage();
       }
       this.applyAIContainerSavedPose();
+      this.wireTrashBinMovement();
+      this.restoreGardenSpawnSourcesLayout('minimal-boot');
       this.hasRestored = true;
       this.textlog.text =
         this.objs.length > 0
@@ -1394,6 +1435,185 @@ export class AnchorController extends BaseScriptComponent {
     return root;
   }
 
+  private getSceneSearchRoots(): SceneObject[] {
+    const roots: SceneObject[] = [];
+    const candidates = [
+      this.camera,
+      this.widgetParent,
+      this.menuRoot,
+      this.waterSourceRoot,
+      this.planterRoot,
+      this.seedsRoot,
+      this.getTrashSceneObject(),
+      this.getSceneObject(),
+    ];
+
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      if (isNull(candidate)) {
+        continue;
+      }
+
+      let top = candidate;
+      while (!isNull(top.getParent())) {
+        top = top.getParent();
+      }
+
+      let alreadyListed = false;
+      for (let j = 0; j < roots.length; j++) {
+        if (roots[j] === top) {
+          alreadyListed = true;
+          break;
+        }
+      }
+      if (!alreadyListed) {
+        roots.push(top);
+      }
+    }
+
+    return roots;
+  }
+
+  private findSceneObjectByName(root: SceneObject, name: string): SceneObject | null {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      if (String(current.name) === name) {
+        return current;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
+  }
+
+  private findGardenSpawnSource(name: string): SceneObject | null {
+    if (name === 'Water Source' && !isNull(this.waterSourceRoot)) {
+      return this.waterSourceRoot;
+    }
+    if (name === 'Planter' && !isNull(this.planterRoot)) {
+      return this.planterRoot;
+    }
+    if (name === 'Seeds' && !isNull(this.seedsRoot)) {
+      return this.seedsRoot;
+    }
+    const searchRoots = this.getSceneSearchRoots();
+    for (let i = 0; i < searchRoots.length; i++) {
+      const found = this.findSceneObjectByName(searchRoots[i], name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+  private isGardenSpawnSourceObject(candidate: SceneObject): boolean {
+    if (isNull(candidate)) {
+      return false;
+    }
+
+    let current: SceneObject | null = candidate;
+    while (!isNull(current)) {
+      const name = String(current.name || '');
+      for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
+        if (name === GARDEN_SPAWN_SOURCE_NAMES[i]) {
+          return true;
+        }
+      }
+      current = current.getParent();
+    }
+
+    return false;
+  }
+
+  private captureGardenSpawnSourceDefaults(): void {
+    if (this.gardenSpawnSourceDefaults.size > 0) {
+      return;
+    }
+
+    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
+      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+      const source = this.findGardenSpawnSource(name);
+      if (isNull(source)) {
+        continue;
+      }
+
+      const sceneRoot = this.findSceneRoot();
+      const parent = source.getParent();
+      const sceneDefault = GARDEN_SOURCE_SCENE_DEFAULTS[name];
+      if (
+        !isNull(sceneDefault) &&
+        (isNull(parent) || parent !== sceneRoot)
+      ) {
+        this.gardenSpawnSourceDefaults.set(name, sceneDefault);
+        continue;
+      }
+
+      const transform = source.getTransform();
+      this.gardenSpawnSourceDefaults.set(name, {
+        pos: transform.getWorldPosition(),
+        rot: transform.getWorldRotation(),
+        scale: transform.getWorldScale(),
+      });
+    }
+  }
+
+  private enableSceneObjectTree(node: SceneObject): void {
+    if (isNull(node)) {
+      return;
+    }
+
+    node.enabled = true;
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      this.enableSceneObjectTree(node.getChild(i));
+    }
+  }
+
+  private restoreGardenSpawnSourcesLayout(reason: string): void {
+    const sceneRoot = this.findSceneRoot();
+    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
+      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+      const source = this.findGardenSpawnSource(name);
+      if (isNull(source)) {
+        print(`Garden source missing: ${name} (${reason})`);
+        continue;
+      }
+
+      if (source.getParent() !== sceneRoot) {
+        source.setParent(sceneRoot);
+      }
+      this.enableSceneObjectTree(source);
+
+      const defaults =
+        this.gardenSpawnSourceDefaults.get(name) ||
+        GARDEN_SOURCE_SCENE_DEFAULTS[name];
+      if (!defaults) {
+        continue;
+      }
+
+      source.getTransform().setWorldPosition(defaults.pos);
+      source.getTransform().setWorldRotation(defaults.rot);
+      source.getTransform().setWorldScale(defaults.scale);
+
+      const worldPos = source.getTransform().getWorldPosition();
+      print(
+        `Garden source ${name} ready (${reason}) at world: {x: ${worldPos.x}, y: ${worldPos.y}, z: ${worldPos.z}}`
+      );
+    }
+  }
+
+  private restoreGardenSpawnSourcesAfterReset(): void {
+    this.restoreGardenSpawnSourcesLayout('reset');
+  }
+
   private captureTrashInitialTransform(): void {
     const trashObject = this.getTrashSceneObject();
     if (isNull(trashObject) || !isNull(this.trashFixedWorldPosition)) {
@@ -2359,7 +2579,14 @@ export class AnchorController extends BaseScriptComponent {
         } catch (e) {
           print('Could not delete active anchor: ' + e);
         }
-        worldAnchor._sceneObject.destroy();
+        const anchorObject = worldAnchor._sceneObject;
+        if (
+          !isNull(anchorObject) &&
+          anchorObject !== this.widgetParent &&
+          !this.isGardenSpawnSourceObject(anchorObject)
+        ) {
+          anchorObject.destroy();
+        }
       }
 
       try {
@@ -2382,6 +2609,8 @@ export class AnchorController extends BaseScriptComponent {
     this.nextPlantSpawnIndex = 0;
     this.isResetting = false;
     this.anchorSaveInProgress = false;
+    this.restoreGardenSpawnSourcesAfterReset();
+    this.wireTrashBinMovement();
     this.textlog.text = 'Desk reset';
     this.keepAIControlButtonsVisible();
     const restoreControlsEvent = this.createEvent('DelayedCallbackEvent');
