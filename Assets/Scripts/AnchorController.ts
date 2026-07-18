@@ -12,8 +12,34 @@ import { InteractionSoundRegistry, playInteractionSound } from './InteractionSou
 import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
 import { SpecsApiClient } from './SpecsApiClient';
 
-const ANCHOR_CONTROLLER_VERSION = 'v25-trash-grab-root';
+const ANCHOR_CONTROLLER_VERSION = 'v27-seeds-template-hidden';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
+const SEEDS_STATIC_CHILD_NAMES = new Set([
+  'Pot1',
+  'Cube',
+  'Dirt',
+  'Pot3',
+  'Pot2',
+  'Seed',
+  'SeedSack',
+  'Backpack',
+]);
+const SEEDS_HIDDEN_CHILD_NAMES = new Set([
+  'Seed',
+  'Pot1',
+  'Pot2',
+  'Pot3',
+  'Dirt',
+  'Backpack',
+]);
+const SEEDS_VISIBLE_CHILD_NAMES = new Set(['SeedSack', 'Cube']);
+const AI_DESK_CONTROL_BUTTON_NAMES = ['Btn Undo', 'Btn Reset'];
+const AI_LEGACY_PLANT_BUTTON_NAMES = [
+  'Btn Place Plant',
+  'Btn Tulip',
+  'Btn Narcissus',
+  'Btn Ranunculus',
+];
 const GARDEN_SOURCE_SCENE_DEFAULTS: Record<
   string,
   { pos: vec3; rot: quat; scale: vec3 }
@@ -1566,14 +1592,40 @@ export class AnchorController extends BaseScriptComponent {
     }
   }
 
-  private enableSceneObjectTree(node: SceneObject): void {
+  private disableSceneObjectTree(node: SceneObject): void {
     if (isNull(node)) {
       return;
     }
 
-    node.enabled = true;
+    node.enabled = false;
     for (let i = 0; i < node.getChildrenCount(); i++) {
-      this.enableSceneObjectTree(node.getChild(i));
+      this.disableSceneObjectTree(node.getChild(i));
+    }
+  }
+
+  private sanitizeGardenSpawnSourcePresentation(
+    source: SceneObject,
+    sourceName: string
+  ): void {
+    if (sourceName !== 'Seeds') {
+      return;
+    }
+
+    for (let i = 0; i < source.getChildrenCount(); i++) {
+      const child = source.getChild(i);
+      if (isNull(child)) {
+        continue;
+      }
+
+      const childName = String(child.name || '');
+      if (SEEDS_HIDDEN_CHILD_NAMES.has(childName)) {
+        this.disableSceneObjectTree(child);
+      } else if (SEEDS_VISIBLE_CHILD_NAMES.has(childName)) {
+        child.enabled = true;
+      } else if (!SEEDS_STATIC_CHILD_NAMES.has(childName)) {
+        child.destroy();
+        i--;
+      }
     }
   }
 
@@ -1590,7 +1642,8 @@ export class AnchorController extends BaseScriptComponent {
       if (source.getParent() !== sceneRoot) {
         source.setParent(sceneRoot);
       }
-      this.enableSceneObjectTree(source);
+      source.enabled = true;
+      this.sanitizeGardenSpawnSourcePresentation(source, name);
 
       const defaults =
         this.gardenSpawnSourceDefaults.get(name) ||
@@ -2375,12 +2428,13 @@ export class AnchorController extends BaseScriptComponent {
         continue;
       }
 
-      if (
-        current.name === 'PlantBtns' ||
-        current.name === 'Btn Undo' ||
-        current.name === 'Btn Reset'
-      ) {
+      const name = String(current.name || '');
+      if (name === 'PlantBtns') {
         current.enabled = true;
+      } else if (AI_DESK_CONTROL_BUTTON_NAMES.indexOf(name) >= 0) {
+        current.enabled = true;
+      } else if (AI_LEGACY_PLANT_BUTTON_NAMES.indexOf(name) >= 0) {
+        current.enabled = false;
       }
 
       for (let i = 0; i < current.getChildrenCount(); i++) {

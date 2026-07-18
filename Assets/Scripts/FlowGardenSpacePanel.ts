@@ -120,7 +120,12 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private panelLockEvent: UpdateEvent | null = null;
   private agentViewActive = false;
   private agentChatFieldsShown = false;
-  private readonly agentLegacyUiNames = ['Btn Place Plant', 'PlantBtns'];
+  private readonly agentLegacyUiNames = [
+    'Btn Place Plant',
+    'Btn Tulip',
+    'Btn Narcissus',
+    'Btn Ranunculus',
+  ];
   private agentFrameComponent: AgentFrameLike | null = null;
   private agentFrameInitBound = false;
   private agentFrameReady = false;
@@ -1116,15 +1121,22 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       return;
     }
 
-    for (let i = 0; i < this.agentChatRoot.getChildrenCount(); i++) {
-      const child = this.agentChatRoot.getChild(i);
-      if (isNull(child)) {
-        continue;
-      }
-      const name = String(child.name || '');
-      if (this.agentLegacyUiNames.indexOf(name) >= 0) {
-        this.disableSceneObjectTree(child);
-      }
+    this.suppressLegacyUiInTree(this.agentChatRoot);
+  }
+
+  private suppressLegacyUiInTree(node: SceneObject): void {
+    if (isNull(node)) {
+      return;
+    }
+
+    const name = String(node.name || '');
+    if (this.agentLegacyUiNames.indexOf(name) >= 0) {
+      this.disableSceneObjectTree(node);
+      return;
+    }
+
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      this.suppressLegacyUiInTree(node.getChild(i));
     }
   }
 
