@@ -16,7 +16,7 @@
   FrustumCullPad: 0.000000
   InstanceCount: 1
   Defines:
-    []
+    - ENABLE_BASE_TEX
   BlendMode: Add
   Properties:
     Port_AO_N006:
@@ -24,7 +24,7 @@
       value: {x: 1.000000, y: 1.000000, z: 1.000000}
     Port_Emissive_N006:
       typeIdx: 4
-      value: {x: 1.000000, y: 0.820000, z: 0.120000}
+      value: {x: 0.900000, y: 0.720000, z: 0.100000}
     Port_SpecularAO_N006:
       typeIdx: 4
       value: {x: 1.000000, y: 1.000000, z: 1.000000}
@@ -33,7 +33,19 @@
       value: 0
     baseColor:
       typeIdx: 5
-      value: {x: 1.000000, y: 0.900000, z: 0.150000, w: 0.350000}
+      value: {x: 1.000000, y: 0.860000, z: 0.100000, w: 0.280000}
+    baseTex:
+      typeIdx: 9
+      value:
+        id: 59563bab-9bcf-488c-b1ff-d348fa0e5ef8
+        sampler:
+          filteringMode: Trilinear
+          wrapModeU: ClampToEdge
+          wrapModeV: ClampToEdge
+          wrapModeW: ClampToEdge
+          borderColor: {x: 1.000000, y: 0.860000, z: 0.100000, w: 0.280000}
+          mipmaps: false
+        type: Texture2D
     metallic:
       typeIdx: 1
       value: 0.000000

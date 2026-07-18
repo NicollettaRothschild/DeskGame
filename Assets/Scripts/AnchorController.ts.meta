@@ -32,6 +32,7 @@
     growthCompleteTrack: false
     growthStartTrack: false
     menuRoot: false
+    moveHandleGlowMaterial: false
     moveHandleMaterial: false
     placeObjectTrack: false
     plantConfigs: false
@@ -93,6 +94,7 @@
       sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       sackTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
       moveHandleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      moveHandleGlowMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
@@ -125,3 +127,4 @@
     - // @input Asset.Material sackMaterial
     - // @input Asset.Texture sackTexture
     - // @input Asset.Material moveHandleMaterial
+    - // @input Asset.Material moveHandleGlowMaterial

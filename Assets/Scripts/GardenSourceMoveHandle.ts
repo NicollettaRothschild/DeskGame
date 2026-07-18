@@ -60,7 +60,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
   glowMaterial!: Material;
 
   private moveInteractionWired = false;
-  private clonedGlowMaterial: Material | null = null;
+  private clonedOuterGlowMaterial: Material | null = null;
   private bindAttempts = 0;
   private moveActive = false;
   private spawnInteractable: InteractableLike | null = null;
@@ -73,6 +73,12 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       this.applyHandleVisual(this.getSceneObject());
       this.tryWireMoveInteraction();
     });
+
+    const retryVisual = this.createEvent('DelayedCallbackEvent');
+    retryVisual.bind(() => {
+      this.applyHandleVisual(this.getSceneObject());
+    });
+    retryVisual.reset(0.25);
   }
 
   public wireMoveInteraction(): void {
@@ -209,18 +215,41 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
         continue;
       }
 
-      if (!isNull(this.handleMaterial)) {
-        visual.mainMaterial = this.handleMaterial;
-      }
-
-      visual.renderOrder = 10;
-      visual.enabled = true;
+      // Keep mesh/collider on MoveHandle; hide the solid inner disc — outer ring only.
+      visual.enabled = false;
     }
 
     const primaryVisual = visuals[0] as RenderMeshVisual;
     if (!isNull(primaryVisual)) {
-      this.ensureGlowHalo(handle, primaryVisual.mesh);
+      this.ensureGlowLayers(handle, primaryVisual.mesh);
     }
+  }
+
+  private ensureGlowLayers(handle: SceneObject, mesh: RenderMesh): void {
+    const glowSource = this.resolveGlowMaterial();
+    if (isNull(mesh) || isNull(glowSource)) {
+      return;
+    }
+
+    const legacyCore = this.findNamedChild(handle, 'GlowCore');
+    if (!isNull(legacyCore)) {
+      legacyCore.enabled = false;
+    }
+
+    this.ensureGlowLayer(
+      handle,
+      mesh,
+      glowSource,
+      'GlowHalo',
+      1.55,
+      8,
+      this.clonedOuterGlowMaterial,
+      new vec4(1, 0.86, 0.1, 0.38),
+      new vec3(1.4, 1.1, 0.18),
+      (material) => {
+        this.clonedOuterGlowMaterial = material;
+      }
+    );
   }
 
   private resolveGlowMaterial(): Material | null {
@@ -228,42 +257,55 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       return this.glowMaterial;
     }
 
-    return this.handleMaterial;
+    return null;
   }
 
-  private ensureGlowHalo(handle: SceneObject, mesh: RenderMesh): void {
-    const glowSource = this.resolveGlowMaterial();
-    if (isNull(mesh) || isNull(glowSource)) {
+  private ensureGlowLayer(
+    handle: SceneObject,
+    mesh: RenderMesh,
+    glowSource: Material,
+    layerName: string,
+    scale: number,
+    renderOrder: number,
+    cachedMaterial: Material | null,
+    baseColor: vec4,
+    emissive: vec3,
+    cacheMaterial: (material: Material) => void
+  ): void {
+    let layer = this.findNamedChild(handle, layerName);
+    if (isNull(layer)) {
+      layer = global.scene.createSceneObject(layerName);
+      layer.setParent(handle);
+      layer.getTransform().setLocalPosition(new vec3(0, 0, 0));
+      const layerVisual = layer.createComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+      layerVisual.mesh = mesh;
+    }
+
+    layer.getTransform().setLocalScale(new vec3(scale, scale, scale));
+
+    const layerVisual = layer.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+    if (isNull(layerVisual)) {
       return;
     }
 
-    let halo = this.findNamedChild(handle, 'GlowHalo');
-    if (isNull(halo)) {
-      halo = global.scene.createSceneObject('GlowHalo');
-      halo.setParent(handle);
-      halo.getTransform().setLocalPosition(new vec3(0, 0, 0));
-      halo.getTransform().setLocalScale(new vec3(1.28, 1.28, 1.28));
-      const haloVisual = halo.createComponent('Component.RenderMeshVisual') as RenderMeshVisual;
-      haloVisual.mesh = mesh;
-      haloVisual.renderOrder = 2;
+    layerVisual.mesh = mesh;
+    layerVisual.renderOrder = renderOrder;
+
+    let layerMaterial = cachedMaterial;
+    if (isNull(layerMaterial)) {
+      layerMaterial = glowSource.clone();
+      layerMaterial.mainPass.baseTex = glowSource.mainPass.baseTex;
+      cacheMaterial(layerMaterial);
     }
 
-    const haloVisual = halo.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
-    if (isNull(haloVisual)) {
-      return;
+    layerMaterial.mainPass.baseColor = baseColor;
+    const passAny = layerMaterial.mainPass as { Port_Emissive_N006?: vec3 };
+    if (passAny.Port_Emissive_N006 !== undefined) {
+      passAny.Port_Emissive_N006 = emissive;
     }
 
-    if (isNull(this.clonedGlowMaterial)) {
-      this.clonedGlowMaterial = glowSource.clone();
-      this.clonedGlowMaterial.mainPass.baseColor = new vec4(1, 0.9, 0.15, 0.35);
-      const passAny = this.clonedGlowMaterial.mainPass as { Port_Emissive_N006?: vec3 };
-      if (passAny.Port_Emissive_N006 !== undefined) {
-        passAny.Port_Emissive_N006 = new vec3(1, 0.82, 0.12);
-      }
-    }
-
-    haloVisual.mainMaterial = this.clonedGlowMaterial;
-    haloVisual.enabled = true;
+    layerVisual.mainMaterial = layerMaterial;
+    layerVisual.enabled = true;
   }
 
   private findNamedChild(root: SceneObject, name: string): SceneObject | null {

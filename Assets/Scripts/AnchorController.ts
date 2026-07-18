@@ -167,8 +167,13 @@ export class AnchorController extends BaseScriptComponent {
   @allowUndefined
   moveHandleMaterial!: Material;
 
+  @input
+  @allowUndefined
+  moveHandleGlowMaterial!: Material;
+
   private anchorSession?: AnchorSession;
   private clonedSackMaterial: Material | null = null;
+  private clonedHandleOuterGlowMaterial: Material | null = null;
   private wrappers: SceneObject[] = [];
   private objs: SceneObject[] = [];
   private objectKinds: string[] = [];
@@ -2004,6 +2009,7 @@ export class AnchorController extends BaseScriptComponent {
 
       handle.enabled = true;
       this.applyGardenSourceMoveHandleVisual(handle);
+      this.applyGardenSourceMoveHandleGlow(handle);
       this.ensureGardenSourceSpawnInteractable(source);
       const scripts = handle.getComponents('Component.ScriptComponent');
       for (let j = 0; j < scripts.length; j++) {
@@ -2036,10 +2042,6 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private applyGardenSourceMoveHandleVisual(handle: SceneObject): void {
-    if (isNull(this.moveHandleMaterial)) {
-      return;
-    }
-
     const visuals = handle.getComponents('Component.RenderMeshVisual');
     for (let i = 0; i < visuals.length; i++) {
       const visual = visuals[i] as RenderMeshVisual;
@@ -2047,10 +2049,87 @@ export class AnchorController extends BaseScriptComponent {
         continue;
       }
 
-      visual.mainMaterial = this.moveHandleMaterial;
-      visual.renderOrder = 10;
-      visual.enabled = true;
+      // Outer glow ring only — hide the solid inner disc mesh.
+      visual.enabled = false;
     }
+  }
+
+  private applyGardenSourceMoveHandleGlow(handle: SceneObject): void {
+    if (isNull(this.moveHandleGlowMaterial)) {
+      return;
+    }
+
+    const visuals = handle.getComponents('Component.RenderMeshVisual');
+    if (visuals.length === 0) {
+      return;
+    }
+
+    const mesh = (visuals[0] as RenderMeshVisual).mesh;
+    if (isNull(mesh)) {
+      return;
+    }
+
+    const legacyCore = this.findNamedChild(handle, 'GlowCore');
+    if (!isNull(legacyCore)) {
+      legacyCore.enabled = false;
+    }
+
+    this.ensureMoveHandleGlowLayer(
+      handle,
+      mesh,
+      'GlowHalo',
+      1.55,
+      8,
+      new vec4(1, 0.86, 0.1, 0.38),
+      new vec3(1.4, 1.1, 0.18)
+    );
+  }
+
+  private ensureMoveHandleGlowLayer(
+    handle: SceneObject,
+    mesh: RenderMesh,
+    layerName: string,
+    scale: number,
+    renderOrder: number,
+    baseColor: vec4,
+    emissive: vec3
+  ): void {
+    let layer = this.findNamedChild(handle, layerName);
+    if (isNull(layer)) {
+      layer = global.scene.createSceneObject(layerName);
+      layer.setParent(handle);
+      layer.getTransform().setLocalPosition(new vec3(0, 0, 0));
+      const layerVisual = layer.createComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+      layerVisual.mesh = mesh;
+    }
+
+    layer.getTransform().setLocalScale(new vec3(scale, scale, scale));
+    layer.enabled = true;
+
+    const layerVisual = layer.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+    if (isNull(layerVisual)) {
+      return;
+    }
+
+    layerVisual.mesh = mesh;
+    layerVisual.renderOrder = renderOrder;
+
+    let layerMaterial = this.clonedHandleOuterGlowMaterial;
+    if (isNull(layerMaterial)) {
+      layerMaterial = this.moveHandleGlowMaterial.clone();
+      const sourcePass = this.moveHandleGlowMaterial.mainPass;
+      layerMaterial.mainPass.baseTex = sourcePass.baseTex;
+      this.clonedHandleOuterGlowMaterial = layerMaterial;
+    }
+
+    layerMaterial.mainPass.baseColor = baseColor;
+    const passAny = layerMaterial.mainPass as { Port_Emissive_N006?: vec3 };
+    if (passAny.Port_Emissive_N006 !== undefined) {
+      passAny.Port_Emissive_N006 = emissive;
+    }
+
+    layerVisual.mainMaterial = layerMaterial;
+    layerVisual.enabled = true;
   }
 
   private wireAIContainerMovement(): void {
