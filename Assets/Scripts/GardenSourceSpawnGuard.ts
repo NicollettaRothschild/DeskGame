@@ -1,10 +1,21 @@
 const moveActiveRoots: SceneObject[] = [];
 const hoveredMoveHandleRoots: SceneObject[] = [];
+const spawnPullActiveRoots: SceneObject[] = [];
 
 export const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
+const MOVE_HANDLE_SPAWN_BLOCK_RADIUS_CM = 4;
+const DEFAULT_STARTUP_SPAWN_BLOCK_SECONDS = 3;
+let startupSpawnBlockedUntil = 0;
+
+export function armGardenSourceStartupSpawnBlock(
+  seconds = DEFAULT_STARTUP_SPAWN_BLOCK_SECONDS
+): void {
+  startupSpawnBlockedUntil = getTime() + Math.max(0, seconds);
+}
 
 type InteractorHitLike = {
   targetHitPosition?: vec3 | null;
+  startPoint?: vec3 | null;
 };
 
 export function setGardenSourceMoveHandleActive(
@@ -35,6 +46,57 @@ export function isGardenSourceSpawnBlocked(sourceRoot: SceneObject | null): bool
   }
 
   return hasRootFlag(moveActiveRoots, sourceRoot);
+}
+
+export function shouldBlockGardenSourceSpawn(
+  sourceRoot: SceneObject | null,
+  interactor: InteractorHitLike | null,
+  spawnSuppressed: boolean
+): boolean {
+  if (getTime() < startupSpawnBlockedUntil) {
+    return true;
+  }
+
+  if (spawnSuppressed) {
+    return true;
+  }
+
+  if (isNull(sourceRoot)) {
+    return false;
+  }
+
+  if (
+    isGardenSourceSpawnBlocked(sourceRoot) ||
+    isGardenSourceMoveHandleHovered(sourceRoot) ||
+    isInteractorNearMoveHandle(sourceRoot, interactor)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isGardenSourceMoveHandleHovered(sourceRoot: SceneObject | null): boolean {
+  if (isNull(sourceRoot)) {
+    return false;
+  }
+
+  return hasRootFlag(hoveredMoveHandleRoots, sourceRoot);
+}
+
+export function setGardenSourceSpawnPullActive(
+  sourceRoot: SceneObject | null,
+  active: boolean
+): void {
+  if (isNull(sourceRoot)) {
+    return;
+  }
+
+  setRootFlag(spawnPullActiveRoots, sourceRoot, active);
+}
+
+export function isAnyGardenSourceSpawnPullActive(): boolean {
+  return spawnPullActiveRoots.length > 0;
 }
 
 export function isMoveHandleSceneObject(candidate: SceneObject | null): boolean {
@@ -74,27 +136,48 @@ export function findMoveHandleChild(sourceRoot: SceneObject | null): SceneObject
 }
 
 export function isInteractorNearMoveHandle(
-  _sourceRoot: SceneObject | null,
-  _interactor: InteractorHitLike | null
+  sourceRoot: SceneObject | null,
+  interactor: InteractorHitLike | null
 ): boolean {
+  if (isNull(sourceRoot)) {
+    return false;
+  }
+
+  const handle = findMoveHandleChild(sourceRoot);
+  if (isNull(handle)) {
+    return false;
+  }
+
+  const handlePos = handle.getTransform().getWorldPosition();
+  const blockRadius = getMoveHandleBlockRadiusWorld(handle);
+  const hitPosition = interactor?.targetHitPosition;
+  if (!isNull(hitPosition) && hitPosition.distance(handlePos) <= blockRadius) {
+    return true;
+  }
+
   return false;
 }
 
-export function scheduleGardenSourceSpawn(
-  host: ScriptComponent,
-  sourceRoot: SceneObject,
-  isBlocked: () => boolean,
-  spawn: () => void
-): void {
-  const deferred = host.createEvent('DelayedCallbackEvent') as DelayedCallbackEvent;
-  deferred.bind(() => {
-    if (isBlocked() || isGardenSourceSpawnBlocked(sourceRoot)) {
-      return;
-    }
+function getMoveHandleBlockRadiusWorld(handle: SceneObject): number {
+  const worldScale = handle.getTransform().getWorldScale();
+  const scale = Math.max(worldScale.x, worldScale.y, worldScale.z);
+  let shapeRadius = 0;
 
-    spawn();
-  });
-  deferred.reset(0);
+  const colliders = handle.getComponents('Component.ColliderComponent');
+  for (let i = 0; i < colliders.length; i++) {
+    const shape = (colliders[i] as unknown as {
+      shape?: { radius?: number; FitVisual?: boolean };
+    }).shape;
+    if (shape?.radius && shape.radius > 0) {
+      shapeRadius = Math.max(shapeRadius, shape.radius * scale);
+    }
+  }
+
+  if (shapeRadius > 0) {
+    return Math.min(MOVE_HANDLE_SPAWN_BLOCK_RADIUS_CM, shapeRadius);
+  }
+
+  return MOVE_HANDLE_SPAWN_BLOCK_RADIUS_CM;
 }
 
 function setRootFlag(list: SceneObject[], root: SceneObject, enabled: boolean): void {

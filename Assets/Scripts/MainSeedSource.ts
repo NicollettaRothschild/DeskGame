@@ -1,8 +1,7 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
 import {
-  isGardenSourceSpawnBlocked,
-  isInteractorNearMoveHandle,
-  scheduleGardenSourceSpawn,
+  shouldBlockGardenSourceSpawn,
+  setGardenSourceSpawnPullActive,
 } from './GardenSourceSpawnGuard';
 import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
 import { PlantLifecycle } from './PlantLifecycle';
@@ -39,12 +38,16 @@ type InteractableLike = ScriptComponent & {
   onTriggerEndOutside?: PublicEventLike<InteractorEventLike>;
   onTriggerCanceled?: PublicEventLike<InteractorEventLike>;
   targetingMode?: number;
+  ignoreInteractionPlane?: boolean;
 };
 
 type AnchorSeedSpawner = {
   createSeedAtWorldPosition(worldPos: vec3): SceneObject | null;
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
+  notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
+  syncTrackedWrapperToContent?: (content: SceneObject) => void;
+  placeTrackedContentAtWorld?: (content: SceneObject, worldPos: vec3, worldRot?: quat) => void;
   destroyTrackedObject?: (candidate: SceneObject) => boolean;
 };
 
@@ -112,6 +115,7 @@ export class MainSeedSource extends BaseScriptComponent {
     }
 
     const seedObject = this.activePull.seedObject;
+    setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
       (this.updateEvent as UpdateEvent).enabled = false;
@@ -182,18 +186,19 @@ export class MainSeedSource extends BaseScriptComponent {
     }
 
     this.isBound = true;
+    if (interactable.targetingMode !== undefined) {
+      interactable.targetingMode = 7;
+    }
+    if (interactable.ignoreInteractionPlane !== undefined) {
+      interactable.ignoreInteractionPlane = true;
+    }
     this.debugLog('bound to source Interactable.');
   }
 
   private onTriggerStart(event: InteractorEventLike, reason: string): void {
     const sourceRoot = this.getSceneObject();
     const interactor = event && event.interactor ? event.interactor : null;
-    if (
-      this.spawnSuppressed ||
-      isGardenSourceSpawnBlocked(sourceRoot) ||
-      this.isDirectManipulationInteraction(event) ||
-      isInteractorNearMoveHandle(sourceRoot, interactor)
-    ) {
+    if (shouldBlockGardenSourceSpawn(sourceRoot, interactor, this.spawnSuppressed)) {
       this.debugLog(`ignored ${reason}: move handle interaction.`);
       return;
     }
@@ -205,12 +210,7 @@ export class MainSeedSource extends BaseScriptComponent {
 
     const rayDistance = this.getRayDistance(interactor);
     const spawnPosition = this.getInteractorPosition(interactor, rayDistance);
-    scheduleGardenSourceSpawn(
-      this,
-      sourceRoot,
-      () => this.spawnSuppressed,
-      () => this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason)
-    );
+    this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason);
   }
 
   private beginSpawnPull(
@@ -219,6 +219,12 @@ export class MainSeedSource extends BaseScriptComponent {
     rayDistance: number,
     reason: string
   ): void {
+    const sourceRoot = this.getSceneObject();
+    if (shouldBlockGardenSourceSpawn(sourceRoot, interactor, this.spawnSuppressed)) {
+      this.debugLog(`ignored ${reason}: move handle interaction.`);
+      return;
+    }
+
     if (!this.allowMultipleActiveSeeds && !isNull(this.activePull)) {
       this.debugLog(`ignored ${reason}: seed already active.`);
       return;
@@ -235,7 +241,18 @@ export class MainSeedSource extends BaseScriptComponent {
       interactor: interactor || null,
       rayDistance: rayDistance,
     };
+    setGardenSourceSpawnPullActive(this.getSceneObject(), true);
+    const anchorSpawner = this.getAnchorSeedSpawner();
+    if (!isNull(anchorSpawner)) {
+      const spawner = anchorSpawner as AnchorSeedSpawner;
+      if (typeof spawner.setActiveManipulatedRoot === 'function') {
+        spawner.setActiveManipulatedRoot(seedObject as SceneObject);
+      }
+      this.notifyTrashSpawnGrace(seedObject as SceneObject, 5);
+    }
+    playInteractionSound((sounds) => sounds.playGrabObject());
     this.ensureUpdateLoop();
+    this.updatePulledSeedPosition();
   }
 
   private onTriggerUpdate(event: InteractorEventLike): void {
@@ -274,13 +291,25 @@ export class MainSeedSource extends BaseScriptComponent {
     }
 
     const interactor = pull.interactor;
-    if (!isNull(interactor) && interactor.isActive && !interactor.isActive()) {
-      this.releaseActivePull();
+    const position = this.getInteractorPosition(interactor, pull.rayDistance);
+    this.syncTrackedWrapper(pull.seedObject, position);
+  }
+
+  private syncTrackedWrapper(content: SceneObject, worldPos?: vec3): void {
+    const anchorSpawner = this.getAnchorSeedSpawner();
+    if (isNull(anchorSpawner)) {
       return;
     }
 
-    const position = this.getInteractorPosition(interactor, pull.rayDistance);
-    pull.seedObject.getTransform().setWorldPosition(position);
+    const spawner = anchorSpawner as AnchorSeedSpawner;
+    if (!isNull(worldPos) && typeof spawner.placeTrackedContentAtWorld === 'function') {
+      spawner.placeTrackedContentAtWorld(content, worldPos);
+      return;
+    }
+
+    if (typeof spawner.syncTrackedWrapperToContent === 'function') {
+      spawner.syncTrackedWrapperToContent(content);
+    }
   }
 
   private spawnSeed(worldPosition: vec3, interactor: InteractorLike | null): SceneObject | null {
@@ -398,11 +427,6 @@ export class MainSeedSource extends BaseScriptComponent {
     return Math.max(0, this.fallbackRayDistance);
   }
 
-  private isDirectManipulationInteraction(event: InteractorEventLike): boolean {
-    const interactor = event && event.interactor ? event.interactor : null;
-    return !isNull(interactor) && interactor.activeTargetingMode === 7;
-  }
-
   private getSpawnParent(): SceneObject {
     if (!isNull(this.spawnParent)) {
       return this.spawnParent;
@@ -450,7 +474,6 @@ export class MainSeedSource extends BaseScriptComponent {
       if (
         !isNull(candidate) &&
         candidate.targetingMode !== undefined &&
-        candidate.targetingMode !== 7 &&
         (candidate.onInteractorTriggerStart !== undefined ||
           candidate.onTriggerStart !== undefined ||
           candidate.onDragStart !== undefined)
@@ -531,20 +554,48 @@ export class MainSeedSource extends BaseScriptComponent {
   }
 
   private releaseActivePull(): void {
-    if (!isNull(this.activePull)) {
-      this.debugLog('released active seed pull.');
-      const anchorSpawner = this.getAnchorSeedSpawner();
-      if (!isNull(anchorSpawner)) {
-        const spawner = anchorSpawner as AnchorSeedSpawner;
-        if (typeof spawner.setActiveManipulatedRoot === 'function') {
-          spawner.setActiveManipulatedRoot(this.activePull.seedObject);
-        }
-        if (typeof spawner.saveObjectPosition === 'function') {
-          spawner.saveObjectPosition();
-        }
+    if (isNull(this.activePull)) {
+      return;
+    }
+
+    this.debugLog('released active seed pull.');
+    const releasedSeed = this.activePull.seedObject;
+    const plant = this.findPlantLifecycle(releasedSeed);
+    const wasPlanted =
+      !isNull(plant) &&
+      typeof plant.getIsPlanted === 'function' &&
+      plant.getIsPlanted();
+    this.abandonActivePull();
+
+    const anchorSpawner = this.getAnchorSeedSpawner();
+    if (!isNull(anchorSpawner) && !wasPlanted) {
+      const spawner = anchorSpawner as AnchorSeedSpawner;
+      const worldPos = releasedSeed.getTransform().getWorldPosition();
+      if (typeof spawner.placeTrackedContentAtWorld === 'function') {
+        spawner.placeTrackedContentAtWorld(releasedSeed, worldPos);
+      } else if (typeof spawner.syncTrackedWrapperToContent === 'function') {
+        spawner.syncTrackedWrapperToContent(releasedSeed);
+      }
+      if (typeof spawner.setActiveManipulatedRoot === 'function') {
+        spawner.setActiveManipulatedRoot(releasedSeed);
+      }
+      this.notifyTrashSpawnGrace(releasedSeed, 5);
+      if (typeof spawner.saveObjectPosition === 'function') {
+        spawner.saveObjectPosition();
       }
     }
-    this.abandonActivePull();
+  }
+
+  private notifyTrashSpawnGrace(root: SceneObject, graceSeconds: number): void {
+    const anchorSpawner = this.getAnchorSeedSpawner();
+    if (isNull(anchorSpawner)) {
+      return;
+    }
+
+    const spawner = anchorSpawner as AnchorSeedSpawner;
+    if (typeof spawner.notifyTrashSpawnGrace === 'function') {
+      spawner.notifyTrashSpawnGrace(root, graceSeconds);
+    }
   }
 
   private abandonActivePullIfMatches(root: SceneObject): void {
@@ -587,6 +638,7 @@ export class MainSeedSource extends BaseScriptComponent {
   }
 
   private abandonActivePull(): void {
+    setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
       (this.updateEvent as UpdateEvent).enabled = false;

@@ -1,8 +1,7 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
 import {
-  isGardenSourceSpawnBlocked,
-  isInteractorNearMoveHandle,
-  scheduleGardenSourceSpawn,
+  shouldBlockGardenSourceSpawn,
+  setGardenSourceSpawnPullActive,
 } from './GardenSourceSpawnGuard';
 import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
 
@@ -35,6 +34,8 @@ type InteractableLike = ScriptComponent & {
   onTriggerEnd?: PublicEventLike<InteractorEventLike>;
   onTriggerEndOutside?: PublicEventLike<InteractorEventLike>;
   onTriggerCanceled?: PublicEventLike<InteractorEventLike>;
+  targetingMode?: number;
+  ignoreInteractionPlane?: boolean;
 };
 
 type AnchorPotSpawner = {
@@ -46,6 +47,8 @@ type AnchorPotSpawner = {
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
   notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
+  syncTrackedWrapperToContent?: (content: SceneObject) => void;
+  placeTrackedContentAtWorld?: (content: SceneObject, worldPos: vec3, worldRot?: quat) => void;
   destroyTrackedObject?: (candidate: SceneObject) => boolean;
 };
 
@@ -108,6 +111,7 @@ export class MainPotSource extends BaseScriptComponent {
     }
 
     const potObject = this.activePull.potObject;
+    setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
       (this.updateEvent as UpdateEvent).enabled = false;
@@ -178,18 +182,19 @@ export class MainPotSource extends BaseScriptComponent {
     }
 
     this.isBound = true;
+    if (interactable.targetingMode !== undefined) {
+      interactable.targetingMode = 7;
+    }
+    if (interactable.ignoreInteractionPlane !== undefined) {
+      interactable.ignoreInteractionPlane = true;
+    }
     this.debugLog('bound to source Interactable.');
   }
 
   private onTriggerStart(event: InteractorEventLike, reason: string): void {
     const sourceRoot = this.getSceneObject();
     const interactor = event && event.interactor ? event.interactor : null;
-    if (
-      this.spawnSuppressed ||
-      isGardenSourceSpawnBlocked(sourceRoot) ||
-      this.isDirectManipulationInteraction(event) ||
-      isInteractorNearMoveHandle(sourceRoot, interactor)
-    ) {
+    if (shouldBlockGardenSourceSpawn(sourceRoot, interactor, this.spawnSuppressed)) {
       this.debugLog(`ignored ${reason}: move handle interaction.`);
       return;
     }
@@ -201,12 +206,7 @@ export class MainPotSource extends BaseScriptComponent {
 
     const rayDistance = this.getRayDistance(interactor);
     const spawnPosition = this.getInteractorPosition(interactor, rayDistance);
-    scheduleGardenSourceSpawn(
-      this,
-      sourceRoot,
-      () => this.spawnSuppressed,
-      () => this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason)
-    );
+    this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason);
   }
 
   private beginSpawnPull(
@@ -215,6 +215,12 @@ export class MainPotSource extends BaseScriptComponent {
     rayDistance: number,
     reason: string
   ): void {
+    const sourceRoot = this.getSceneObject();
+    if (shouldBlockGardenSourceSpawn(sourceRoot, interactor, this.spawnSuppressed)) {
+      this.debugLog(`ignored ${reason}: move handle interaction.`);
+      return;
+    }
+
     if (!this.allowMultipleActivePots && !isNull(this.activePull)) {
       this.debugLog(`ignored ${reason}: pot already active.`);
       return;
@@ -231,7 +237,18 @@ export class MainPotSource extends BaseScriptComponent {
       interactor: interactor || null,
       rayDistance: rayDistance,
     };
+    setGardenSourceSpawnPullActive(this.getSceneObject(), true);
+    const anchorSpawner = this.getAnchorPotSpawner();
+    if (!isNull(anchorSpawner)) {
+      const spawner = anchorSpawner as AnchorPotSpawner;
+      if (typeof spawner.setActiveManipulatedRoot === 'function') {
+        spawner.setActiveManipulatedRoot(potObject as SceneObject);
+      }
+      this.notifyTrashSpawnGrace(potObject as SceneObject, 5);
+    }
+    playInteractionSound((sounds) => sounds.playGrabObject());
     this.ensureUpdateLoop();
+    this.updatePulledPotPosition();
   }
 
   private onTriggerUpdate(event: InteractorEventLike): void {
@@ -258,13 +275,25 @@ export class MainPotSource extends BaseScriptComponent {
 
     const pull = this.activePull as PullState;
     const interactor = pull.interactor;
-    if (!isNull(interactor) && interactor.isActive && !interactor.isActive()) {
-      this.releaseActivePull();
+    const position = this.getInteractorPosition(interactor, pull.rayDistance);
+    this.syncTrackedWrapper(pull.potObject, position);
+  }
+
+  private syncTrackedWrapper(content: SceneObject, worldPos?: vec3): void {
+    const anchorSpawner = this.getAnchorPotSpawner();
+    if (isNull(anchorSpawner)) {
       return;
     }
 
-    const position = this.getInteractorPosition(interactor, pull.rayDistance);
-    pull.potObject.getTransform().setWorldPosition(position);
+    const spawner = anchorSpawner as AnchorPotSpawner;
+    if (!isNull(worldPos) && typeof spawner.placeTrackedContentAtWorld === 'function') {
+      spawner.placeTrackedContentAtWorld(content, worldPos);
+      return;
+    }
+
+    if (typeof spawner.syncTrackedWrapperToContent === 'function') {
+      spawner.syncTrackedWrapperToContent(content);
+    }
   }
 
   private spawnPot(worldPosition: vec3, interactor: InteractorLike | null): SceneObject | null {
@@ -353,11 +382,6 @@ export class MainPotSource extends BaseScriptComponent {
     return Math.max(0, this.fallbackRayDistance);
   }
 
-  private isDirectManipulationInteraction(event: InteractorEventLike): boolean {
-    const interactor = event && event.interactor ? event.interactor : null;
-    return !isNull(interactor) && interactor.activeTargetingMode === 7;
-  }
-
   private getSpawnParent(): SceneObject {
     if (!isNull(this.spawnParent)) {
       return this.spawnParent;
@@ -438,25 +462,39 @@ export class MainPotSource extends BaseScriptComponent {
     this.updateEvent.enabled = true;
   }
 
-  private releaseActivePull(): void {
-    if (!isNull(this.activePull)) {
-      this.debugLog('released active pot pull.');
-      const releasedPot = this.activePull.potObject;
-      const anchorSpawner = this.getAnchorPotSpawner();
-      if (!isNull(anchorSpawner)) {
-        const spawner = anchorSpawner as AnchorPotSpawner;
-        if (typeof spawner.setActiveManipulatedRoot === 'function') {
-          spawner.setActiveManipulatedRoot(releasedPot);
-        }
-        this.notifyTrashSpawnGrace(releasedPot, 1.5);
-        if (typeof spawner.saveObjectPosition === 'function') {
-          spawner.saveObjectPosition();
-        }
-      }
-    }
+  private abandonActivePull(): void {
+    setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
       (this.updateEvent as UpdateEvent).enabled = false;
+    }
+  }
+
+  private releaseActivePull(): void {
+    if (isNull(this.activePull)) {
+      return;
+    }
+
+    this.debugLog('released active pot pull.');
+    const releasedPot = this.activePull.potObject;
+    this.abandonActivePull();
+
+    const anchorSpawner = this.getAnchorPotSpawner();
+    if (!isNull(anchorSpawner)) {
+      const spawner = anchorSpawner as AnchorPotSpawner;
+      const worldPos = releasedPot.getTransform().getWorldPosition();
+      if (typeof spawner.placeTrackedContentAtWorld === 'function') {
+        spawner.placeTrackedContentAtWorld(releasedPot, worldPos);
+      } else if (typeof spawner.syncTrackedWrapperToContent === 'function') {
+        spawner.syncTrackedWrapperToContent(releasedPot);
+      }
+      if (typeof spawner.setActiveManipulatedRoot === 'function') {
+        spawner.setActiveManipulatedRoot(releasedPot);
+      }
+      this.notifyTrashSpawnGrace(releasedPot, 5);
+      if (typeof spawner.saveObjectPosition === 'function') {
+        spawner.saveObjectPosition();
+      }
     }
   }
 

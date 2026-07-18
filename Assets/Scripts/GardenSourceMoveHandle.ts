@@ -1,5 +1,6 @@
 import {
   isMoveHandleSceneObject,
+  isAnyGardenSourceSpawnPullActive,
   setGardenSourceMoveHandleActive,
   setGardenSourceMoveHandleHovered,
 } from './GardenSourceSpawnGuard';
@@ -70,9 +71,6 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
   private handleManipulation: InteractableManipulationLike | null = null;
   private hideVisibilityEvent: DelayedCallbackEvent | null = null;
   private glowVisible = false;
-  private spawnInteractable: InteractableLike | null = null;
-  private spawnInteractableWasEnabled = true;
-  private spawnInteractableDisabledByHandle = false;
   private sourceSpawner: GardenSourceSpawnerLike | null = null;
 
   onAwake(): void {
@@ -148,6 +146,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     const onHandleInteractionStart = (): void => {
       setGardenSourceMoveHandleHovered(sourceRoot, true);
       this.setSpawnBlocked(sourceRoot, true);
+      this.abortMistakenSpawnPull();
     };
     const onGrabStart = (): void => {
       this.onHandleGrabStart(sourceRoot);
@@ -201,7 +200,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     interactable.targetingMode = 7;
     interactable.ignoreInteractionPlane = true;
 
-    this.spawnInteractable = this.findSourceSpawnInteractable(sourceRoot);
+    this.configureHandleCollider(handle);
     this.sourceSpawner = this.findSourceSpawner(sourceRoot);
     this.wireHandleHover(interactable, sourceRoot);
     this.wireParentHover(sourceRoot);
@@ -359,7 +358,6 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     if (this.moveActive) {
       this.cancelScheduledHide();
       this.setHandleGlowVisible(false);
-      this.setHandleInteractionEnabled(true);
       return;
     }
 
@@ -369,14 +367,12 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
         playInteractionSound((sounds) => sounds.playHover());
       }
       this.setHandleGlowVisible(true);
-      this.setHandleInteractionEnabled(true);
       return;
     }
 
     if (immediateHide) {
       this.cancelScheduledHide();
       this.setHandleGlowVisible(false);
-      this.setHandleInteractionEnabled(false);
       return;
     }
 
@@ -394,9 +390,33 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       }
 
       this.setHandleGlowVisible(false);
-      this.setHandleInteractionEnabled(false);
     });
     event.reset(0.12);
+  }
+
+  private configureHandleCollider(handle: SceneObject): void {
+    const colliders = handle.getComponents('Component.ColliderComponent');
+    for (let i = 0; i < colliders.length; i++) {
+      const collider = colliders[i] as ColliderComponent;
+      if (isNull(collider)) {
+        continue;
+      }
+
+      const colliderLike = collider as unknown as {
+        intangible?: boolean;
+        forceCompound?: boolean;
+        shape?: { radius?: number; FitVisual?: boolean };
+      };
+      colliderLike.intangible = false;
+      colliderLike.forceCompound = true;
+
+      if (!colliderLike.shape) {
+        colliderLike.shape = { radius: 8, FitVisual: false };
+      } else {
+        colliderLike.shape.FitVisual = false;
+        colliderLike.shape.radius = Math.max(colliderLike.shape.radius || 0, 8);
+      }
+    }
   }
 
   private cancelScheduledHide(): void {
@@ -419,19 +439,6 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     }
 
     this.glowVisible = visible;
-  }
-
-  private setHandleInteractionEnabled(enabled: boolean): void {
-    if (this.moveActive) {
-      enabled = true;
-    }
-
-    if (!isNull(this.handleInteractable)) {
-      (this.handleInteractable as ScriptComponent).enabled = enabled;
-    }
-    if (!isNull(this.handleManipulation)) {
-      (this.handleManipulation as ScriptComponent).enabled = enabled;
-    }
   }
 
   private findNamedChild(root: SceneObject, name: string): SceneObject | null {
@@ -476,7 +483,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
   }
 
   private onHandleGrabStart(sourceRoot: SceneObject): void {
-    if (this.moveActive) {
+    if (this.moveActive || isAnyGardenSourceSpawnPullActive()) {
       return;
     }
 
@@ -515,26 +522,6 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     const spawner = this.sourceSpawner || this.findSourceSpawner(sourceRoot);
     if (!isNull(spawner) && typeof spawner.setSpawnSuppressed === 'function') {
       spawner.setSpawnSuppressed(blocked);
-    }
-
-    const spawnInteractable =
-      this.spawnInteractable || this.findSourceSpawnInteractable(sourceRoot);
-    if (isNull(spawnInteractable)) {
-      return;
-    }
-
-    if (blocked) {
-      if ((spawnInteractable as ScriptComponent).enabled) {
-        this.spawnInteractableWasEnabled = true;
-        this.spawnInteractableDisabledByHandle = true;
-        (spawnInteractable as ScriptComponent).enabled = false;
-      }
-      return;
-    }
-
-    if (this.spawnInteractableDisabledByHandle) {
-      (spawnInteractable as ScriptComponent).enabled = this.spawnInteractableWasEnabled;
-      this.spawnInteractableDisabledByHandle = false;
     }
   }
 

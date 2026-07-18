@@ -1007,6 +1007,15 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
+    // Planted growth uses container offsets to keep the mesh foot on the pot soil line.
+    // Do not snap back to attach origin once the plant reaches Adult stage.
+    if (!isNull(this.growthScaleNode) && !isNull(this.getActiveStageModel())) {
+      this.enforcePlantedContainerScale();
+      this.enforcePlantedWorldRotation();
+      this.applyPlantedAttachAlignment();
+      return;
+    }
+
     const localPos = this.getSceneObject().getTransform().getLocalPosition();
     if (localPos.distance(vec3.zero()) > 0.01) {
       this.alignPlantedRootToParent();
@@ -1322,8 +1331,45 @@ export class PlantLifecycle extends BaseScriptComponent {
       return;
     }
 
+    this.enableRemoteGrabTargeting(root);
     this.wireManipulationToContainer(root);
     this.setInteractionEnabledOnHierarchy(root, true);
+  }
+
+  private enableRemoteGrabTargeting(root: SceneObject): void {
+    const stack: SceneObject[] = [root];
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as {
+          targetingMode?: number;
+          ignoreInteractionPlane?: boolean;
+          onTriggerStart?: unknown;
+        };
+        if (
+          isNull(candidate) ||
+          candidate.targetingMode === undefined ||
+          candidate.onTriggerStart === undefined
+        ) {
+          continue;
+        }
+
+        candidate.targetingMode = 7;
+        if (candidate.ignoreInteractionPlane !== undefined) {
+          candidate.ignoreInteractionPlane = true;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
   }
 
   private applyClonedBabyMaterial(root: SceneObject): void {
@@ -1380,7 +1426,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     if (this.isPlanted) {
       this.enforcePlantedContainerScale();
       this.enforcePlantedWorldRotation();
-      this.applyPlantedAttachAlignment();
+      this.finalizePlantedPlacement({ preserveContainerPlacement: true });
       return;
     }
 

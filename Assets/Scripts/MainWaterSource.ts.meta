@@ -27,6 +27,7 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     allowMultipleActiveWaterObjects: false
+    anchorController: false
     debugLogging: false
     fallbackRayDistance: false
     followInteractorWhileHeld: false
@@ -44,6 +45,7 @@
     []
   DefaultScriptInputs:
     - wateringObjectPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       sourceInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       spawnParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spawnForwardOffset: !<float> 0.000000
@@ -56,6 +58,7 @@
       {}
   InputLines:
     - // @input Asset.ObjectPrefab wateringObjectPrefab
+    - // @input Component.ScriptComponent anchorController
     - // @input Component.ScriptComponent sourceInteractable
     - // @input SceneObject spawnParent
     - // @input float spawnForwardOffset

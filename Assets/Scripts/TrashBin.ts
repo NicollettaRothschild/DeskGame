@@ -31,6 +31,12 @@ type InteractableManipulationLike = ScriptComponent & {
 
 type WateringObjectLike = ScriptComponent & {
   beginUnusedLifetime?: () => void;
+  waterPlant?: (plant: unknown) => void;
+};
+
+type GardenSourceSpawnerLike = ScriptComponent & {
+  setSpawnSuppressed?: (suppressed: boolean) => void;
+  abortActiveSpawnPull?: () => void;
 };
 
 type PlantLifecycleLike = ScriptComponent & {
@@ -85,6 +91,8 @@ export class TrashBin extends BaseScriptComponent {
     'WidgetParent',
     'Text3D UserID',
   ];
+
+  private readonly gardenSourceContainerNames = ['Water Source', 'Planter', 'Seeds'];
 
   private recentDestroyRoots: SceneObject[] = [];
   private recentDestroyTimes: number[] = [];
@@ -362,9 +370,44 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
+    this.tryTrashOverlappingTracked(true);
     this.trashMoveActive = false;
     playInteractionSound((sounds) => sounds.playReleaseObject());
     this.persistTrashAnchorTransform();
+  }
+
+  private tryTrashOverlappingTracked(deliberate: boolean): void {
+    const handler = this.getAnchorTrashHandler();
+    if (
+      isNull(handler) ||
+      typeof handler.getTrackedContentRoots !== 'function'
+    ) {
+      return;
+    }
+
+    const now = getTime();
+    const roots = handler.getTrackedContentRoots();
+    for (let i = 0; i < roots.length; i++) {
+      const root = roots[i];
+      if (isNull(root) || !root.enabled || this.isBerryObject(root)) {
+        continue;
+      }
+
+      if (this.isGardenSourceContainerHierarchy(root)) {
+        continue;
+      }
+
+      if (!this.isTrackedRootInTrashVolume(root)) {
+        continue;
+      }
+
+      const destroyRoot = this.findDestroyRoot(root) || root;
+      if (isNull(destroyRoot)) {
+        continue;
+      }
+
+      this.tryDestroyRoot(destroyRoot, now, deliberate);
+    }
   }
 
   private markTrashBeingMoved(root: SceneObject): void {
@@ -454,8 +497,16 @@ export class TrashBin extends BaseScriptComponent {
     this.spawnGraceUntilTimes.push(until);
   }
 
+  public isInSpawnGrace(root: SceneObject): boolean {
+    return this.isInSpawnGraceAt(root, getTime());
+  }
+
   public tryTrashSceneObject(candidate: SceneObject): boolean {
-    if (isNull(candidate) || this.isProtectedHierarchy(candidate)) {
+    if (
+      isNull(candidate) ||
+      this.isProtectedHierarchy(candidate) ||
+      this.isGardenSourceContainerHierarchy(candidate)
+    ) {
       return false;
     }
 
@@ -465,7 +516,14 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     const now = getTime();
-    if (this.wasRecentlyDestroyed(destroyRoot, now)) {
+    if (
+      this.wasRecentlyDestroyed(destroyRoot, now) ||
+      this.isInSpawnGraceAt(destroyRoot, now)
+    ) {
+      return false;
+    }
+
+    if (!this.isDestroyRootInTrashForRelease(destroyRoot)) {
       return false;
     }
 
@@ -499,7 +557,11 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   public tryTrashTrackedOnRelease(releasedRoot?: SceneObject | null): boolean {
-    if (isNull(releasedRoot) || this.containsTrashBinObject(releasedRoot)) {
+    if (
+      isNull(releasedRoot) ||
+      this.containsTrashBinObject(releasedRoot) ||
+      this.isGardenSourceContainerHierarchy(releasedRoot)
+    ) {
       return false;
     }
 
@@ -518,12 +580,11 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     const now = getTime();
-    if (this.isInSpawnGrace(trackedRoot, now) || this.isInSpawnGrace(destroyRoot, now)) {
+    if (this.isInSpawnGraceAt(trackedRoot, now) || this.isInSpawnGraceAt(destroyRoot, now)) {
       return false;
     }
 
-    const releaseRadius = this.computeReleaseTrashRadius();
-    if (!this.isTrackedRootWithinTrashRadius(trackedRoot, releaseRadius)) {
+    if (!this.isTrackedRootInTrashVolume(trackedRoot)) {
       return false;
     }
 
@@ -531,33 +592,45 @@ export class TrashBin extends BaseScriptComponent {
     return this.wasRecentlyDestroyed(destroyRoot, now);
   }
 
+  public tryTrashReleasedObject(releasedRoot?: SceneObject | null): boolean {
+    if (this.tryTrashTrackedOnRelease(releasedRoot)) {
+      return true;
+    }
+
+    if (isNull(releasedRoot) || this.containsTrashBinObject(releasedRoot)) {
+      return false;
+    }
+
+    const destroyRoot = this.findDestroyRoot(releasedRoot);
+    if (isNull(destroyRoot) || this.isAnchorTrackedDestroyRoot(destroyRoot)) {
+      return false;
+    }
+
+    return this.tryTrashSceneObject(releasedRoot);
+  }
+
   private isTrackedRootInTrashVolume(root: SceneObject): boolean {
-    return this.isTrackedRootWithinTrashRadius(root, this.computeTrashAcceptRadius());
+    return this.isTrackedRootWithinTrashRadius(root, this.computeReleaseTrashRadius());
+  }
+
+  /** Release checks use a tighter radius than overlap/FitVisual padding. */
+  private computeReleaseTrashRadius(): number {
+    return Math.max(this.trashRadius, this.computeColliderTrashRadius(false));
+  }
+
+  private isDestroyRootInTrashForRelease(destroyRoot: SceneObject): boolean {
+    if (isNull(destroyRoot)) {
+      return false;
+    }
+
+    const trashCenter = this.getTrashWorldCenter();
+    const trashRadius = this.computeReleaseTrashRadius();
+    return this.getClosestDistanceToTrash(trashCenter, destroyRoot) <= trashRadius;
   }
 
   private isTrackedRootWithinTrashRadius(root: SceneObject, trashRadius: number): boolean {
     const trashCenter = this.getTrashWorldCenter();
-    if (this.getClosestDistanceToTrash(trashCenter, root) <= trashRadius) {
-      return true;
-    }
-
-    const handler = this.getAnchorTrashHandler();
-    if (isNull(handler) || typeof handler.getTrackedWrapperRoots !== 'function') {
-      return false;
-    }
-
-    const wrappers = handler.getTrackedWrapperRoots();
-    for (let i = 0; i < wrappers.length; i++) {
-      const wrapper = wrappers[i];
-      if (isNull(wrapper)) {
-        continue;
-      }
-      if (wrapper === root || this.isDescendantOf(root, wrapper) || this.isDescendantOf(wrapper, root)) {
-        return this.getClosestDistanceToTrash(trashCenter, wrapper) <= trashRadius;
-      }
-    }
-
-    return false;
+    return this.getClosestDistanceToTrash(trashCenter, root) <= trashRadius;
   }
 
   private checkProximityTrash(): void {
@@ -613,11 +686,6 @@ export class TrashBin extends BaseScriptComponent {
   /** Collider overlap / proximity checks — includes FitVisual padding. */
   private computeTrashAcceptRadius(): number {
     return this.computeColliderTrashRadius(true);
-  }
-
-  /** Pinch-release trash — physical bin only, no FitVisual inflation. */
-  private computeReleaseTrashRadius(): number {
-    return this.computeColliderTrashRadius(false);
   }
 
   private computeColliderTrashRadius(includeVisualFit: boolean): number {
@@ -743,18 +811,20 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     const destroyRoot = this.findDestroyRoot(otherObject);
-    if (isNull(destroyRoot) || this.isWaterDestroyRoot(destroyRoot)) {
+    if (isNull(destroyRoot)) {
       return;
     }
 
+    const deliberate = this.trashMoveActive;
     if (
+      !deliberate &&
       this.isAnchorTrackedDestroyRoot(destroyRoot) &&
       !this.isTrashableLooseTrackedPlant(destroyRoot)
     ) {
       return;
     }
 
-    this.tryDestroyRoot(destroyRoot, getTime(), false);
+    this.tryDestroyRoot(destroyRoot, getTime(), deliberate);
   }
 
   private isAnchorTrackedDestroyRoot(destroyRoot: SceneObject): boolean {
@@ -796,19 +866,19 @@ export class TrashBin extends BaseScriptComponent {
     now: number,
     deliberate: boolean
   ): void {
-    if (isNull(destroyRoot) || this.wasRecentlyDestroyed(destroyRoot, now)) {
+    if (
+      isNull(destroyRoot) ||
+      this.isGardenSourceContainerHierarchy(destroyRoot) ||
+      this.wasRecentlyDestroyed(destroyRoot, now)
+    ) {
       return;
     }
 
-    if (!deliberate && this.isInSpawnGrace(destroyRoot, now)) {
+    if (!deliberate && this.isInSpawnGraceAt(destroyRoot, now)) {
       return;
     }
 
     if (this.isBerryObject(destroyRoot)) {
-      return;
-    }
-
-    if (!deliberate && this.isWaterDestroyRoot(destroyRoot)) {
       return;
     }
 
@@ -873,8 +943,16 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   private findDestroyRoot(sceneObject: SceneObject): SceneObject | null {
+    if (this.isGardenSourceContainerHierarchy(sceneObject)) {
+      return null;
+    }
+
     let current = sceneObject;
     while (!isNull(current)) {
+      if (this.isGardenSourceContainerRoot(current)) {
+        return null;
+      }
+
       const trackedRoot = this.getTrackedContentRoot(current);
       if (!isNull(trackedRoot)) {
         return trackedRoot;
@@ -916,7 +994,11 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   private isLooseWaterLikeObject(sceneObject: SceneObject): boolean {
-    if (isNull(sceneObject) || this.isProtectedDestroyTarget(sceneObject)) {
+    if (
+      isNull(sceneObject) ||
+      this.isProtectedDestroyTarget(sceneObject) ||
+      this.isGardenSourceContainerHierarchy(sceneObject)
+    ) {
       return false;
     }
 
@@ -977,10 +1059,18 @@ export class TrashBin extends BaseScriptComponent {
   private findWateringObject(sceneObject: SceneObject): WateringObjectLike | null {
     let current = sceneObject;
     while (!isNull(current)) {
+      if (this.isGardenSourceContainerRoot(current)) {
+        return null;
+      }
+
       const scripts = current.getComponents('Component.ScriptComponent');
       for (let i = 0; i < scripts.length; i++) {
         const candidate = scripts[i] as unknown as WateringObjectLike;
-        if (!isNull(candidate) && typeof candidate.beginUnusedLifetime === 'function') {
+        if (
+          !isNull(candidate) &&
+          typeof candidate.beginUnusedLifetime === 'function' &&
+          typeof candidate.waterPlant === 'function'
+        ) {
           return candidate;
         }
       }
@@ -1034,6 +1124,10 @@ export class TrashBin extends BaseScriptComponent {
       return true;
     }
 
+    if (this.isGardenSourceContainerHierarchy(sceneObject)) {
+      return true;
+    }
+
     if (!isNull(this.getTrackedContentRoot(sceneObject))) {
       return false;
     }
@@ -1083,7 +1177,46 @@ export class TrashBin extends BaseScriptComponent {
     return false;
   }
 
-  private isInSpawnGrace(root: SceneObject, now: number): boolean {
+  private isGardenSourceContainerHierarchy(sceneObject: SceneObject): boolean {
+    let current = sceneObject;
+    while (!isNull(current)) {
+      if (this.isGardenSourceContainerRoot(current)) {
+        return true;
+      }
+      current = current.getParent();
+    }
+
+    return false;
+  }
+
+  private isGardenSourceContainerRoot(sceneObject: SceneObject): boolean {
+    const name = String(sceneObject.name || '');
+    for (let i = 0; i < this.gardenSourceContainerNames.length; i++) {
+      if (name === this.gardenSourceContainerNames[i]) {
+        return true;
+      }
+    }
+
+    return this.hasGardenSourceSpawnerScript(sceneObject);
+  }
+
+  private hasGardenSourceSpawnerScript(sceneObject: SceneObject): boolean {
+    const scripts = sceneObject.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as unknown as GardenSourceSpawnerLike;
+      if (
+        !isNull(candidate) &&
+        typeof candidate.setSpawnSuppressed === 'function' &&
+        typeof candidate.abortActiveSpawnPull === 'function'
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private isInSpawnGraceAt(root: SceneObject, now: number): boolean {
     for (let i = this.spawnGraceRoots.length - 1; i >= 0; i--) {
       const graceRoot = this.spawnGraceRoots[i];
       if (isNull(graceRoot) || now >= this.spawnGraceUntilTimes[i]) {

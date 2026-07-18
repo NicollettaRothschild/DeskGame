@@ -1,8 +1,7 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
 import {
-  isGardenSourceSpawnBlocked,
-  isInteractorNearMoveHandle,
-  scheduleGardenSourceSpawn,
+  shouldBlockGardenSourceSpawn,
+  setGardenSourceSpawnPullActive,
 } from './GardenSourceSpawnGuard';
 import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
 import { WateringObject } from './WateringObject';
@@ -36,6 +35,16 @@ type InteractableLike = ScriptComponent & {
   onTriggerEnd?: PublicEventLike<InteractorEventLike>;
   onTriggerEndOutside?: PublicEventLike<InteractorEventLike>;
   onTriggerCanceled?: PublicEventLike<InteractorEventLike>;
+  targetingMode?: number;
+  ignoreInteractionPlane?: boolean;
+};
+
+type AnchorWaterSpawner = {
+  saveObjectPosition?: () => void;
+  setActiveManipulatedRoot?: (root: SceneObject | null) => void;
+  notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
+  syncTrackedWrapperToContent?: (content: SceneObject) => void;
+  placeTrackedContentAtWorld?: (content: SceneObject, worldPos: vec3, worldRot?: quat) => void;
 };
 
 type PullState = {
@@ -48,6 +57,10 @@ type PullState = {
 export class MainWaterSource extends BaseScriptComponent {
   @input
   wateringObjectPrefab!: ObjectPrefab;
+
+  @input
+  @allowUndefined
+  anchorController!: ScriptComponent;
 
   @input
   @allowUndefined
@@ -92,9 +105,10 @@ export class MainWaterSource extends BaseScriptComponent {
     }
 
     const waterObject = this.activePull.waterObject;
+    setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
-      this.updateEvent.enabled = false;
+      (this.updateEvent as UpdateEvent).enabled = false;
     }
 
     scheduleDeferredDestroy(this, waterObject, () => {
@@ -160,18 +174,19 @@ export class MainWaterSource extends BaseScriptComponent {
     }
 
     this.isBound = true;
+    if (interactable.targetingMode !== undefined) {
+      interactable.targetingMode = 7;
+    }
+    if (interactable.ignoreInteractionPlane !== undefined) {
+      interactable.ignoreInteractionPlane = true;
+    }
     this.debugLog('bound to source Interactable.');
   }
 
   private onTriggerStart(event: InteractorEventLike, reason: string): void {
     const sourceRoot = this.getSceneObject();
     const interactor = event && event.interactor ? event.interactor : null;
-    if (
-      this.spawnSuppressed ||
-      isGardenSourceSpawnBlocked(sourceRoot) ||
-      this.isDirectManipulationInteraction(event) ||
-      isInteractorNearMoveHandle(sourceRoot, interactor)
-    ) {
+    if (shouldBlockGardenSourceSpawn(sourceRoot, interactor, this.spawnSuppressed)) {
       this.debugLog(`ignored ${reason}: move handle interaction.`);
       return;
     }
@@ -183,12 +198,7 @@ export class MainWaterSource extends BaseScriptComponent {
 
     const rayDistance = this.getRayDistance(interactor);
     const spawnPosition = this.getInteractorPosition(interactor, rayDistance);
-    scheduleGardenSourceSpawn(
-      this,
-      sourceRoot,
-      () => this.spawnSuppressed,
-      () => this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason)
-    );
+    this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason);
   }
 
   private beginSpawnPull(
@@ -197,6 +207,12 @@ export class MainWaterSource extends BaseScriptComponent {
     rayDistance: number,
     reason: string
   ): void {
+    const sourceRoot = this.getSceneObject();
+    if (shouldBlockGardenSourceSpawn(sourceRoot, interactor, this.spawnSuppressed)) {
+      this.debugLog(`ignored ${reason}: move handle interaction.`);
+      return;
+    }
+
     if (!this.allowMultipleActiveWaterObjects && !isNull(this.activePull)) {
       this.debugLog(`ignored ${reason}: water already active.`);
       return;
@@ -213,7 +229,18 @@ export class MainWaterSource extends BaseScriptComponent {
       interactor: interactor,
       rayDistance: rayDistance,
     };
+    setGardenSourceSpawnPullActive(this.getSceneObject(), true);
+    const anchorSpawner = this.getAnchorWaterSpawner();
+    if (!isNull(anchorSpawner)) {
+      const spawner = anchorSpawner as AnchorWaterSpawner;
+      if (typeof spawner.setActiveManipulatedRoot === 'function') {
+        spawner.setActiveManipulatedRoot(waterObject);
+      }
+      this.notifyTrashSpawnGrace(waterObject, 5);
+    }
+    playInteractionSound((sounds) => sounds.playGrabObject());
     this.ensureUpdateLoop();
+    this.updatePulledWaterPosition();
   }
 
   private onTriggerUpdate(event: InteractorEventLike): void {
@@ -238,13 +265,37 @@ export class MainWaterSource extends BaseScriptComponent {
     }
 
     const interactor = this.activePull.interactor;
-    if (!isNull(interactor) && interactor.isActive && !interactor.isActive()) {
-      this.releaseActivePull();
+    if (
+      interactor &&
+      typeof interactor.isActive === 'function' &&
+      !interactor.isActive()
+    ) {
+      this.finalizeReleasedPull(this.activePull.waterObject);
       return;
     }
 
     const position = this.getInteractorPosition(interactor, this.activePull.rayDistance);
-    this.activePull.waterObject.getTransform().setWorldPosition(position);
+    this.syncTrackedWrapper(this.activePull.waterObject, position);
+  }
+
+  private syncTrackedWrapper(content: SceneObject, worldPos?: vec3): void {
+    const anchorSpawner = this.getAnchorWaterSpawner();
+    if (!isNull(anchorSpawner)) {
+      const spawner = anchorSpawner as AnchorWaterSpawner;
+      if (!isNull(worldPos) && typeof spawner.placeTrackedContentAtWorld === 'function') {
+        spawner.placeTrackedContentAtWorld(content, worldPos);
+        return;
+      }
+
+      if (typeof spawner.syncTrackedWrapperToContent === 'function') {
+        spawner.syncTrackedWrapperToContent(content);
+        return;
+      }
+    }
+
+    if (!isNull(worldPos)) {
+      content.getTransform().setWorldPosition(worldPos);
+    }
   }
 
   private spawnWater(worldPosition: vec3, interactor: InteractorLike | null): SceneObject | null {
@@ -274,17 +325,24 @@ export class MainWaterSource extends BaseScriptComponent {
   }
 
   private getInteractorPosition(interactor: InteractorLike | null, rayDistance: number): vec3 {
-    if (!isNull(interactor)) {
-      if (interactor.activeTargetingMode === 1 && !isNull(interactor.startPoint)) {
-        return interactor.startPoint;
+    if (interactor) {
+      const startPoint = interactor.startPoint || null;
+      const direction = interactor.direction || null;
+      const targetHitPosition = interactor.targetHitPosition || null;
+      if (interactor.activeTargetingMode === 1 && startPoint) {
+        return startPoint;
       }
 
-      if (!isNull(interactor.startPoint) && !isNull(interactor.direction)) {
-        return interactor.startPoint.add(interactor.direction.uniformScale(rayDistance));
+      if (startPoint && direction) {
+        return startPoint.add(direction.uniformScale(rayDistance));
       }
 
-      if (!isNull(interactor.targetHitPosition)) {
-        return interactor.targetHitPosition;
+      if (targetHitPosition) {
+        return targetHitPosition;
+      }
+
+      if (startPoint) {
+        return startPoint;
       }
     }
 
@@ -292,15 +350,35 @@ export class MainWaterSource extends BaseScriptComponent {
   }
 
   private getRayDistance(interactor: InteractorLike | null): number {
-    if (!isNull(interactor) && !isNull(interactor.distanceToTarget)) {
+    if (interactor && interactor.distanceToTarget !== null && interactor.distanceToTarget !== undefined) {
       return Math.max(0, interactor.distanceToTarget);
     }
     return Math.max(0, this.fallbackRayDistance);
   }
 
-  private isDirectManipulationInteraction(event: InteractorEventLike): boolean {
-    const interactor = event && event.interactor ? event.interactor : null;
-    return !isNull(interactor) && interactor.activeTargetingMode === 7;
+  private getAnchorWaterSpawner(): AnchorWaterSpawner | null {
+    if (isNull(this.anchorController)) {
+      return null;
+    }
+
+    const candidate = this.anchorController as unknown as AnchorWaterSpawner;
+    if (typeof candidate.placeTrackedContentAtWorld === 'function') {
+      return candidate;
+    }
+
+    return null;
+  }
+
+  private notifyTrashSpawnGrace(root: SceneObject, graceSeconds: number): void {
+    const anchorSpawner = this.getAnchorWaterSpawner();
+    if (isNull(anchorSpawner)) {
+      return;
+    }
+
+    const spawner = anchorSpawner as AnchorWaterSpawner;
+    if (typeof spawner.notifyTrashSpawnGrace === 'function') {
+      spawner.notifyTrashSpawnGrace(root, graceSeconds);
+    }
   }
 
   private getSpawnParent(): SceneObject {
@@ -370,15 +448,41 @@ export class MainWaterSource extends BaseScriptComponent {
     this.updateEvent.enabled = true;
   }
 
-  private releaseActivePull(): void {
-    if (!isNull(this.activePull) && !isNull(this.activePull.waterObject)) {
-      this.beginUnusedLifetime(this.activePull.waterObject);
-      this.debugLog('released active water pull.');
-    }
+  private abandonActivePull(): void {
+    setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
-      this.updateEvent.enabled = false;
+      (this.updateEvent as UpdateEvent).enabled = false;
     }
+  }
+
+  private releaseActivePull(): void {
+    if (isNull(this.activePull) || isNull(this.activePull.waterObject)) {
+      return;
+    }
+
+    this.debugLog('released active water pull.');
+    this.finalizeReleasedPull(this.activePull.waterObject);
+  }
+
+  private finalizeReleasedPull(releasedWater: SceneObject): void {
+    this.abandonActivePull();
+
+    const anchorSpawner = this.getAnchorWaterSpawner();
+    if (!isNull(anchorSpawner)) {
+      const spawner = anchorSpawner as AnchorWaterSpawner;
+      const worldPos = releasedWater.getTransform().getWorldPosition();
+      if (typeof spawner.placeTrackedContentAtWorld === 'function') {
+        spawner.placeTrackedContentAtWorld(releasedWater, worldPos);
+      } else if (typeof spawner.syncTrackedWrapperToContent === 'function') {
+        spawner.syncTrackedWrapperToContent(releasedWater);
+      }
+      if (typeof spawner.setActiveManipulatedRoot === 'function') {
+        spawner.setActiveManipulatedRoot(releasedWater);
+      }
+    }
+
+    this.beginUnusedLifetime(releasedWater);
   }
 
   private beginUnusedLifetime(waterObject: SceneObject): void {

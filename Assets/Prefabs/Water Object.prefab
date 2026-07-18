@@ -172,8 +172,8 @@
       targetingMode: !<float> 3.000000
       targetingVisual: !<float> 1.000000
       ignoreInteractionPlane: false
-      keepHoverOnTrigger: false
-      enableInstantDrag: false
+      keepHoverOnTrigger: true
+      enableInstantDrag: true
       isScrollable: false
       allowMultipleInteractors: true
       enablePokeDirectionality: false
