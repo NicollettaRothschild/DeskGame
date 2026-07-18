@@ -92,6 +92,7 @@ export class TrashBin extends BaseScriptComponent {
   private spawnGraceUntilTimes: number[] = [];
   private moveInteractionWired = false;
   private bindAttempts = 0;
+  private trashMoveActive = false;
 
   onAwake(): void {
     this.ensureGrabCollider();
@@ -286,18 +287,22 @@ export class TrashBin extends BaseScriptComponent {
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;
 
+    const onGrabStart = (): void => {
+      this.onTrashGrabStart(root);
+    };
+
     const onRelease = (): void => {
-      this.persistTrashAnchorTransform();
+      this.onTrashGrabRelease();
     };
 
     if (interactable.onDragStart) {
-      interactable.onDragStart.add(() => this.markTrashBeingMoved(root));
+      interactable.onDragStart.add(onGrabStart);
     }
     if (interactable.onTriggerStart) {
-      interactable.onTriggerStart.add(() => this.markTrashBeingMoved(root));
+      interactable.onTriggerStart.add(onGrabStart);
     }
     if (interactable.onInteractorTriggerStart) {
-      interactable.onInteractorTriggerStart.add(() => this.markTrashBeingMoved(root));
+      interactable.onInteractorTriggerStart.add(onGrabStart);
     }
 
     if (interactable.onDragEnd) {
@@ -340,6 +345,26 @@ export class TrashBin extends BaseScriptComponent {
     if (!isNull(handler) && typeof handler.persistTrashTransform === 'function') {
       handler.persistTrashTransform();
     }
+  }
+
+  private onTrashGrabStart(root: SceneObject): void {
+    if (this.trashMoveActive) {
+      return;
+    }
+
+    this.trashMoveActive = true;
+    this.markTrashBeingMoved(root);
+    playInteractionSound((sounds) => sounds.playGrabObject());
+  }
+
+  private onTrashGrabRelease(): void {
+    if (!this.trashMoveActive) {
+      return;
+    }
+
+    this.trashMoveActive = false;
+    playInteractionSound((sounds) => sounds.playReleaseObject());
+    this.persistTrashAnchorTransform();
   }
 
   private markTrashBeingMoved(root: SceneObject): void {

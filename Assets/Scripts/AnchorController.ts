@@ -229,6 +229,8 @@ export class AnchorController extends BaseScriptComponent {
         spawnPot: this.spawnPotTrack,
         spawnWater: this.spawnWaterTrack,
         placeObject: this.placeObjectTrack,
+        grabObject: this.spawnPotTrack,
+        releaseObject: this.placeObjectTrack,
       },
       this.soundVolume,
       this.soundDebugLogging

@@ -13,6 +13,8 @@ export type InteractionSoundTracks = {
   spawnPot?: AudioTrackAsset | null;
   spawnWater?: AudioTrackAsset | null;
   placeObject?: AudioTrackAsset | null;
+  grabObject?: AudioTrackAsset | null;
+  releaseObject?: AudioTrackAsset | null;
 };
 
 export class InteractionSoundRegistry {
@@ -74,6 +76,20 @@ export class InteractionSoundRegistry {
 
   public static playPlaceObject(): void {
     InteractionSoundRegistry.play('placeObject', InteractionSoundRegistry.tracks.placeObject);
+  }
+
+  public static playGrabObject(): void {
+    InteractionSoundRegistry.play(
+      'grabObject',
+      InteractionSoundRegistry.tracks.grabObject ?? InteractionSoundRegistry.tracks.spawnPot
+    );
+  }
+
+  public static playReleaseObject(): void {
+    InteractionSoundRegistry.play(
+      'releaseObject',
+      InteractionSoundRegistry.tracks.releaseObject ?? InteractionSoundRegistry.tracks.placeObject
+    );
   }
 
   public static playWaterSplash(): void {
