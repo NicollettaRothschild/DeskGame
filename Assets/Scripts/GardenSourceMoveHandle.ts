@@ -1,4 +1,5 @@
 import {
+  isMoveHandleSceneObject,
   setGardenSourceMoveHandleActive,
   setGardenSourceMoveHandleHovered,
 } from './GardenSourceSpawnGuard';
@@ -63,6 +64,11 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
   private clonedOuterGlowMaterial: Material | null = null;
   private bindAttempts = 0;
   private moveActive = false;
+  private parentHovered = false;
+  private handleHovered = false;
+  private handleInteractable: InteractableLike | null = null;
+  private handleManipulation: InteractableManipulationLike | null = null;
+  private hideVisibilityEvent: DelayedCallbackEvent | null = null;
   private spawnInteractable: InteractableLike | null = null;
   private spawnInteractableWasEnabled = true;
   private spawnInteractableDisabledByHandle = false;
@@ -133,6 +139,8 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     manipulation.enableTranslation = true;
     manipulation.enableRotation = false;
     manipulation.enableScale = false;
+    this.handleInteractable = interactable;
+    this.handleManipulation = manipulation;
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;
 
@@ -195,8 +203,10 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     this.spawnInteractable = this.findSourceSpawnInteractable(sourceRoot);
     this.sourceSpawner = this.findSourceSpawner(sourceRoot);
     this.wireHandleHover(interactable, sourceRoot);
+    this.wireParentHover(sourceRoot);
     this.applyHandleVisual(handle);
     this.setSpawnBlocked(sourceRoot, false);
+    this.refreshHandleVisibility(true);
 
     this.moveInteractionWired = true;
     print(`${this.getSourceLabel()} move handle wired`);
@@ -223,6 +233,8 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     if (!isNull(primaryVisual)) {
       this.ensureGlowLayers(handle, primaryVisual.mesh);
     }
+
+    this.refreshHandleVisibility(true);
   }
 
   private ensureGlowLayers(handle: SceneObject, mesh: RenderMesh): void {
@@ -282,6 +294,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     }
 
     layer.getTransform().setLocalScale(new vec3(scale, scale, scale));
+    layer.enabled = this.shouldShowHandleGlow();
 
     const layerVisual = layer.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
     if (isNull(layerVisual)) {
@@ -305,7 +318,107 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     }
 
     layerVisual.mainMaterial = layerMaterial;
-    layerVisual.enabled = true;
+    layerVisual.enabled = this.shouldShowHandleGlow();
+  }
+
+  private wireParentHover(sourceRoot: SceneObject): void {
+    const parentInteractable = this.findSourceSpawnInteractable(sourceRoot);
+    if (isNull(parentInteractable)) {
+      return;
+    }
+
+    const onParentHoverEnter = (): void => {
+      this.parentHovered = true;
+      this.refreshHandleVisibility();
+    };
+    const onParentHoverExit = (): void => {
+      this.parentHovered = false;
+      this.refreshHandleVisibility();
+    };
+
+    if (parentInteractable.onHoverEnter) {
+      parentInteractable.onHoverEnter.add(onParentHoverEnter);
+    }
+    if (parentInteractable.onHoverExit) {
+      parentInteractable.onHoverExit.add(onParentHoverExit);
+    }
+    if (parentInteractable.onInteractorHoverEnter) {
+      parentInteractable.onInteractorHoverEnter.add(onParentHoverEnter);
+    }
+    if (parentInteractable.onInteractorHoverExit) {
+      parentInteractable.onInteractorHoverExit.add(onParentHoverExit);
+    }
+  }
+
+  private shouldShowHandleGlow(): boolean {
+    return this.parentHovered || this.handleHovered || this.moveActive;
+  }
+
+  private refreshHandleVisibility(immediateHide: boolean = false): void {
+    if (this.shouldShowHandleGlow()) {
+      this.cancelScheduledHide();
+      this.setHandleGlowVisible(true);
+      this.setHandleInteractionEnabled(true);
+      return;
+    }
+
+    if (immediateHide) {
+      this.cancelScheduledHide();
+      this.setHandleGlowVisible(false);
+      this.setHandleInteractionEnabled(false);
+      return;
+    }
+
+    this.scheduleHide();
+  }
+
+  private scheduleHide(): void {
+    this.cancelScheduledHide();
+    const event = this.createEvent('DelayedCallbackEvent') as DelayedCallbackEvent;
+    this.hideVisibilityEvent = event;
+    event.bind(() => {
+      this.hideVisibilityEvent = null;
+      if (this.shouldShowHandleGlow()) {
+        return;
+      }
+
+      this.setHandleGlowVisible(false);
+      this.setHandleInteractionEnabled(false);
+    });
+    event.reset(0.12);
+  }
+
+  private cancelScheduledHide(): void {
+    if (!isNull(this.hideVisibilityEvent)) {
+      this.hideVisibilityEvent.enabled = false;
+      this.hideVisibilityEvent = null;
+    }
+  }
+
+  private setHandleGlowVisible(visible: boolean): void {
+    const halo = this.findNamedChild(this.getSceneObject(), 'GlowHalo');
+    if (isNull(halo)) {
+      return;
+    }
+
+    halo.enabled = visible;
+    const layerVisual = halo.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+    if (!isNull(layerVisual)) {
+      layerVisual.enabled = visible;
+    }
+  }
+
+  private setHandleInteractionEnabled(enabled: boolean): void {
+    if (this.moveActive) {
+      enabled = true;
+    }
+
+    if (!isNull(this.handleInteractable)) {
+      (this.handleInteractable as ScriptComponent).enabled = enabled;
+    }
+    if (!isNull(this.handleManipulation)) {
+      (this.handleManipulation as ScriptComponent).enabled = enabled;
+    }
   }
 
   private findNamedChild(root: SceneObject, name: string): SceneObject | null {
@@ -321,14 +434,18 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
 
   private wireHandleHover(interactable: InteractableLike, sourceRoot: SceneObject): void {
     const onHoverEnter = (): void => {
+      this.handleHovered = true;
       setGardenSourceMoveHandleHovered(sourceRoot, true);
       this.setSpawnBlocked(sourceRoot, true);
+      this.refreshHandleVisibility();
     };
     const onHoverExit = (): void => {
+      this.handleHovered = false;
       setGardenSourceMoveHandleHovered(sourceRoot, false);
       if (!this.moveActive) {
         this.setSpawnBlocked(sourceRoot, false);
       }
+      this.refreshHandleVisibility();
     };
 
     if (interactable.onHoverEnter) {
@@ -353,6 +470,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     this.moveActive = true;
     setGardenSourceMoveHandleActive(sourceRoot, true);
     this.setSpawnBlocked(sourceRoot, true);
+    this.refreshHandleVisibility();
     this.abortMistakenSpawnPull();
     const handler = this.getAnchorHandler();
     if (!isNull(handler) && typeof handler.setActiveManipulatedRoot === 'function') {
@@ -372,6 +490,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       setGardenSourceMoveHandleActive(sourceRoot, false);
       this.setSpawnBlocked(sourceRoot, false);
     }
+    this.refreshHandleVisibility();
     playInteractionSound((sounds) => sounds.playReleaseObject());
     const handler = this.getAnchorHandler();
     if (!isNull(handler) && typeof handler.persistGardenSourceTransform === 'function') {
@@ -430,7 +549,15 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
   }
 
   private findSourceSpawnInteractable(sourceRoot: SceneObject): InteractableLike | null {
-    const scripts = sourceRoot.getComponents('Component.ScriptComponent');
+    return this.findSpawnInteractableOnObject(sourceRoot);
+  }
+
+  private findSpawnInteractableOnObject(root: SceneObject): InteractableLike | null {
+    if (isMoveHandleSceneObject(root)) {
+      return null;
+    }
+
+    const scripts = root.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
       const candidate = scripts[i] as unknown as InteractableLike;
       if (
@@ -445,6 +572,19 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       }
 
       return candidate;
+    }
+
+    const count = root.getChildrenCount();
+    for (let i = 0; i < count; i++) {
+      const child = root.getChild(i);
+      if (isMoveHandleSceneObject(child)) {
+        continue;
+      }
+
+      const nested = this.findSpawnInteractableOnObject(child);
+      if (!isNull(nested)) {
+        return nested;
+      }
     }
 
     return null;

@@ -2104,7 +2104,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     layer.getTransform().setLocalScale(new vec3(scale, scale, scale));
-    layer.enabled = true;
+    layer.enabled = false;
 
     const layerVisual = layer.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
     if (isNull(layerVisual)) {
@@ -2129,7 +2129,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     layerVisual.mainMaterial = layerMaterial;
-    layerVisual.enabled = true;
+    layerVisual.enabled = false;
   }
 
   private wireAIContainerMovement(): void {
