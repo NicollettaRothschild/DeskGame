@@ -133,6 +133,10 @@ export class AnchorController extends BaseScriptComponent {
 
   @input
   @allowUndefined
+  hoverTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
   trashBin!: ScriptComponent;
 
   @input
@@ -242,6 +246,7 @@ export class AnchorController extends BaseScriptComponent {
         placeObject: this.placeObjectTrack,
         grabObject: this.spawnPotTrack,
         releaseObject: this.placeObjectTrack,
+        hover: this.hoverTrack ?? this.placeObjectTrack,
       },
       this.soundVolume,
       this.soundDebugLogging

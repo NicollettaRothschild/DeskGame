@@ -15,6 +15,7 @@ export type InteractionSoundTracks = {
   placeObject?: AudioTrackAsset | null;
   grabObject?: AudioTrackAsset | null;
   releaseObject?: AudioTrackAsset | null;
+  hover?: AudioTrackAsset | null;
 };
 
 export class InteractionSoundRegistry {
@@ -96,6 +97,14 @@ export class InteractionSoundRegistry {
     InteractionSoundRegistry.play('waterSplash', InteractionSoundRegistry.tracks.watering);
   }
 
+  public static playHover(): void {
+    InteractionSoundRegistry.play(
+      'hover',
+      InteractionSoundRegistry.tracks.hover ?? InteractionSoundRegistry.tracks.placeObject,
+      0.25
+    );
+  }
+
   private static collectPlayers(host: SceneObject): void {
     const players: AudioComponent[] = [];
     const components = host.getComponents('Component.AudioComponent') as AudioComponent[];
@@ -140,7 +149,11 @@ export class InteractionSoundRegistry {
     return fallback;
   }
 
-  private static play(key: string, track: AudioTrackAsset | null | undefined): void {
+  private static play(
+    key: string,
+    track: AudioTrackAsset | null | undefined,
+    minReplayInterval = InteractionSoundRegistry.minReplayInterval
+  ): void {
     if (!InteractionSoundRegistry.ready) {
       InteractionSoundRegistry.debugLog(`skip ${key}: registry not ready`);
       return;
@@ -152,7 +165,7 @@ export class InteractionSoundRegistry {
 
     const now = getTime();
     const lastPlay = InteractionSoundRegistry.lastPlayTimes[key] ?? -999;
-    if (now - lastPlay < InteractionSoundRegistry.minReplayInterval) {
+    if (now - lastPlay < minReplayInterval) {
       return;
     }
     InteractionSoundRegistry.lastPlayTimes[key] = now;

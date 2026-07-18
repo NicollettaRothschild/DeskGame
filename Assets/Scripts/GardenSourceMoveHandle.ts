@@ -69,6 +69,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
   private handleInteractable: InteractableLike | null = null;
   private handleManipulation: InteractableManipulationLike | null = null;
   private hideVisibilityEvent: DelayedCallbackEvent | null = null;
+  private glowVisible = false;
   private spawnInteractable: InteractableLike | null = null;
   private spawnInteractableWasEnabled = true;
   private spawnInteractableDisabledByHandle = false;
@@ -351,12 +352,22 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
   }
 
   private shouldShowHandleGlow(): boolean {
-    return this.parentHovered || this.handleHovered || this.moveActive;
+    return (this.parentHovered || this.handleHovered) && !this.moveActive;
   }
 
   private refreshHandleVisibility(immediateHide: boolean = false): void {
+    if (this.moveActive) {
+      this.cancelScheduledHide();
+      this.setHandleGlowVisible(false);
+      this.setHandleInteractionEnabled(true);
+      return;
+    }
+
     if (this.shouldShowHandleGlow()) {
       this.cancelScheduledHide();
+      if (!this.glowVisible) {
+        playInteractionSound((sounds) => sounds.playHover());
+      }
       this.setHandleGlowVisible(true);
       this.setHandleInteractionEnabled(true);
       return;
@@ -378,7 +389,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     this.hideVisibilityEvent = event;
     event.bind(() => {
       this.hideVisibilityEvent = null;
-      if (this.shouldShowHandleGlow()) {
+      if (this.shouldShowHandleGlow() || this.moveActive) {
         return;
       }
 
@@ -406,6 +417,8 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     if (!isNull(layerVisual)) {
       layerVisual.enabled = visible;
     }
+
+    this.glowVisible = visible;
   }
 
   private setHandleInteractionEnabled(enabled: boolean): void {

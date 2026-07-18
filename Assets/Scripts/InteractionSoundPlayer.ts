@@ -46,6 +46,10 @@ export class InteractionSoundPlayer extends BaseScriptComponent {
   @allowUndefined
   placeObjectTrack!: AudioTrackAsset;
 
+  @input
+  @allowUndefined
+  hoverTrack!: AudioTrackAsset;
+
   onAwake(): void {
     this.configureRegistry();
     this.createEvent('OnStartEvent').bind(() => this.configureRegistry());
@@ -65,6 +69,7 @@ export class InteractionSoundPlayer extends BaseScriptComponent {
         placeObject: this.placeObjectTrack,
         grabObject: this.spawnPotTrack,
         releaseObject: this.placeObjectTrack,
+        hover: this.hoverTrack ?? this.placeObjectTrack,
       },
       this.volume,
       this.debugLogging
