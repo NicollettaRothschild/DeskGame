@@ -12,7 +12,7 @@ import { InteractionSoundRegistry, playInteractionSound } from './InteractionSou
 import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
 import { SpecsApiClient } from './SpecsApiClient';
 
-const ANCHOR_CONTROLLER_VERSION = 'v27-seeds-template-hidden';
+const ANCHOR_CONTROLLER_VERSION = 'v28-sack-texture-fix';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
 const SEEDS_STATIC_CHILD_NAMES = new Set([
   'Pot1',
@@ -153,7 +153,16 @@ export class AnchorController extends BaseScriptComponent {
   @allowUndefined
   specsApi!: SpecsApiClient;
 
+  @input
+  @allowUndefined
+  sackMaterial!: Material;
+
+  @input
+  @allowUndefined
+  sackTexture!: Texture;
+
   private anchorSession?: AnchorSession;
+  private clonedSackMaterial: Material | null = null;
   private wrappers: SceneObject[] = [];
   private objs: SceneObject[] = [];
   private objectKinds: string[] = [];
@@ -1627,6 +1636,73 @@ export class AnchorController extends BaseScriptComponent {
         i--;
       }
     }
+
+    this.applySeedSackVisual(source);
+  }
+
+  private findNamedChild(root: SceneObject, name: string): SceneObject | null {
+    if (isNull(root)) {
+      return null;
+    }
+
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      if (String(current.name || '') === name) {
+        return current;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
+  }
+
+  private applySeedSackVisual(seedsRoot: SceneObject): void {
+    if (isNull(this.sackMaterial) || isNull(this.sackTexture)) {
+      return;
+    }
+
+    const seedSack = this.findNamedChild(seedsRoot, 'SeedSack');
+    if (isNull(seedSack)) {
+      return;
+    }
+
+    seedSack.enabled = true;
+    const sackObject = this.findNamedChild(seedSack, 'sack');
+    if (isNull(sackObject)) {
+      return;
+    }
+
+    sackObject.enabled = true;
+    const visuals = sackObject.getComponents('Component.RenderMeshVisual');
+    if (visuals.length === 0) {
+      return;
+    }
+
+    if (isNull(this.clonedSackMaterial)) {
+      this.clonedSackMaterial = this.sackMaterial.clone();
+    }
+
+    this.clonedSackMaterial.mainPass.baseTex = this.sackTexture;
+    for (let i = 0; i < visuals.length; i++) {
+      const visual = visuals[i] as RenderMeshVisual;
+      if (isNull(visual)) {
+        continue;
+      }
+      visual.mainMaterial = this.clonedSackMaterial;
+      visual.enabled = true;
+    }
+
+    print(
+      `Seed sack texture applied (${this.sackTexture.name}) on ${visuals.length} mesh visual(s)`
+    );
   }
 
   private restoreGardenSpawnSourcesLayout(reason: string): void {

@@ -4,58 +4,11 @@
     - !<own> 2a034449-6de9-4c0e-af57-27c107d27e20
 - !<PassInfo/2a034449-6de9-4c0e-af57-27c107d27e20>
   CachedProperties:
-    - Port_Depth_N004:
-        typeIdx: 1
-        value: 1.000000
-    - Port_FinalColor1_N004:
-        typeIdx: 5
-        value: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-    - Port_FinalColor2_N004:
-        typeIdx: 5
-        value: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-    - Port_FinalColor3_N004:
-        typeIdx: 5
-        value: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-    - Port_FinalColor_N004:
-        typeIdx: 5
-        value: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-    - Port_GSplatPointSize_N004:
-        typeIdx: 1
-        value: 0.000000
-    - Port_GSplatRotation_N004:
-        typeIdx: 5
-        value: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
-    - Port_GSplatScale_N004:
-        typeIdx: 4
-        value: {x: 0.000000, y: 0.000000, z: 0.000000}
-    - Port_LODValue_N000:
-        typeIdx: 1
-        value: 0.000000
-    - Port_PrevWorldPosition_N004:
-        typeIdx: 4
-        value: {x: 0.000000, y: 0.000000, z: 0.000000}
-    - Port_RayDirection_N004:
-        typeIdx: 4
-        value: {x: 0.000000, y: 1.000000, z: 0.000000}
-    - Port_RayOrigin_N004:
-        typeIdx: 4
-        value: {x: 0.000000, y: 0.000000, z: 0.000000}
-    - Port_UVCoord_N000:
-        typeIdx: 3
-        value: {x: 0.000000, y: 0.000000}
-    - Port_WorldNormal_N004:
-        typeIdx: 4
-        value: {x: 0.000000, y: 1.000000, z: 0.000000}
-    - Port_WorldPosition_N004:
-        typeIdx: 4
-        value: {x: 0.000000, y: 0.000000, z: 0.000000}
-    - Port_WorldTangent_N004:
-        typeIdx: 4
-        value: {x: 0.000000, y: 0.000000, z: 1.000000}
+    []
   DepthWrite: true
   DepthTest: true
   DepthFunction: LessEqual
-  TwoSided: false
+  TwoSided: true
   ColorMask: {x: true, y: true, z: true, w: true}
   CullMode: Back
   PolygonOffset: {x: 0.000000, y: 0.000000}
@@ -63,22 +16,40 @@
   FrustumCullPad: 0.000000
   InstanceCount: 1
   Defines:
-    []
+    - ENABLE_BASE_TEX
   BlendMode: Disabled
   Properties:
+    Port_AO_N006:
+      typeIdx: 4
+      value: {x: 1.000000, y: 1.000000, z: 1.000000}
+    Port_Emissive_N006:
+      typeIdx: 4
+      value: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Port_SpecularAO_N006:
+      typeIdx: 4
+      value: {x: 1.000000, y: 1.000000, z: 1.000000}
     PreviewEnabled:
       typeIdx: 0
       value: 0
-    Tweak_N0:
+    baseColor:
+      typeIdx: 5
+      value: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    baseTex:
       typeIdx: 9
       value:
-        id: effd577f-30ba-4e3f-9f0f-5464190bd3f8
+        id: a7d396e2-eb3f-4f67-b8cf-2a4db49965bd
         sampler:
           filteringMode: Trilinear
           wrapModeU: Repeat
           wrapModeV: Repeat
           wrapModeW: Repeat
           borderColor: {x: 0.000000, y: 0.000000, z: 0.000000, w: 0.000000}
-          mipmaps: false
+          mipmaps: true
         type: Texture2D
-  Pass: !<reference> 23cf1d55-ce91-4a73-b079-66c902c8fd2b
+    metallic:
+      typeIdx: 1
+      value: 0.000000
+    roughness:
+      typeIdx: 1
+      value: 0.900000
+  Pass: !<reference> 188ccf35-4e86-4d2d-ac3a-5ea6ac2d43de

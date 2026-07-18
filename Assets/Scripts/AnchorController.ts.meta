@@ -38,6 +38,8 @@
     plantSeedTrack: false
     planterRoot: false
     potPrefabs: false
+    sackMaterial: false
+    sackTexture: false
     seedsRoot: false
     soundDebugLogging: false
     soundVolume: false
@@ -87,6 +89,8 @@
       seedsRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      sackTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
@@ -116,3 +120,5 @@
     - // @input SceneObject seedsRoot
     - // @input Component.ScriptComponent spacePanel
     - // @input AssignableType_3 specsApi
+    - // @input Asset.Material sackMaterial
+    - // @input Asset.Texture sackTexture
