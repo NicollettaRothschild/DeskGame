@@ -1,4 +1,10 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
+import {
+  isGardenSourceSpawnBlocked,
+  isInteractorNearMoveHandle,
+  scheduleGardenSourceSpawn,
+} from './GardenSourceSpawnGuard';
+import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
 import { WateringObject } from './WateringObject';
 
 type PublicEventLike<T> = {
@@ -70,9 +76,30 @@ export class MainWaterSource extends BaseScriptComponent {
   private updateEvent: UpdateEvent | null = null;
   private bindAttempts = 0;
   private isBound = false;
+  private spawnSuppressed = false;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => this.tryBindInteractable());
+  }
+
+  public setSpawnSuppressed(suppressed: boolean): void {
+    this.spawnSuppressed = suppressed;
+  }
+
+  public abortActiveSpawnPull(): void {
+    if (isNull(this.activePull) || isNull(this.activePull.waterObject)) {
+      return;
+    }
+
+    const waterObject = this.activePull.waterObject;
+    this.activePull = null;
+    if (!isNull(this.updateEvent)) {
+      this.updateEvent.enabled = false;
+    }
+
+    scheduleDeferredDestroy(this, waterObject, () => {
+      this.debugLog('aborted mistaken spawn pull for move handle.');
+    });
   }
 
   public spawnWaterAtSource(): SceneObject | null {
@@ -137,14 +164,44 @@ export class MainWaterSource extends BaseScriptComponent {
   }
 
   private onTriggerStart(event: InteractorEventLike, reason: string): void {
+    const sourceRoot = this.getSceneObject();
+    const interactor = event && event.interactor ? event.interactor : null;
+    if (
+      this.spawnSuppressed ||
+      isGardenSourceSpawnBlocked(sourceRoot) ||
+      this.isDirectManipulationInteraction(event) ||
+      isInteractorNearMoveHandle(sourceRoot, interactor)
+    ) {
+      this.debugLog(`ignored ${reason}: move handle interaction.`);
+      return;
+    }
+
     if (!this.allowMultipleActiveWaterObjects && !isNull(this.activePull)) {
       this.debugLog(`ignored ${reason}: water already active.`);
       return;
     }
 
-    const interactor = event && event.interactor ? event.interactor : null;
     const rayDistance = this.getRayDistance(interactor);
     const spawnPosition = this.getInteractorPosition(interactor, rayDistance);
+    scheduleGardenSourceSpawn(
+      this,
+      sourceRoot,
+      () => this.spawnSuppressed,
+      () => this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason)
+    );
+  }
+
+  private beginSpawnPull(
+    spawnPosition: vec3,
+    interactor: InteractorLike | null,
+    rayDistance: number,
+    reason: string
+  ): void {
+    if (!this.allowMultipleActiveWaterObjects && !isNull(this.activePull)) {
+      this.debugLog(`ignored ${reason}: water already active.`);
+      return;
+    }
+
     this.debugLog(`spawning water from ${reason}.`);
     const waterObject = this.spawnWater(spawnPosition, interactor);
     if (isNull(waterObject)) {
@@ -239,6 +296,11 @@ export class MainWaterSource extends BaseScriptComponent {
       return Math.max(0, interactor.distanceToTarget);
     }
     return Math.max(0, this.fallbackRayDistance);
+  }
+
+  private isDirectManipulationInteraction(event: InteractorEventLike): boolean {
+    const interactor = event && event.interactor ? event.interactor : null;
+    return !isNull(interactor) && interactor.activeTargetingMode === 7;
   }
 
   private getSpawnParent(): SceneObject {

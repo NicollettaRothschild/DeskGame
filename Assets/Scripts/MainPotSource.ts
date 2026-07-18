@@ -1,4 +1,10 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
+import {
+  isGardenSourceSpawnBlocked,
+  isInteractorNearMoveHandle,
+  scheduleGardenSourceSpawn,
+} from './GardenSourceSpawnGuard';
+import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
 
 type PublicEventLike<T> = {
   add(callback: (event: T) => void): void;
@@ -40,6 +46,7 @@ type AnchorPotSpawner = {
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
   notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
+  destroyTrackedObject?: (candidate: SceneObject) => boolean;
 };
 
 type PullState = {
@@ -85,9 +92,40 @@ export class MainPotSource extends BaseScriptComponent {
   private bindAttempts = 0;
   private isBound = false;
   private nextPotIndex = 0;
+  private spawnSuppressed = false;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => this.tryBindInteractable());
+  }
+
+  public setSpawnSuppressed(suppressed: boolean): void {
+    this.spawnSuppressed = suppressed;
+  }
+
+  public abortActiveSpawnPull(): void {
+    if (isNull(this.activePull) || isNull(this.activePull.potObject)) {
+      return;
+    }
+
+    const potObject = this.activePull.potObject;
+    this.activePull = null;
+    if (!isNull(this.updateEvent)) {
+      (this.updateEvent as UpdateEvent).enabled = false;
+    }
+
+    const anchorSpawner = this.getAnchorPotSpawner();
+    if (
+      !isNull(anchorSpawner) &&
+      typeof anchorSpawner.destroyTrackedObject === 'function' &&
+      anchorSpawner.destroyTrackedObject(potObject)
+    ) {
+      this.debugLog('aborted mistaken spawn pull for move handle.');
+      return;
+    }
+
+    scheduleDeferredDestroy(this, potObject, () => {
+      this.debugLog('aborted mistaken spawn pull for move handle.');
+    });
   }
 
   public spawnPotAtSource(): SceneObject | null {
@@ -144,14 +182,44 @@ export class MainPotSource extends BaseScriptComponent {
   }
 
   private onTriggerStart(event: InteractorEventLike, reason: string): void {
+    const sourceRoot = this.getSceneObject();
+    const interactor = event && event.interactor ? event.interactor : null;
+    if (
+      this.spawnSuppressed ||
+      isGardenSourceSpawnBlocked(sourceRoot) ||
+      this.isDirectManipulationInteraction(event) ||
+      isInteractorNearMoveHandle(sourceRoot, interactor)
+    ) {
+      this.debugLog(`ignored ${reason}: move handle interaction.`);
+      return;
+    }
+
     if (!this.allowMultipleActivePots && !isNull(this.activePull)) {
       this.debugLog(`ignored ${reason}: pot already active.`);
       return;
     }
 
-    const interactor = event && event.interactor ? event.interactor : null;
     const rayDistance = this.getRayDistance(interactor);
     const spawnPosition = this.getInteractorPosition(interactor, rayDistance);
+    scheduleGardenSourceSpawn(
+      this,
+      sourceRoot,
+      () => this.spawnSuppressed,
+      () => this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason)
+    );
+  }
+
+  private beginSpawnPull(
+    spawnPosition: vec3,
+    interactor: InteractorLike | null,
+    rayDistance: number,
+    reason: string
+  ): void {
+    if (!this.allowMultipleActivePots && !isNull(this.activePull)) {
+      this.debugLog(`ignored ${reason}: pot already active.`);
+      return;
+    }
+
     this.debugLog(`spawning pot from ${reason}.`);
     const potObject = this.spawnPot(spawnPosition, interactor);
     if (isNull(potObject)) {
@@ -283,6 +351,11 @@ export class MainPotSource extends BaseScriptComponent {
       return Math.max(0, interactor.distanceToTarget);
     }
     return Math.max(0, this.fallbackRayDistance);
+  }
+
+  private isDirectManipulationInteraction(event: InteractorEventLike): boolean {
+    const interactor = event && event.interactor ? event.interactor : null;
+    return !isNull(interactor) && interactor.activeTargetingMode === 7;
   }
 
   private getSpawnParent(): SceneObject {

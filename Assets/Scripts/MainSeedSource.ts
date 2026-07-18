@@ -1,4 +1,10 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
+import {
+  isGardenSourceSpawnBlocked,
+  isInteractorNearMoveHandle,
+  scheduleGardenSourceSpawn,
+} from './GardenSourceSpawnGuard';
+import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
 import { PlantLifecycle } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 import { registerPreDestroyHook } from './FlowGardenDestroyHooks';
@@ -32,12 +38,14 @@ type InteractableLike = ScriptComponent & {
   onTriggerEnd?: PublicEventLike<InteractorEventLike>;
   onTriggerEndOutside?: PublicEventLike<InteractorEventLike>;
   onTriggerCanceled?: PublicEventLike<InteractorEventLike>;
+  targetingMode?: number;
 };
 
 type AnchorSeedSpawner = {
   createSeedAtWorldPosition(worldPos: vec3): SceneObject | null;
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
+  destroyTrackedObject?: (candidate: SceneObject) => boolean;
 };
 
 type PullState = {
@@ -87,10 +95,41 @@ export class MainSeedSource extends BaseScriptComponent {
   private bindAttempts = 0;
   private isBound = false;
   private nextConfigIndex = 0;
+  private spawnSuppressed = false;
 
   onAwake(): void {
     registerPreDestroyHook((root) => this.abandonActivePullIfMatches(root));
     this.createEvent('OnStartEvent').bind(() => this.tryBindInteractable());
+  }
+
+  public setSpawnSuppressed(suppressed: boolean): void {
+    this.spawnSuppressed = suppressed;
+  }
+
+  public abortActiveSpawnPull(): void {
+    if (isNull(this.activePull) || isNull(this.activePull.seedObject)) {
+      return;
+    }
+
+    const seedObject = this.activePull.seedObject;
+    this.activePull = null;
+    if (!isNull(this.updateEvent)) {
+      (this.updateEvent as UpdateEvent).enabled = false;
+    }
+
+    const anchorSpawner = this.getAnchorSeedSpawner();
+    if (
+      !isNull(anchorSpawner) &&
+      typeof anchorSpawner.destroyTrackedObject === 'function' &&
+      anchorSpawner.destroyTrackedObject(seedObject)
+    ) {
+      this.debugLog('aborted mistaken spawn pull for move handle.');
+      return;
+    }
+
+    scheduleDeferredDestroy(this, seedObject, () => {
+      this.debugLog('aborted mistaken spawn pull for move handle.');
+    });
   }
 
   public spawnSeedAtSource(): SceneObject | null {
@@ -147,14 +186,44 @@ export class MainSeedSource extends BaseScriptComponent {
   }
 
   private onTriggerStart(event: InteractorEventLike, reason: string): void {
+    const sourceRoot = this.getSceneObject();
+    const interactor = event && event.interactor ? event.interactor : null;
+    if (
+      this.spawnSuppressed ||
+      isGardenSourceSpawnBlocked(sourceRoot) ||
+      this.isDirectManipulationInteraction(event) ||
+      isInteractorNearMoveHandle(sourceRoot, interactor)
+    ) {
+      this.debugLog(`ignored ${reason}: move handle interaction.`);
+      return;
+    }
+
     if (!this.allowMultipleActiveSeeds && !isNull(this.activePull)) {
       this.debugLog(`ignored ${reason}: seed already active.`);
       return;
     }
 
-    const interactor = event && event.interactor ? event.interactor : null;
     const rayDistance = this.getRayDistance(interactor);
     const spawnPosition = this.getInteractorPosition(interactor, rayDistance);
+    scheduleGardenSourceSpawn(
+      this,
+      sourceRoot,
+      () => this.spawnSuppressed,
+      () => this.beginSpawnPull(spawnPosition, interactor, rayDistance, reason)
+    );
+  }
+
+  private beginSpawnPull(
+    spawnPosition: vec3,
+    interactor: InteractorLike | null,
+    rayDistance: number,
+    reason: string
+  ): void {
+    if (!this.allowMultipleActiveSeeds && !isNull(this.activePull)) {
+      this.debugLog(`ignored ${reason}: seed already active.`);
+      return;
+    }
+
     this.debugLog(`spawning seed from ${reason}.`);
     const seedObject = this.spawnSeed(spawnPosition, interactor);
     if (isNull(seedObject)) {
@@ -329,6 +398,11 @@ export class MainSeedSource extends BaseScriptComponent {
     return Math.max(0, this.fallbackRayDistance);
   }
 
+  private isDirectManipulationInteraction(event: InteractorEventLike): boolean {
+    const interactor = event && event.interactor ? event.interactor : null;
+    return !isNull(interactor) && interactor.activeTargetingMode === 7;
+  }
+
   private getSpawnParent(): SceneObject {
     if (!isNull(this.spawnParent)) {
       return this.spawnParent;
@@ -351,24 +425,69 @@ export class MainSeedSource extends BaseScriptComponent {
     return null;
   }
 
-  private getSourceInteractable(): InteractableLike {
+  private getSourceInteractable(): InteractableLike | null {
     if (!isNull(this.sourceInteractable)) {
       return this.sourceInteractable as InteractableLike;
     }
 
-    const scripts = this.getSceneObject().getComponents('Component.ScriptComponent');
+    const fromRoot = this.findSpawnInteractableOnObject(this.getSceneObject());
+    if (!isNull(fromRoot)) {
+      return fromRoot;
+    }
+
+    const seedSack = this.findNamedChild(this.getSceneObject(), 'SeedSack');
+    if (!isNull(seedSack)) {
+      return this.findSpawnInteractableOnObject(seedSack);
+    }
+
+    return null;
+  }
+
+  private findSpawnInteractableOnObject(root: SceneObject): InteractableLike | null {
+    const scripts = root.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
       const candidate = scripts[i] as InteractableLike;
       if (
         !isNull(candidate) &&
-        (candidate.onInteractorTriggerStart !== undefined || candidate.onTriggerStart !== undefined) &&
-        candidate.onTriggerUpdate !== undefined
+        candidate.targetingMode !== undefined &&
+        candidate.targetingMode !== 7 &&
+        (candidate.onInteractorTriggerStart !== undefined ||
+          candidate.onTriggerStart !== undefined ||
+          candidate.onDragStart !== undefined)
       ) {
         return candidate;
       }
     }
 
-    return null as unknown as InteractableLike;
+    for (let i = 0; i < root.getChildrenCount(); i++) {
+      const child = root.getChild(i);
+      const nested = this.findSpawnInteractableOnObject(child);
+      if (!isNull(nested)) {
+        return nested;
+      }
+    }
+
+    return null;
+  }
+
+  private findNamedChild(root: SceneObject, name: string): SceneObject | null {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      if (String(current.name || '') === name) {
+        return current;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
   }
 
   private tryBindInteractable(): void {
@@ -377,10 +496,10 @@ export class MainSeedSource extends BaseScriptComponent {
     }
 
     const interactable = this.getSourceInteractable();
-    if (!isNull(interactable)) {
-      this.bindInteractable(interactable);
-    } else {
+    if (isNull(interactable)) {
       this.debugLog('no source Interactable found yet.');
+    } else {
+      this.bindInteractable(interactable);
     }
 
     if (this.isBound) {

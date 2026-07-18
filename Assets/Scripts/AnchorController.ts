@@ -12,8 +12,9 @@ import { InteractionSoundRegistry, playInteractionSound } from './InteractionSou
 import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
 import { SpecsApiClient } from './SpecsApiClient';
 
-const ANCHOR_CONTROLLER_VERSION = 'v28-sack-texture-fix';
+const ANCHOR_CONTROLLER_VERSION = 'v31-handle-spawn-defer';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
+const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
 const SEEDS_STATIC_CHILD_NAMES = new Set([
   'Pot1',
   'Cube',
@@ -23,6 +24,7 @@ const SEEDS_STATIC_CHILD_NAMES = new Set([
   'Seed',
   'SeedSack',
   'Backpack',
+  GARDEN_SOURCE_MOVE_HANDLE_NAME,
 ]);
 const SEEDS_HIDDEN_CHILD_NAMES = new Set([
   'Seed',
@@ -161,6 +163,10 @@ export class AnchorController extends BaseScriptComponent {
   @allowUndefined
   sackTexture!: Texture;
 
+  @input
+  @allowUndefined
+  moveHandleMaterial!: Material;
+
   private anchorSession?: AnchorSession;
   private clonedSackMaterial: Material | null = null;
   private wrappers: SceneObject[] = [];
@@ -272,6 +278,7 @@ export class AnchorController extends BaseScriptComponent {
       }
       this.applyAIContainerSavedPose();
       this.wireTrashBinMovement();
+      this.wireGardenSourceMoveHandles();
       this.restoreGardenSpawnSourcesLayout('minimal-boot');
       this.hasRestored = true;
       this.textlog.text =
@@ -302,6 +309,7 @@ export class AnchorController extends BaseScriptComponent {
 
     this.startAnchorSaveLoop();
     this.wireTrashBinMovement();
+    this.wireGardenSourceMoveHandles();
     this.wireAIContainerMovement();
     this.startAIContainerPersistenceLoop();
 
@@ -1705,6 +1713,24 @@ export class AnchorController extends BaseScriptComponent {
     print(
       `Seed sack texture applied (${this.sackTexture.name}) on ${visuals.length} mesh visual(s)`
     );
+
+    this.ensureSeedSackCollider(sackObject);
+  }
+
+  private ensureSeedSackCollider(sackObject: SceneObject): void {
+    let collider = sackObject.getComponent('Component.ColliderComponent') as ColliderComponent;
+    if (isNull(collider)) {
+      collider = sackObject.createComponent('Component.ColliderComponent') as ColliderComponent;
+    }
+
+    if (isNull(collider)) {
+      return;
+    }
+
+    collider.enabled = true;
+    collider.intangible = false;
+    collider.fitVisual = true;
+    collider.shape = Shape.createBoxShape();
   }
 
   private restoreGardenSpawnSourcesLayout(reason: string): void {
@@ -1945,6 +1971,85 @@ export class AnchorController extends BaseScriptComponent {
     };
     if (!isNull(trash) && typeof trash.wireMoveInteraction === 'function') {
       trash.wireMoveInteraction();
+    }
+  }
+
+  public persistGardenSourceTransform(sourceName: string): void {
+    const source = this.findGardenSpawnSource(sourceName);
+    if (isNull(source)) {
+      return;
+    }
+
+    const transform = source.getTransform();
+    this.gardenSpawnSourceDefaults.set(sourceName, {
+      pos: transform.getWorldPosition(),
+      rot: transform.getWorldRotation(),
+      scale: transform.getWorldScale(),
+    });
+    print(`Saved ${sourceName} layout at world: ${transform.getWorldPosition().toString()}`);
+  }
+
+  private wireGardenSourceMoveHandles(): void {
+    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
+      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+      const source = this.findGardenSpawnSource(name);
+      if (isNull(source)) {
+        continue;
+      }
+
+      const handle = this.findNamedChild(source, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+      if (isNull(handle)) {
+        continue;
+      }
+
+      handle.enabled = true;
+      this.applyGardenSourceMoveHandleVisual(handle);
+      this.ensureGardenSourceSpawnInteractable(source);
+      const scripts = handle.getComponents('Component.ScriptComponent');
+      for (let j = 0; j < scripts.length; j++) {
+        const script = scripts[j] as ScriptComponent & {
+          wireMoveInteraction?: () => void;
+        };
+        if (isNull(script) || typeof script.wireMoveInteraction !== 'function') {
+          continue;
+        }
+        script.wireMoveInteraction();
+      }
+    }
+  }
+
+  private ensureGardenSourceSpawnInteractable(source: SceneObject): void {
+    const scripts = source.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as ScriptComponent & { targetingMode?: number };
+      if (
+        isNull(candidate) ||
+        candidate.targetingMode === undefined ||
+        candidate.targetingMode === 7
+      ) {
+        continue;
+      }
+
+      candidate.enabled = true;
+      return;
+    }
+  }
+
+  private applyGardenSourceMoveHandleVisual(handle: SceneObject): void {
+    if (isNull(this.moveHandleMaterial)) {
+      return;
+    }
+
+    const visuals = handle.getComponents('Component.RenderMeshVisual');
+    for (let i = 0; i < visuals.length; i++) {
+      const visual = visuals[i] as RenderMeshVisual;
+      if (isNull(visual)) {
+        continue;
+      }
+
+      visual.mainMaterial = this.moveHandleMaterial;
+      visual.renderOrder = 10;
+      visual.enabled = true;
     }
   }
 
@@ -2743,6 +2848,7 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorSaveInProgress = false;
     this.restoreGardenSpawnSourcesAfterReset();
     this.wireTrashBinMovement();
+    this.wireGardenSourceMoveHandles();
     this.textlog.text = 'Desk reset';
     this.keepAIControlButtonsVisible();
     const restoreControlsEvent = this.createEvent('DelayedCallbackEvent');

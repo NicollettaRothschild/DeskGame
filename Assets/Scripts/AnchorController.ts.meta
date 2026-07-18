@@ -32,6 +32,7 @@
     growthCompleteTrack: false
     growthStartTrack: false
     menuRoot: false
+    moveHandleMaterial: false
     placeObjectTrack: false
     plantConfigs: false
     plantPrefab: false
@@ -91,6 +92,7 @@
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       sackTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
+      moveHandleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
@@ -122,3 +124,4 @@
     - // @input AssignableType_3 specsApi
     - // @input Asset.Material sackMaterial
     - // @input Asset.Texture sackTexture
+    - // @input Asset.Material moveHandleMaterial
