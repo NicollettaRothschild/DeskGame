@@ -55,157 +55,7 @@
       mesh: None Compression
     Overrides:
       {}
-- !<RenderMeshVisual/09642849-e252-468a-7448-33a1e49d13e7>
-  PrefabRemaps:
-    []
-  Name: component_4
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> 80b2eeb9-4405-4780-919e-34dd21e9bb76
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<SceneObject/46b4b45a-8602-4e80-788a-4b1528cb0b9b>
-  PrefabRemaps:
-    []
-  Name: Pot2
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 1155.406738}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 94c21f41-761b-45c6-5f70-317c3da8231e
-- !<ObjectPrefabAssetData/63a0056f-60e4-4623-91fc-abd613235c22>
-  Prototype: !<ObjectOwner/6b0f10e3-59c0-4c12-8808-dc491fd96b7f>
-    PackagePath: ""
-    objects:
-      - !<own> 9b44a7b3-3edd-4e90-5e17-520734b2056a
-- !<SceneObject/821c6290-cd48-4293-74c2-8d2c54c16e3c>
-  PrefabRemaps:
-    []
-  Name: Pot3Dirt
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 100.000000, z: 1788.196533}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 94998572-2978-446c-498f-af85ff7e64f0
-- !<RenderMeshVisual/89e9eae0-6c8e-4f9f-404c-0d13280cc1b3>
-  PrefabRemaps:
-    []
-  Name: component_3
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> b9996043-2eb1-4a74-8670-e78b58566ba6
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<RenderMeshVisual/94998572-2978-446c-498f-af85ff7e64f0>
-  PrefabRemaps:
-    []
-  Name: component_5
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> 3e2058fa-fdc9-4090-badd-d98aeaafcc10
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<RenderMeshVisual/94c21f41-761b-45c6-5f70-317c3da8231e>
-  PrefabRemaps:
-    []
-  Name: component_2
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> bf99ed3d-9ee9-4ddd-95a4-b5852bb699fe
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<SceneObject/960f9342-969d-431a-7d97-fb2ee07ee6bf>
-  PrefabRemaps:
-    []
-  Name: Pot3
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 100.000000, z: 1788.196533}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 09642849-e252-468a-7448-33a1e49d13e7
-- !<SceneObject/9b44a7b3-3edd-4e90-5e17-520734b2056a>
-  PrefabRemaps:
-    []
-  Name: PotswithDirt
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> f109631d-43c7-43a7-42dd-27f051b10cee
-    - !<own> daeea47d-af8c-499c-4676-268a5a82de76
-    - !<own> 46b4b45a-8602-4e80-788a-4b1528cb0b9b
-    - !<own> e749fd29-23fd-4da3-6a17-345238e6bac1
-    - !<own> 960f9342-969d-431a-7d97-fb2ee07ee6bf
-    - !<own> 821c6290-cd48-4293-74c2-8d2c54c16e3c
-  Components:
-    []
-- !<RenderMeshVisual/ae3e85ad-53b2-47a7-4726-db46dc26cb7a>
+- !<RenderMeshVisual/245c0e27-3290-47e9-5929-27aa53b94d17>
   PrefabRemaps:
     []
   Name: component_0
@@ -225,7 +75,62 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/daeea47d-af8c-499c-4676-268a5a82de76>
+- !<RenderMeshVisual/2abf41eb-a5a9-40c2-75fc-a72dfc99d9dc>
+  PrefabRemaps:
+    []
+  Name: component_2
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> bf99ed3d-9ee9-4ddd-95a4-b5852bb699fe
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/2ebe57be-9dd7-4b94-4693-147709304fd5>
+  PrefabRemaps:
+    []
+  Name: PotswithDirt
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> b79849cf-e8bf-4ac3-78bc-85900f73a9eb
+    - !<own> 52115ea1-753e-4de5-7c55-af935ae0292d
+    - !<own> e577698a-26df-4936-5ccd-d82b2649a53e
+    - !<own> eff6f556-6223-4ff8-4fb4-c4564665e455
+    - !<own> 34aa55be-91ed-4378-74ee-4a9b4d7ebc97
+    - !<own> ae4498b5-f60d-424e-7434-4fb158d49338
+  Components:
+    []
+- !<SceneObject/34aa55be-91ed-4378-74ee-4a9b4d7ebc97>
+  PrefabRemaps:
+    []
+  Name: Pot3
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 100.000000, z: 1788.196533}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 92417973-b832-444a-7e27-2b7d8610a526
+- !<SceneObject/52115ea1-753e-4de5-7c55-af935ae0292d>
   PrefabRemaps:
     []
   Name: Pot1Dirt
@@ -239,8 +144,53 @@
   Children:
     []
   Components:
-    - !<own> e68d2636-ba62-4a26-62aa-3e359c9e0175
-- !<RenderMeshVisual/e68d2636-ba62-4a26-62aa-3e359c9e0175>
+    - !<own> a3ab5741-1e35-49b1-6d3e-09d6fc17610c
+- !<ObjectPrefabAssetData/63a0056f-60e4-4623-91fc-abd613235c22>
+  Prototype: !<ObjectOwner/6b0f10e3-59c0-4c12-8808-dc491fd96b7f>
+    PackagePath: ""
+    objects:
+      - !<own> 2ebe57be-9dd7-4b94-4693-147709304fd5
+- !<RenderMeshVisual/92417973-b832-444a-7e27-2b7d8610a526>
+  PrefabRemaps:
+    []
+  Name: component_4
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 80b2eeb9-4405-4780-919e-34dd21e9bb76
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/98f5302f-728d-4270-633f-4640b711a5aa>
+  PrefabRemaps:
+    []
+  Name: component_5
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 3e2058fa-fdc9-4090-badd-d98aeaafcc10
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/a3ab5741-1e35-49b1-6d3e-09d6fc17610c>
   PrefabRemaps:
     []
   Name: component_1
@@ -260,22 +210,42 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/e749fd29-23fd-4da3-6a17-345238e6bac1>
+- !<RenderMeshVisual/a5267cbe-5ac6-40eb-6375-5f57bf48db7e>
   PrefabRemaps:
     []
-  Name: Pot2dirt
+  Name: component_3
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> b9996043-2eb1-4a74-8670-e78b58566ba6
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/ae4498b5-f60d-424e-7434-4fb158d49338>
+  PrefabRemaps:
+    []
+  Name: Pot3Dirt
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 1155.406738}
+    Position: {x: 0.000000, y: 100.000000, z: 1788.196533}
     Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
     Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
   Components:
-    - !<own> 89e9eae0-6c8e-4f9f-404c-0d13280cc1b3
-- !<SceneObject/f109631d-43c7-43a7-42dd-27f051b10cee>
+    - !<own> 98f5302f-728d-4270-633f-4640b711a5aa
+- !<SceneObject/b79849cf-e8bf-4ac3-78bc-85900f73a9eb>
   PrefabRemaps:
     []
   Name: Pot1
@@ -289,4 +259,34 @@
   Children:
     []
   Components:
-    - !<own> ae3e85ad-53b2-47a7-4726-db46dc26cb7a
+    - !<own> 245c0e27-3290-47e9-5929-27aa53b94d17
+- !<SceneObject/e577698a-26df-4936-5ccd-d82b2649a53e>
+  PrefabRemaps:
+    []
+  Name: Pot2
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 1155.406738}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 2abf41eb-a5a9-40c2-75fc-a72dfc99d9dc
+- !<SceneObject/eff6f556-6223-4ff8-4fb4-c4564665e455>
+  PrefabRemaps:
+    []
+  Name: Pot2dirt
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 1155.406738}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> a5267cbe-5ac6-40eb-6375-5f57bf48db7e
