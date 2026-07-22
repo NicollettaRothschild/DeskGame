@@ -1625,16 +1625,7 @@ export class TrashBin extends BaseScriptComponent {
       this.markStashPullWired(node);
       const scripts = node.getComponents('Component.ScriptComponent');
       for (let i = 0; i < scripts.length; i++) {
-        const script = scripts[i] as ScriptComponent & {
-          onDragStart?: { add: (cb: () => void) => void };
-          onDragEnd?: { add: (cb: () => void) => void };
-          onTriggerStart?: { add: (cb: () => void) => void };
-          onTriggerEnd?: { add: (cb: () => void) => void };
-          onTriggerEndOutside?: { add: (cb: () => void) => void };
-          onInteractorTriggerStart?: { add: (cb: () => void) => void };
-          onInteractorTriggerEnd?: { add: (cb: () => void) => void };
-          onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
-        };
+        const script = scripts[i] as InteractableLike;
         if (isNull(script) || !this.isStashPullInteractionScript(script)) {
           continue;
         }
