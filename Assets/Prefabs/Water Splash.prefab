@@ -4,7 +4,6 @@
     - !<own> fe6e1fce-f8e5-4982-a213-c97797816a55
   LazyLoading: false
   RetainAssets: true
-  PreviewEnvironment: !<reference> 00000000-0000-0000-0000-000000000000
 - !<ScriptComponent/88389e8e-0eeb-4361-993f-4569dc2e0a8f>
   PrefabRemaps:
     []

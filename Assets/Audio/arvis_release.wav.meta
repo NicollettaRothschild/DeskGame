@@ -1,8 +1,8 @@
-- !<AssetImportMetadata/24038429-055e-411b-8131-6d310ad91725>
+- !<AssetImportMetadata/867bc354-1e65-4f2a-94db-2ea5083238d5>
   ImportedAssetIds:
-    Texture: !<reference> 53b7485a-5c00-4a12-9242-e37653d5e98f
-  ImporterName: FileTextureImporter
-  PrimaryAsset: !<reference> 53b7485a-5c00-4a12-9242-e37653d5e98f
+    FileAudioTrack: !<reference> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
+  ImporterName: FileAudioTrackImporter
+  PrimaryAsset: !<reference> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
   PackageType: NotAPackage
   LegacyPackagePolicy: ~
   ExtraData:

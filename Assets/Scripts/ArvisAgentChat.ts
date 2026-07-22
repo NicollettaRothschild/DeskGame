@@ -1,4 +1,5 @@
 import {
+  getSharedArvisGhostBlob,
   getSharedFlowGardenSpacePanel,
   getSharedFlowGardenTts,
   getSharedSpecsApi,
@@ -590,6 +591,26 @@ export class ArvisAgentChat extends BaseScriptComponent {
     );
   }
 
+  private setGhostPhase(phase: 'listening' | 'thinking' | 'reply' | 'error' | 'idle'): void {
+    const ghost = getSharedArvisGhostBlob();
+    if (!isNull(ghost)) {
+      ghost.setPhase(phase);
+    }
+  }
+
+  private updateGhostSpeechBubble(
+    phase: 'listening' | 'thinking' | 'reply' | 'error' | 'idle',
+    transcript: string,
+    response: string | null,
+    agentName?: string
+  ): void {
+    const ghost = getSharedArvisGhostBlob();
+    if (isNull(ghost)) {
+      return;
+    }
+    ghost.showSpeechBubble(phase, transcript, response, agentName || this.agentName);
+  }
+
   private updateBoard(
     phase: 'listening' | 'thinking' | 'reply' | 'error',
     transcript: string,
@@ -597,6 +618,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
     agentName?: string,
     imageUrl?: string | null
   ): void {
+    this.setGhostPhase(phase);
+    this.updateGhostSpeechBubble(phase, transcript, response, agentName);
+
     const label = agentName || this.agentName;
     const panel = this.getSpacePanel();
     if (!isNull(panel) && typeof panel.showAgentChat === 'function') {
@@ -640,7 +664,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     this.setStatus(`${label} speaking…`);
+    this.setGhostPhase('reply');
     this.agentTts.speak(spoken, (ok) => {
+      this.setGhostPhase('idle');
       this.setStatus(ok ? '' : 'Speech unavailable');
       if (this.debugLogging) {
         print(`[ArvisAgentChat] TTS ${ok ? 'played' : 'failed'}`);

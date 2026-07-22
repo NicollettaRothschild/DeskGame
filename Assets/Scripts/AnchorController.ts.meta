@@ -22,7 +22,6 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
-  VersionPrerelease: ""
   ComponentUid: 5804491d-6937-48cc-b971-6c138e23831d
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
@@ -70,16 +69,16 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - anchorModule: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+    - anchorModule: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       widgetParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      anchorComponent: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      anchorComponent: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       camera: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       menuRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       plantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
       potPrefabs: !<reference.ObjectPrefab[]>
         []
       textlog: !<reference.Text> 00000000-0000-0000-0000-000000000000
-      plantConfigs: !<MappingBased.AssignableType_3[]>
+      plantConfigs: !<MappingBased.AssignableType_2[]>
         []
       soundVolume: 1.250000
       soundDebugLogging: true
@@ -101,7 +100,7 @@
       planterRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       seedsRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-      specsApi: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
+      specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       sackTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
       moveHandleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
@@ -110,15 +109,15 @@
     -
       {}
   InputLines:
-    - // @input AssignableType_1 anchorModule
+    - // @input AssignableType anchorModule
     - // @input SceneObject widgetParent
-    - // @input AssignableType_2 anchorComponent
+    - // @input AssignableType_1 anchorComponent
     - // @input SceneObject camera
     - // @input SceneObject menuRoot
     - // @input Asset.ObjectPrefab plantPrefab
     - "// @input Asset.ObjectPrefab[] potPrefabs = {}"
     - // @input Component.Text textlog
-    - "// @input AssignableType_3[] plantConfigs = {}"
+    - "// @input AssignableType_2[] plantConfigs = {}"
     - // @input float soundVolume = 0.6
     - // @input bool soundDebugLogging = true
     - // @input Asset.AudioTrackAsset wateringTrack
@@ -139,7 +138,7 @@
     - // @input SceneObject planterRoot
     - // @input SceneObject seedsRoot
     - // @input Component.ScriptComponent spacePanel
-    - // @input AssignableType_4 specsApi
+    - // @input AssignableType_3 specsApi
     - // @input Asset.Material sackMaterial
     - // @input Asset.Texture sackTexture
     - // @input Asset.Material moveHandleMaterial

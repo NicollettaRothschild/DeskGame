@@ -30,6 +30,7 @@
     debugLogging: false
     growthCompleteTrack: false
     growthStartTrack: false
+    hoverTrack: false
     placeObjectTrack: false
     plantSeedTrack: false
     spawnPotTrack: false
@@ -57,6 +58,7 @@
       spawnPotTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       spawnWaterTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       placeObjectTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      hoverTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
@@ -72,3 +74,4 @@
     - // @input Asset.AudioTrackAsset spawnPotTrack
     - // @input Asset.AudioTrackAsset spawnWaterTrack
     - // @input Asset.AudioTrackAsset placeObjectTrack
+    - // @input Asset.AudioTrackAsset hoverTrack
