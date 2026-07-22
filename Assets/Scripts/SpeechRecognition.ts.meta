@@ -46,10 +46,10 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - startupDisabled: true
+    - startupDisabled: false
       languageCode: en_US
       autoStartListening: true
-      startupListenDelaySec: !<float> 10.000000
+      startupListenDelaySec: !<float> 2.500000
       tapToListen: true
       listeningWindowSec: !<float> 8.000000
       debugLogging: true
@@ -61,13 +61,13 @@
     -
       {}
   InputLines:
-    - // @input bool startupDisabled = true
+    - // @input bool startupDisabled
     - '// @input string languageCode = "en_US"'
     - // @input bool autoStartListening = true
-    - // @input float startupListenDelaySec = 10
+    - // @input float startupListenDelaySec = 2.5
     - // @input bool tapToListen = true
     - // @input float listeningWindowSec = 8
-    - // @input bool debugLogging
+    - // @input bool debugLogging = true
     - // @input float commandCooldownSec = 1.5
     - // @input bool mirrorTranscriptToSpacePanel = true
     - // @input Component.Text3D transcriptText

@@ -424,7 +424,7 @@
   PrefabRemaps:
     []
   Name: SpecsApiClient
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> f1a343a6-62ec-47eb-bfa3-1c41cb74c1e8
   ScriptInputsDefault:
     internetModule: true
@@ -2091,26 +2091,27 @@
   PrefabRemaps:
     []
   Name: SpeechRecognition
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> 2f847a23-53c2-4432-ba78-20f3f08d5fb1
   ScriptInputsDefault:
-    startupDisabled: true
     languageCode: true
+    autoStartListening: true
     tapToListen: true
     listeningWindowSec: true
+    debugLogging: true
     commandCooldownSec: true
     mirrorTranscriptToSpacePanel: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
     "":
-      startupDisabled: true
+      startupDisabled: false
       languageCode: en_US
-      autoStartListening: false
-      startupListenDelaySec: !<float> 15.000000
+      autoStartListening: true
+      startupListenDelaySec: !<float> 2.500000
       tapToListen: true
       listeningWindowSec: !<float> 8.000000
-      debugLogging: false
+      debugLogging: true
       commandCooldownSec: 1.500000
       mirrorTranscriptToSpacePanel: true
       transcriptText: !<reference.Text3D> b7c8d9e0-f1a2-4b3c-8d4e-5f6a7b8c9d0e
@@ -2515,7 +2516,7 @@
   PrefabRemaps:
     []
   Name: FlowGardenVoiceCommands
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> e86285e0-3c97-44fc-b74e-0016e7872331
   ScriptInputsDefault:
     spacePanel: true
@@ -4618,7 +4619,7 @@
   PrefabRemaps:
     []
   Name: ArvisAgentChat
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> 0f4a6303-5205-42a6-b0cd-0455ebca40bf
   ScriptInputsDefault:
     agentResponseText: true
@@ -4644,7 +4645,7 @@
       agentName: Arvis
       useHoldToTalk: false
       maxHistoryTurns: !<float> 8.000000
-      debugLogging: false
+      debugLogging: true
       transcriptOnlyMode: false
   ScriptTypes:
     "":
@@ -4850,7 +4851,7 @@
   PrefabRemaps:
     []
   Name: FlowGardenTTS
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> b4c5d6e7-f8a9-4013-a456-789abcdef012
   ScriptInputsDefault:
     ttsModule: true
