@@ -1,5 +1,20 @@
-import { hasWakeFollowUp, parseArvisWakePhrase } from './ArvisWakePhrase';
-import { getSharedArvisAgentChat } from './FlowGardenServiceRegistry';
+import {
+  isIgnorableUtterance,
+  looksLikeAssistantEcho,
+  looksLikeIncompleteAgentPrompt,
+  looksLikePossibleAgentWake,
+  normalizeAsrTranscript,
+  parseArvisWakePhrase,
+} from './ArvisWakePhrase';
+import { isImageQuery } from './ArvisImageSkill';
+import { isMeshQuery } from './ArvisMeshSkill';
+import { isMusicQuery } from './ArvisMusicSkill';
+import { isNewsQuery } from './ArvisNewsSkill';
+import {
+  getSharedArvisAgentChat,
+  getSharedFlowGardenTts,
+  getSharedSpeechRecognition,
+} from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
@@ -65,13 +80,29 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   @input
   debugLogging: boolean = true;
 
-  private lastProcessedFinal = '';
+  private lastPollUtterance = '';
+  private lastPollUtteranceAt = 0;
+  private wiringLogged = false;
 
   onAwake(): void {
+    this.createEvent('OnStartEvent').bind(() => this.resolveDependencies());
     this.createEvent('UpdateEvent').bind(() => this.pollTranscript());
   }
 
+  private resolveDependencies(): void {
+    if (isNull(this.speechRecognition)) {
+      this.speechRecognition = getSharedSpeechRecognition();
+    }
+    if (this.debugLogging && !this.wiringLogged) {
+      this.wiringLogged = true;
+      print(
+        `[VoiceCommands] ready speech=${!isNull(this.speechRecognition)} debug=${this.debugLogging}`
+      );
+    }
+  }
+
   private pollTranscript(): void {
+    this.resolveDependencies();
     if (isNull(this.speechRecognition)) {
       return;
     }
@@ -85,8 +116,62 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       return;
     }
 
-    const finalText = String(this.speechRecognition.finalTranscript || '').trim().toLowerCase();
-    if (!finalText || finalText === this.lastProcessedFinal) {
+    if (this.speechRecognition.isSuppressingVoiceCommands()) {
+      return;
+    }
+
+    const tts = getSharedFlowGardenTts();
+    if (!isNull(tts) && (tts.isBlockingVoiceCommands() || tts.isSpeaking())) {
+      return;
+    }
+
+    const finalText = normalizeAsrTranscript(this.speechRecognition.finalTranscript || '');
+    const stableText = normalizeAsrTranscript(
+      this.speechRecognition.getStableUtterance(0.5)
+    );
+
+    if (
+      finalText &&
+      !looksLikeIncompleteAgentPrompt(finalText) &&
+      !parseArvisWakePhrase(finalText).triggered &&
+      !looksLikePossibleAgentWake(finalText) &&
+      !looksLikeAssistantEcho(finalText) &&
+      this.tryForwardAgentUtterance(finalText)
+    ) {
+      if (
+        finalText === this.lastPollUtterance &&
+        getTime() - this.lastPollUtteranceAt < 0.75
+      ) {
+        return;
+      }
+      this.lastPollUtterance = finalText;
+      this.lastPollUtteranceAt = getTime();
+      this.speechRecognition.clearUtteranceState();
+      this.speechRecognition.markCommandHandled();
+      return;
+    }
+
+    const utterance = finalText || stableText;
+    if (!utterance || isIgnorableUtterance(utterance)) {
+      return;
+    }
+
+    // Agent wake is handled by ArvisAgentChat.pollIdleVoiceWake().
+    if (
+      parseArvisWakePhrase(utterance).triggered ||
+      looksLikePossibleAgentWake(utterance)
+    ) {
+      return;
+    }
+
+    if (looksLikeAssistantEcho(utterance)) {
+      return;
+    }
+
+    if (
+      utterance === this.lastPollUtterance &&
+      getTime() - this.lastPollUtteranceAt < 0.75
+    ) {
       return;
     }
 
@@ -94,21 +179,23 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       return;
     }
 
-    this.lastProcessedFinal = finalText;
-    this.speechRecognition.clearFinalTranscript();
-    this.handleUtterance(finalText);
+    this.lastPollUtterance = utterance;
+    this.lastPollUtteranceAt = getTime();
+    this.speechRecognition.clearUtteranceState();
+    this.handleUtterance(utterance);
     this.speechRecognition.markCommandHandled();
   }
 
   private handleUtterance(text: string): void {
-    if (this.debugLogging) {
-      print(`[VoiceCommands] Processing: ${text}`);
+    if (looksLikeAssistantEcho(text)) {
+      if (this.debugLogging) {
+        print(`[VoiceCommands] Ignoring assistant echo: ${text.slice(0, 80)}`);
+      }
+      return;
     }
 
-    const wake = parseArvisWakePhrase(text);
-    if (wake.triggered) {
-      this.tryAgentWake(wake.message, text);
-      return;
+    if (this.debugLogging) {
+      print(`[VoiceCommands] Processing: ${text}`);
     }
 
     if (this.tryTodoCommand(text)) {
@@ -126,38 +213,40 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
     if (this.trySpawnCommand(text)) {
       return;
     }
+    if (this.tryForwardAgentUtterance(text)) {
+      return;
+    }
 
     if (this.debugLogging) {
       print(`[VoiceCommands] Transcript only (no wake phrase): ${text}`);
     }
   }
 
-  private tryAgentWake(message: string, rawUtterance: string): void {
-    const agent = getSharedArvisAgentChat();
-    if (isNull(agent)) {
-      this.setStatus('Agent not wired');
-      return;
+  private tryForwardAgentUtterance(text: string): boolean {
+    const trimmed = String(text || '').trim();
+    if (!trimmed || looksLikeIncompleteAgentPrompt(trimmed)) {
+      return false;
     }
 
-    if (hasWakeFollowUp(message)) {
-      const trimmed = String(message || '').trim();
-      const imageMatch = trimmed.match(
-        /^(?:generate|create|make|draw|render|design|produce|show)\s+(?:me\s+)?(?:an?\s+)?(?:image|picture|photo|illustration|drawing|sketch|concept(?:\s+art)?)\s+(?:of\s+)?([\s\S]{1,700})$/i
-      );
-      const agentPrompt = imageMatch?.[1]
-        ? `/image ${String(imageMatch[1]).trim().replace(/[.?!]+$/, '')}`
-        : trimmed;
-      if (this.debugLogging) {
-        print(`[VoiceCommands] Wake phrase — agent: ${agentPrompt}`);
-      }
-      agent.sendUtterance(agentPrompt);
-      return;
+    const isAgentIntent =
+      isImageQuery(trimmed) ||
+      isMeshQuery(trimmed) ||
+      isMusicQuery(trimmed) ||
+      isNewsQuery(trimmed);
+    if (!isAgentIntent) {
+      return false;
+    }
+
+    const agent = getSharedArvisAgentChat();
+    if (isNull(agent) || agent.isBusy()) {
+      return false;
     }
 
     if (this.debugLogging) {
-      print(`[VoiceCommands] Wake phrase only — opening agent talk (${rawUtterance})`);
+      print(`[VoiceCommands] Forwarding to Arvis: ${trimmed.slice(0, 100)}`);
     }
-    agent.beginWakeListening();
+    agent.sendUtterance(trimmed);
+    return true;
   }
 
   private tryTodoCommand(text: string): boolean {

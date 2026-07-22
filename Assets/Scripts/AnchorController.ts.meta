@@ -22,6 +22,7 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
+  VersionPrerelease: ""
   ComponentUid: 5804491d-6937-48cc-b971-6c138e23831d
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
@@ -54,6 +55,10 @@
     textlog: false
     trashBin: false
     waterSourceRoot: false
+    waterSplashIntensity: false
+    waterSplashLifetime: false
+    waterSplashMaxParticles: false
+    waterSplashPrefab: false
     wateringTrack: false
     widgetParent: false
   ScriptTypesHidden:
@@ -65,16 +70,16 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - anchorModule: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+    - anchorModule: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       widgetParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      anchorComponent: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      anchorComponent: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
       camera: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       menuRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       plantPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
       potPrefabs: !<reference.ObjectPrefab[]>
         []
       textlog: !<reference.Text> 00000000-0000-0000-0000-000000000000
-      plantConfigs: !<MappingBased.AssignableType_2[]>
+      plantConfigs: !<MappingBased.AssignableType_3[]>
         []
       soundVolume: 1.250000
       soundDebugLogging: true
@@ -86,13 +91,17 @@
       spawnPotTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       spawnWaterTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       placeObjectTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      waterSplashPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      waterSplashLifetime: 1.200000
+      waterSplashIntensity: 0.550000
+      waterSplashMaxParticles: 1000
       hoverTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       trashBin: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       waterSourceRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       planterRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       seedsRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-      specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      specsApi: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
       sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       sackTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
       moveHandleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
@@ -101,16 +110,16 @@
     -
       {}
   InputLines:
-    - // @input AssignableType anchorModule
+    - // @input AssignableType_1 anchorModule
     - // @input SceneObject widgetParent
-    - // @input AssignableType_1 anchorComponent
+    - // @input AssignableType_2 anchorComponent
     - // @input SceneObject camera
     - // @input SceneObject menuRoot
     - // @input Asset.ObjectPrefab plantPrefab
     - "// @input Asset.ObjectPrefab[] potPrefabs = {}"
     - // @input Component.Text textlog
-    - "// @input AssignableType_2[] plantConfigs = {}"
-    - // @input float soundVolume = 1.25
+    - "// @input AssignableType_3[] plantConfigs = {}"
+    - // @input float soundVolume = 0.6
     - // @input bool soundDebugLogging = true
     - // @input Asset.AudioTrackAsset wateringTrack
     - // @input Asset.AudioTrackAsset plantSeedTrack
@@ -120,13 +129,17 @@
     - // @input Asset.AudioTrackAsset spawnPotTrack
     - // @input Asset.AudioTrackAsset spawnWaterTrack
     - // @input Asset.AudioTrackAsset placeObjectTrack
+    - // @input Asset.ObjectPrefab waterSplashPrefab
+    - // @input float waterSplashLifetime = 1.2
+    - // @input float waterSplashIntensity = 0.55
+    - // @input int waterSplashMaxParticles = 1000
     - // @input Asset.AudioTrackAsset hoverTrack
     - // @input Component.ScriptComponent trashBin
     - // @input SceneObject waterSourceRoot
     - // @input SceneObject planterRoot
     - // @input SceneObject seedsRoot
     - // @input Component.ScriptComponent spacePanel
-    - // @input AssignableType_3 specsApi
+    - // @input AssignableType_4 specsApi
     - // @input Asset.Material sackMaterial
     - // @input Asset.Texture sackTexture
     - // @input Asset.Material moveHandleMaterial

@@ -1,0 +1,54 @@
+- !<AssetImportMetadata/d57e9342-920e-46da-94b8-8824f8f41f38>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> fd55d579-1280-4d13-9df4-c71b70752937
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> fd55d579-1280-4d13-9df4-c71b70752937
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 833d00e8-09c5-40fa-a823-4d5722b17cb0
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/833d00e8-09c5-40fa-a823-4d5722b17cb0>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  ComponentUid: 8a2d89d3-f6a8-4098-8237-8da4b5ba6260
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    burstIntensity: false
+    lifetime: false
+    maxParticles: false
+    particleVisual: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - particleVisual: !<reference.RenderMeshVisual> 00000000-0000-0000-0000-000000000000
+      burstIntensity: 0.550000
+      maxParticles: 1000
+      lifetime: 1.200000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Component.RenderMeshVisual particleVisual
+    - // @input float burstIntensity = 0.55
+    - // @input int maxParticles = 1000
+    - // @input float lifetime = 1.2

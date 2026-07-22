@@ -1,4 +1,17 @@
 import { registerSpecsApi } from './FlowGardenServiceRegistry';
+import { resolveAgentSkillsForMessage } from './ArvisAgentSkills';
+import {
+  extractImageUrlFromAgentResponse,
+  isImageQuery,
+  normalizeImagePrompt,
+} from './ArvisImageSkill';
+import {
+  extractMusicUrlFromAgentResponse,
+  isMusicQuery,
+  normalizeMusicPrompt,
+} from './ArvisMusicSkill';
+import { isMeshQuery, normalizeMeshPrompt } from './ArvisMeshSkill';
+import { fetchNewsHeadlinesBrief, isNewsQuery } from './ArvisNewsSkill';
 import { SpecsEditorMock } from './SpecsEditorMock';
 
 export type SpecsTask = {
@@ -50,14 +63,47 @@ export class SpecsApiClient extends BaseScriptComponent {
   @input
   requestTimeoutSec: number = 20;
 
+  /** Longer HTTP timeout for /image generation (server-side concept art can take 30–60s). */
+  @input('float')
+  imageRequestTimeoutSec: number = 60;
+
+  /** Longer HTTP timeout for /music generation (Lyria + agent routing can take 60–90s). */
+  @input('float')
+  musicRequestTimeoutSec: number = 90;
+
+  /** Longer HTTP timeout for /mesh agent replies (Snap3D refinement can take 30–90s). */
+  @input('float')
+  meshRequestTimeoutSec: number = 90;
+
   @input
   useEditorMockWhenOffline: boolean = true;
 
   @input
   editorStartPaired: boolean = false;
 
+  /** When live arvis.space rejects chat/TTS because the device is unpaired, answer via SpecsEditorMock in preview. */
+  @input
+  useMockFallbackWhenUnpaired: boolean = true;
+
   @input('float')
   editorAutoPairDelaySec: number = 12;
+
+  /** Sign in to arvis.space (Supabase password) and pair this device — no Google OAuth in Lens. */
+  @input
+  autoPairWithCredentials: boolean = true;
+
+  @input
+  autoPairEmail: string = 'test@user.com';
+
+  @input
+  autoPairPassword: string = 'test321';
+
+  @input
+  arvisSupabaseUrl: string = 'https://bigsedudegjukszrfyil.supabase.co';
+
+  @input
+  arvisSupabaseAnonKey: string =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo';
 
   @input
   debugLogging: boolean = true;
@@ -66,6 +112,8 @@ export class SpecsApiClient extends BaseScriptComponent {
   private networkAvailable = false;
   private editorAutoPairEvent: DelayedCallbackEvent | null = null;
   private editorAutoPairScheduled = false;
+  private credentialPairInFlight = false;
+  private credentialPairFailed = false;
 
   onAwake(): void {
     registerSpecsApi(this);
@@ -104,7 +152,15 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   public isEditorMockActive(): boolean {
-    return this.useEditorMockWhenOffline && !this.isNetworkAvailable();
+    if (!this.useEditorMockWhenOffline) {
+      return false;
+    }
+    return !this.isNetworkAvailable();
+  }
+
+  /** When true, editor mock registration auto-marks the device paired (offline preview only). */
+  public shouldAutoPairInEditorMock(): boolean {
+    return this.editorStartPaired;
   }
 
   private normalizeBaseUrl(): string {
@@ -114,7 +170,7 @@ export class SpecsApiClient extends BaseScriptComponent {
   public registerDevice(deviceId: string, onDone: (result: SpecsDeviceRegistration | null, error?: string) => void): void {
     if (this.isEditorMockActive()) {
       const result = SpecsEditorMock.register(deviceId);
-      if (this.editorStartPaired && !result.paired) {
+      if (this.shouldAutoPairInEditorMock() && !result.paired) {
         SpecsEditorMock.markPaired();
         result.paired = true;
       } else if (!result.paired) {
@@ -142,6 +198,136 @@ export class SpecsApiClient extends BaseScriptComponent {
         });
       }
     );
+  }
+
+  public isAutoPairWithCredentialsEnabled(): boolean {
+    return this.autoPairWithCredentials && !this.isEditorMockActive();
+  }
+
+  public isCredentialPairInFlight(): boolean {
+    return this.credentialPairInFlight;
+  }
+
+  public tryAutoPairWithCredentials(
+    deviceId: string,
+    onDone: (ok: boolean, userEmail?: string | null, error?: string) => void
+  ): void {
+    if (!this.isAutoPairWithCredentialsEnabled()) {
+      onDone(false, null, 'Auto-pair disabled');
+      return;
+    }
+    if (this.credentialPairInFlight) {
+      onDone(false, null, 'Pairing in progress');
+      return;
+    }
+    if (this.credentialPairFailed) {
+      onDone(false, null, 'Auto-pair already failed this session');
+      return;
+    }
+
+    const email = String(this.autoPairEmail || '').trim();
+    const password = String(this.autoPairPassword || '');
+    if (!email || !password) {
+      onDone(false, null, 'Auto-pair email/password not configured');
+      return;
+    }
+
+    const normalizedDeviceId = String(deviceId || '').trim();
+    if (!normalizedDeviceId) {
+      onDone(false, null, 'device_id required');
+      return;
+    }
+
+    this.credentialPairInFlight = true;
+    if (this.debugLogging) {
+      print(`[SpecsApi] Auto-pair signing in as ${email}`);
+    }
+
+    this.supabasePasswordSignIn(email, password, (session, signInError) => {
+      if (!session) {
+        this.credentialPairInFlight = false;
+        this.credentialPairFailed = true;
+        if (this.debugLogging) {
+          print('[SpecsApi] Auto-pair sign-in failed: ' + (signInError || 'unknown'));
+        }
+        onDone(false, null, signInError || 'Supabase sign-in failed');
+        return;
+      }
+
+      this.postJson(
+        '/api/specs/pair',
+        {
+          device_id: normalizedDeviceId,
+          user_id: session.userId,
+          access_token: session.accessToken,
+        },
+        (data, err) => {
+          this.credentialPairInFlight = false;
+          if (err || !data?.ok) {
+            this.credentialPairFailed = true;
+            if (this.debugLogging) {
+              print('[SpecsApi] Auto-pair /pair failed: ' + (err || 'unknown'));
+            }
+            onDone(false, null, err || 'Device pair failed');
+            return;
+          }
+
+          const userEmail = data.user_email ? String(data.user_email) : session.email || email;
+          if (this.debugLogging) {
+            print(`[SpecsApi] Auto-paired ${normalizedDeviceId} as ${userEmail || email}`);
+          }
+          onDone(true, userEmail, undefined);
+        }
+      );
+    });
+  }
+
+  private supabasePasswordSignIn(
+    email: string,
+    password: string,
+    onDone: (session: { userId: string; accessToken: string; email: string | null } | null, error?: string) => void
+  ): void {
+    const supabaseUrl = String(this.arvisSupabaseUrl || '').replace(/\/$/, '');
+    const anonKey = String(this.arvisSupabaseAnonKey || '').trim();
+    if (!supabaseUrl || !anonKey) {
+      onDone(null, 'Arvis Supabase credentials not configured');
+      return;
+    }
+
+    const request = this.createRequest((_data, err) => {
+      onDone(null, err || 'Network unavailable');
+    });
+    if (!request) {
+      return;
+    }
+
+    request.url = `${supabaseUrl}/auth/v1/token?grant_type=password`;
+    request.method = RemoteServiceHttpRequest.HttpRequestMethod.Post;
+    request.setHeader('Content-Type', 'application/json');
+    request.setHeader('apikey', anonKey);
+    request.body = JSON.stringify({ email, password });
+
+    this.performRequest(request, (data, err) => {
+      if (err || !data) {
+        onDone(null, err || 'Supabase sign-in failed');
+        return;
+      }
+
+      const user = data.user as JsonRecord | undefined;
+      const userId = String(user?.id || '').trim();
+      const accessToken = String(data.access_token || '').trim();
+      if (!userId || !accessToken) {
+        const description = String(data.error_description || data.msg || 'Missing access_token');
+        onDone(null, description);
+        return;
+      }
+
+      onDone({
+        userId,
+        accessToken,
+        email: user?.email ? String(user.email) : null,
+      });
+    });
   }
 
   public fetchPairStatus(
@@ -247,13 +433,24 @@ export class SpecsApiClient extends BaseScriptComponent {
       },
       (data, err) => {
         if (err) {
+          if (this.debugLogging) {
+            print('[SpecsApi] speakAgent failed: ' + err);
+          }
           onDone(null, err);
           return;
         }
         const audioBase64 = String(data?.audio_base64 || '').trim();
         if (!audioBase64) {
+          if (this.debugLogging) {
+            print('[SpecsApi] speakAgent returned no audio');
+          }
           onDone(null, 'No audio returned');
           return;
+        }
+        if (this.debugLogging) {
+          print(
+            `[SpecsApi] speakAgent ok bytes~${Math.floor((audioBase64.length * 3) / 4)} voice=${String(data?.voice_id || '')}`
+          );
         }
         onDone({
           audioBase64,
@@ -270,7 +467,10 @@ export class SpecsApiClient extends BaseScriptComponent {
     message: string,
     agentName: string,
     history: Array<{ role: string; text: string }>,
-    onDone: (result: { response: string; agentName: string; imageUrl?: string } | null, error?: string) => void
+    onDone: (
+      result: { response: string; agentName: string; imageUrl?: string; musicUrl?: string } | null,
+      error?: string
+    ) => void
   ): void {
     const trimmed = String(message || '').trim();
     if (!trimmed) {
@@ -279,50 +479,118 @@ export class SpecsApiClient extends BaseScriptComponent {
     }
 
     const agent = String(agentName || 'Arvis').trim() || 'Arvis';
+    const outboundMessage =
+      normalizeMeshPrompt(trimmed) ||
+      normalizeImagePrompt(trimmed) ||
+      normalizeMusicPrompt(trimmed) ||
+      trimmed;
+    const imageRequest = isImageQuery(outboundMessage);
+    const meshRequest = isMeshQuery(outboundMessage);
+    const musicRequest = isMusicQuery(outboundMessage);
+
+    if (isNewsQuery(outboundMessage)) {
+      this.replyWithNewsBrowseFallback(agent, outboundMessage, onDone);
+      return;
+    }
 
     if (this.isEditorMockActive()) {
-      const mock = SpecsEditorMock.chatWithAgent(agent, trimmed, history);
-      const reply = { response: mock.response, agentName: mock.agent.name, imageUrl: mock.imageUrl };
+      const mock = SpecsEditorMock.chatWithAgent(agent, outboundMessage, history);
+      const imageUrl = extractImageUrlFromAgentResponse(
+        mock.response,
+        mock.imageUrl,
+        this.normalizeBaseUrl()
+      );
+      const musicUrl = extractMusicUrlFromAgentResponse(
+        mock.response,
+        mock.musicUrl,
+        this.normalizeBaseUrl()
+      );
+      const reply = { response: mock.response, agentName: mock.agent.name, imageUrl, musicUrl };
       const delayEvent = this.createEvent('DelayedCallbackEvent');
       delayEvent.bind(() => {
         if (this.debugLogging) {
           print(`[SpecsApi] Editor mock agent ${mock.agent.name}: ${mock.response}`);
+          if (imageUrl) {
+            print(`[SpecsApi] Editor mock image ${imageUrl.slice(0, 120)}`);
+          }
+          if (musicUrl) {
+            print(`[SpecsApi] Editor mock music ${musicUrl.slice(0, 120)}`);
+          }
         }
         onDone(reply);
       });
-      delayEvent.reset(0.4);
+      delayEvent.reset(imageRequest || meshRequest || musicRequest ? 1.2 : 0.4);
       return;
     }
+
+    const requestTimeoutSec = meshRequest
+      ? this.meshRequestTimeoutSec
+      : imageRequest
+        ? this.imageRequestTimeoutSec
+        : musicRequest
+          ? this.musicRequestTimeoutSec
+          : this.requestTimeoutSec;
 
     this.postJson(
       '/api/specs/agent/chat',
       {
         device_id: deviceId,
         device_secret: deviceSecret,
-        message: trimmed,
+        message: outboundMessage,
         agent_name: agent,
         history,
+        skills: resolveAgentSkillsForMessage(outboundMessage),
       },
       (data, err) => {
         if (err) {
+          if (this.shouldUseUnpairedMockFallback(err, outboundMessage)) {
+            this.replyWithUnpairedMockFallback(agent, outboundMessage, history, onDone);
+            return;
+          }
           onDone(null, err);
           return;
         }
         const response = String(data?.response || '').trim();
         const agentRecord = data?.agent as JsonRecord | undefined;
         const resolvedName = String(agentRecord?.name || agent).trim() || agent;
-        const imageUrl = String(
-          (data?.image_url as string) ||
-            (data?.imageUrl as string) ||
-            ((data?.image as JsonRecord | undefined)?.url as string) ||
-            ''
-        ).trim();
+        const imageUrl = extractImageUrlFromAgentResponse(
+          response,
+          String(
+            (data?.image_url as string) ||
+              (data?.imageUrl as string) ||
+              ((data?.image as JsonRecord | undefined)?.url as string) ||
+              ''
+          ).trim(),
+          this.normalizeBaseUrl()
+        );
+        const musicUrl = extractMusicUrlFromAgentResponse(
+          response,
+          String(
+            (data?.music_url as string) ||
+              (data?.musicUrl as string) ||
+              ((data?.music as JsonRecord | undefined)?.url as string) ||
+              ''
+          ).trim(),
+          this.normalizeBaseUrl()
+        );
         if (!response) {
           onDone(null, 'Empty agent response');
           return;
         }
-        onDone({ response, agentName: resolvedName, imageUrl: imageUrl || undefined });
-      }
+        if (this.debugLogging && imageUrl) {
+          print(`[SpecsApi] agent image ${imageUrl.slice(0, 160)}`);
+        }
+        if (this.debugLogging && musicUrl) {
+          print(`[SpecsApi] agent music ${musicUrl.slice(0, 160)}`);
+        }
+        onDone({
+          response,
+          agentName: resolvedName,
+          imageUrl: imageUrl || undefined,
+          musicUrl: musicUrl || undefined,
+        });
+      },
+      requestTimeoutSec
     );
   }
 
@@ -484,9 +752,10 @@ export class SpecsApiClient extends BaseScriptComponent {
   private postJson(
     path: string,
     body: JsonRecord,
-    onDone: (data: JsonRecord | null, error?: string) => void
+    onDone: (data: JsonRecord | null, error?: string) => void,
+    timeoutSec?: number
   ): void {
-    const request = this.createRequest(onDone);
+    const request = this.createRequest(onDone, timeoutSec);
     if (!request) {
       return;
     }
@@ -498,7 +767,8 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   private createRequest(
-    onDone: (data: JsonRecord | null, error?: string) => void
+    onDone: (data: JsonRecord | null, error?: string) => void,
+    timeoutSec?: number
   ): RemoteServiceHttpRequest | null {
     if (!this.isNetworkAvailable()) {
       const message = this.useEditorMockWhenOffline
@@ -518,6 +788,113 @@ export class SpecsApiClient extends BaseScriptComponent {
       onDone(null, 'Network unavailable');
       return null;
     }
+  }
+
+  private shouldUseUnpairedMockFallback(error?: string, message?: string): boolean {
+    if (!this.useMockFallbackWhenUnpaired || this.isEditorMockActive()) {
+      return false;
+    }
+    if (this.isAutoPairWithCredentialsEnabled()) {
+      return false;
+    }
+    if (isMusicQuery(String(message || ''))) {
+      return false;
+    }
+    if (isNewsQuery(String(message || ''))) {
+      return true;
+    }
+    if (isImageQuery(String(message || ''))) {
+      return false;
+    }
+    const errorMessage = String(error || '').toLowerCase();
+    return (
+      errorMessage.includes('not paired') ||
+      errorMessage.includes('device is not paired') ||
+      errorMessage.includes('http 403')
+    );
+  }
+
+  private replyWithUnpairedMockFallback(
+    agentName: string,
+    message: string,
+    history: Array<{ role: string; text: string }>,
+    onDone: (
+      result: { response: string; agentName: string; imageUrl?: string; musicUrl?: string } | null,
+      error?: string
+    ) => void
+  ): void {
+    if (isNewsQuery(message)) {
+      this.replyWithNewsBrowseFallback(agentName, message, onDone);
+      return;
+    }
+
+    const mock = SpecsEditorMock.chatWithAgent(agentName, message, history);
+    if (this.debugLogging) {
+      print(
+        `[SpecsApi] Unpaired live device — mock fallback ${mock.agent.name}: ${mock.response.slice(0, 120)}`
+      );
+    }
+    const imageUrl = extractImageUrlFromAgentResponse(
+      mock.response,
+      mock.imageUrl,
+      this.normalizeBaseUrl()
+    );
+    const musicUrl = extractMusicUrlFromAgentResponse(
+      mock.response,
+      mock.musicUrl,
+      this.normalizeBaseUrl()
+    );
+    const delayEvent = this.createEvent('DelayedCallbackEvent');
+    delayEvent.bind(() => {
+      onDone({
+        response: mock.response,
+        agentName: mock.agent.name,
+        imageUrl,
+        musicUrl,
+      });
+    });
+    delayEvent.reset(isImageQuery(message) || isMeshQuery(message) || isMusicQuery(message) ? 1.0 : 0.35);
+  }
+
+  private replyWithNewsBrowseFallback(
+    agentName: string,
+    message: string,
+    onDone: (result: { response: string; agentName: string; imageUrl?: string } | null, error?: string) => void
+  ): void {
+    this.resolveInternetModule();
+    if (isNull(this.internetModule)) {
+      onDone(null, 'InternetModule not configured (enable Internet Access capability)');
+      return;
+    }
+
+    fetchNewsHeadlinesBrief(this.internetModule, message, (summary, error) => {
+      if (!summary) {
+        const mock = SpecsEditorMock.chatWithAgent(agentName, message, []);
+        if (this.debugLogging) {
+          print(
+            `[SpecsApi] News browse failed (${error || 'unknown'}) — mock fallback ${mock.response.slice(0, 100)}`
+          );
+        }
+        onDone({
+          response: mock.response,
+          agentName: mock.agent.name,
+          imageUrl: extractImageUrlFromAgentResponse(
+            mock.response,
+            mock.imageUrl,
+            this.normalizeBaseUrl()
+          ),
+        });
+        return;
+      }
+
+      if (this.debugLogging) {
+        print(`[SpecsApi] News browse skill ${summary.slice(0, 120)}`);
+      }
+      onDone({
+        response: summary,
+        agentName: agentName || 'Arvis',
+      });
+    });
   }
 
   private scheduleEditorAutoPair(): void {

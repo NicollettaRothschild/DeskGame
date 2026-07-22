@@ -252,6 +252,13 @@ export class PlantLifecycle extends BaseScriptComponent {
   }
 
   public water(): boolean {
+    if (!this.isPlanted) {
+      const pot = this.findParentPlantPot();
+      if (!isNull(pot) && typeof pot.tryAttachSeed === 'function') {
+        pot.tryAttachSeed(this);
+      }
+    }
+
     if (this.requiresPlanting && !this.isPlanted) {
       print(`[PlantLifecycle] ${this.getSceneObject().name}: water ignored (seed must be planted in a pot)`);
       return false;
@@ -965,6 +972,31 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     (this.anchorPersistence as AnchorPersistence).persistPlantLifecycleState(this.getSceneObject() as SceneObject);
+  }
+
+  private findParentPlantPot(): {
+    tryAttachSeed?: (plant: PlantLifecycle) => boolean;
+  } | null {
+    let current = this.getSceneObject().getParent();
+    while (!isNull(current)) {
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as {
+          tryAttachSeed?: (plant: PlantLifecycle) => boolean;
+          hasPlant?: () => boolean;
+        };
+        if (
+          !isNull(candidate) &&
+          typeof candidate.tryAttachSeed === 'function' &&
+          typeof candidate.hasPlant === 'function'
+        ) {
+          return candidate;
+        }
+      }
+      current = current.getParent();
+    }
+
+    return null;
   }
 
   private refreshPlantedVisual(): void {

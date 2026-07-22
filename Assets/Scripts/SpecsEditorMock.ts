@@ -1,3 +1,8 @@
+import { isNewsQuery } from './ArvisNewsSkill';
+import { extractMeshSubject, isMeshQuery } from './ArvisMeshSkill';
+import { extractImageSubject, isImageQuery, isSpatialImageQuery } from './ArvisImageSkill';
+import { extractMusicSubject, isMusicQuery } from './ArvisMusicSkill';
+
 type MockTask = {
   id: string;
   text: string;
@@ -116,7 +121,7 @@ export class SpecsEditorMock {
     agentName: string,
     message: string,
     history: Array<{ role: string; text: string }> = []
-  ): { agent: { name: string; role: string }; response: string; model: string; imageUrl?: string } {
+  ): { agent: { name: string; role: string }; response: string; model: string; imageUrl?: string; musicUrl?: string } {
     const name = String(agentName || 'Arvis').trim() || 'Arvis';
     const trimmed = String(message || '').trim();
     const lower = trimmed.toLowerCase();
@@ -127,37 +132,54 @@ export class SpecsEditorMock {
       .reverse()
       .find((entry) => entry && entry.role === 'user');
 
-    let response = `I'm ${name}, your ARVIS assistant on the space board. In editor preview I answer locally; on Spectacles I use arvis.space agents.`;
+    let response = `Hey — I'm ${name}. I help with your garden, tasks, and notes. In preview I answer locally; on device I use your paired account.`;
     let imageUrl = '';
 
-    const imageCmd = trimmed.match(/^\/(?:image|concept|art)\s+([\s\S]{1,700})$/i);
+    const imageSubject = isImageQuery(trimmed) ? extractImageSubject(trimmed) : '';
+    const spatialImage = isSpatialImageQuery(trimmed);
+    const meshSubject = isMeshQuery(trimmed) ? extractMeshSubject(trimmed) : '';
+    const musicSubject = isMusicQuery(trimmed) ? extractMusicSubject(trimmed) : '';
 
     if (/hello|hi|hey|how are you/.test(lower)) {
-      response = `Hey! I'm ${name}, your ARVIS assistant. I can help with Flow Garden, todos, and your desk space. What do you want to do?`;
-    } else if (imageCmd?.[1]) {
-      const subject = String(imageCmd[1] || '').trim().slice(0, 160);
-      response = `Concept art ready (editor preview mock).\n"${subject}"`;
-      // 1x1 PNG (light green). Lets SpacePanel test image rendering without HTTP.
+      response = `Hey — I'm ${name}. I can help with your garden, tasks, and notes. What can I help with?`;
+    } else if (isNewsQuery(trimmed)) {
+      response =
+        `I couldn't reach the live news feed just now. Pair your device for live headlines, ` +
+        `or try again in a moment. I can still help with your garden, tasks, or notes.`;
+    } else if (meshSubject) {
+      response =
+        `Generating a 3D model (editor preview mock).\n` +
+        `"${meshSubject.slice(0, 160)}"\n` +
+        `On device with RemoteServiceGateway + pairing, Snap3D will spawn the mesh in your garden.`;
+    } else if (musicSubject) {
+      response =
+        `Music request noted (editor preview mock).\n` +
+        `"${musicSubject.slice(0, 160)}"\n` +
+        `Pair at arvis.space/specs on device — Lyria + Snap Cloud will compose and play a ~30s track.`;
+    } else if (imageSubject) {
+      response = spatialImage
+        ? `Spatial image ready (editor preview mock).\n"${imageSubject.slice(0, 160)}"\nOn device with RemoteServiceGateway + pairing, the image will depth-spatialize in your garden.`
+        : `Concept art ready (editor preview mock).\n"${imageSubject.slice(0, 160)}"`;
+      // 1x1 PNG placeholder. Lets SpacePanel test image rendering without HTTP.
       imageUrl =
         'data:image/png;base64,' +
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6mZJtUAAAAASUVORK5CYII=';
     } else if (/hear me|can you hear/.test(lower)) {
       response = `Yes — I got "${trimmed}". Speech is working. Ask me anything about your garden or tasks.`;
-    } else if (/\b(news|headline|headlines|current events|today|breaking)\b/.test(lower)) {
+    } else if (/what(?:'s| is) going on\b/.test(lower) && !isNewsQuery(trimmed)) {
       response =
-        `I can’t fetch live news in Lens Studio editor preview (no internet / HTTP). ` +
-        `On Spectacles (real device), ask again and I’ll use the arvis.space agent to summarize today’s headlines. ` +
-        `For now, I *can* help with Flow Garden, tasks, or your space notes.`;
+        `Want today's headlines? Say "what's in the news today." I can also help with your garden or tasks.`;
     } else if (/todo|task|berry|remember/.test(lower)) {
       response = 'Try "todo" plus your task and I will sync it as a berry when you are on device.';
     } else if (/plant|seed|water|pot|garden/.test(lower)) {
       response = 'Pinch to place pots, spawn seeds from the tray, then water to grow. Want a task for that?';
     } else if (/who are you|what are you|stephany|stephanie|ars|avis|arvis/.test(lower)) {
-      response = `I'm ${name}, the ARVIS assistant for Flow Garden on arvis.space.`;
+      response = `I'm your Flow Garden assistant. I can help with your garden, tasks, and notes.`;
     } else if (trimmed && lastUser && lastAssistant) {
-      response = `${name}: About "${trimmed}" — still in editor mock. Deploy to Specs for live arvis.space agent replies.`;
+      response = `About "${trimmed}" — still in editor mock. Deploy to Specs for live arvis.space agent replies.`;
     } else if (trimmed) {
-      response = `${name}: I heard "${trimmed}". Editor mock is active — pair on Spectacles for live arvis.space chat.`;
+      response =
+        `In editor preview I answer locally — pair on Spectacles for live arvis.space chat. What can I help with?`;
     }
 
     return {

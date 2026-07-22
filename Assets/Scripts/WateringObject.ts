@@ -2,6 +2,7 @@ import { PlantLifecycle } from './PlantLifecycle';
 import { PlantPot } from './PlantPot';
 
 import { playInteractionSound } from './InteractionSoundRegistry';
+import { playWaterSplashVfx } from './WaterSplashVfx';
 
 type InteractableLike = ScriptComponent & {
   enabled: boolean;
@@ -133,6 +134,7 @@ export class WateringObject extends BaseScriptComponent {
 
     this.consumed = true;
     this.cancelUnusedLifetime();
+    this.playDestroySplash();
 
     if (!this.destroyAfterWatering) {
       return;
@@ -148,8 +150,13 @@ export class WateringObject extends BaseScriptComponent {
 
     this.consumed = true;
     this.cancelUnusedLifetime();
+    this.playDestroySplash();
     playInteractionSound((sounds) => sounds.playWaterSplash());
     this.getSceneObject().destroy();
+  }
+
+  private playDestroySplash(): void {
+    playWaterSplashVfx(this.getSceneObject().getTransform().getWorldPosition());
   }
 
   private hideDisableAndPark(): void {

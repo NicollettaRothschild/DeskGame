@@ -480,6 +480,10 @@ export class MainWaterSource extends BaseScriptComponent {
       if (typeof spawner.setActiveManipulatedRoot === 'function') {
         spawner.setActiveManipulatedRoot(releasedWater);
       }
+      this.notifyTrashSpawnGrace(releasedWater, 5);
+      if (typeof spawner.saveObjectPosition === 'function') {
+        spawner.saveObjectPosition();
+      }
     }
 
     this.beginUnusedLifetime(releasedWater);

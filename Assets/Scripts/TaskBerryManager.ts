@@ -207,7 +207,9 @@ export class TaskBerryManager extends BaseScriptComponent {
     const deviceId = this.deviceRegistry.getDeviceId();
     const mockHint = this.specsApi.isEditorMockActive()
       ? '\n(Editor preview — device is NOT on arvis.space; deploy to Specs to pair on website)'
-      : '';
+      : this.specsApi.isAutoPairWithCredentialsEnabled()
+        ? `\n(Signing in as ${this.specsApi.autoPairEmail || 'test account'}…)`
+        : '';
     this.setStatus(`Pair at arvis.space/specs\nDevice: ${deviceId}${mockHint}`);
 
     this.specsApi.registerDevice(deviceId, (registration, error) => {
@@ -228,6 +230,23 @@ export class TaskBerryManager extends BaseScriptComponent {
 
       if (registration.paired) {
         this.onPaired();
+        return;
+      }
+
+      if (this.specsApi.isAutoPairWithCredentialsEnabled()) {
+        this.setStatus(`Pairing ${this.specsApi.autoPairEmail || 'account'}…\nDevice: ${deviceId}`);
+        this.specsApi.tryAutoPairWithCredentials(registration.deviceId, (ok, userEmail, pairError) => {
+          if (ok) {
+            this.deviceRegistry.setPaired(true);
+            this.onPaired(userEmail || null);
+            return;
+          }
+          if (this.debugLogging) {
+            print(`[TaskBerry] auto-pair failed: ${pairError || 'unknown'}`);
+          }
+          this.setStatus(`Pair failed: ${pairError || 'unknown'}\nDevice: ${deviceId}`);
+          this.schedulePairPoll();
+        });
         return;
       }
 

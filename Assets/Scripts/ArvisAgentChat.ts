@@ -6,7 +6,19 @@ import {
   getSharedSpeechRecognition,
   registerArvisAgentChat,
 } from './FlowGardenServiceRegistry';
-import { hasWakeFollowUp, parseArvisWakePhrase } from './ArvisWakePhrase';
+import {
+  extractAgentPrompt,
+  hasWakeFollowUp,
+  isIgnorableUtterance,
+  looksLikeAssistantEcho,
+  looksLikeIncompleteAgentPrompt,
+  normalizeAsrTranscript,
+  parseArvisWakePhrase,
+  sanitizeListeningTranscript,
+} from './ArvisWakePhrase';
+import { isImageQuery, normalizeImagePrompt } from './ArvisImageSkill';
+import { isMeshQuery, normalizeMeshPrompt } from './ArvisMeshSkill';
+import { isMusicQuery, normalizeMusicPrompt } from './ArvisMusicSkill';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
@@ -100,6 +112,11 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private lastListeningBoardTranscript = '';
   private interactableBound = false;
   private dependenciesLogged = false;
+  private lastVoiceWakeUtterance = '';
+  private lastVoiceWakeAt = 0;
+
+  private static readonly VOICE_WAKE_DEDUPE_SEC = 2.5;
+  private static readonly VOICE_WAKE_STABLE_SEC = 0.55;
 
   onAwake(): void {
     registerArvisAgentChat(this);
@@ -108,7 +125,10 @@ export class ArvisAgentChat extends BaseScriptComponent {
       this.resolveDependencies();
       this.bindTalkInteractable();
     });
-    this.createEvent('UpdateEvent').bind(() => this.refreshListeningBoard());
+    this.createEvent('UpdateEvent').bind(() => {
+      this.pollIdleVoiceWake();
+      this.refreshListeningBoard();
+    });
     this.createEvent('TapEvent').bind(() => this.toggleAgentTalk());
   }
 
@@ -135,6 +155,89 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
   private resetListeningBoardCache(): void {
     this.lastListeningBoardTranscript = '';
+  }
+
+  private pollIdleVoiceWake(): void {
+    if (this.listening || this.sending) {
+      return;
+    }
+
+    this.resolveDependencies();
+    if (isNull(this.speechRecognition)) {
+      return;
+    }
+    if (this.speechRecognition.isAgentSessionActive()) {
+      return;
+    }
+    if (this.speechRecognition.isSuppressingVoiceCommands()) {
+      return;
+    }
+
+    const tts = getSharedFlowGardenTts();
+    if (!isNull(tts) && (tts.isBlockingVoiceCommands() || tts.isSpeaking())) {
+      return;
+    }
+    if (this.speechRecognition.isCoolingDown()) {
+      return;
+    }
+
+    const finalText = normalizeAsrTranscript(this.speechRecognition.finalTranscript || '');
+    const stableWakeText = normalizeAsrTranscript(
+      this.speechRecognition.getStableUtterance(ArvisAgentChat.VOICE_WAKE_STABLE_SEC)
+    );
+    const wakeCandidate = finalText || stableWakeText;
+    if (!wakeCandidate || isIgnorableUtterance(wakeCandidate) || looksLikeAssistantEcho(wakeCandidate)) {
+      return;
+    }
+
+    if (!parseArvisWakePhrase(wakeCandidate).triggered) {
+      return;
+    }
+
+    const finalPrompt = finalText ? extractAgentPrompt(finalText) : '';
+    const streamingPrompt = !finalText ? extractAgentPrompt(wakeCandidate) : '';
+    if (!finalPrompt && streamingPrompt) {
+      return;
+    }
+
+    const wakeOnlyOnFinal =
+      !!finalText && parseArvisWakePhrase(finalText).triggered && !finalPrompt;
+    const wakeOnlyOnStable =
+      !finalText &&
+      !!stableWakeText &&
+      parseArvisWakePhrase(stableWakeText).triggered &&
+      !extractAgentPrompt(stableWakeText);
+
+    if (!finalPrompt && !wakeOnlyOnFinal && !wakeOnlyOnStable) {
+      return;
+    }
+
+    const dedupeKey = finalPrompt || wakeCandidate;
+    if (
+      normalizeAsrTranscript(dedupeKey) === normalizeAsrTranscript(this.lastVoiceWakeUtterance) &&
+      getTime() - this.lastVoiceWakeAt < ArvisAgentChat.VOICE_WAKE_DEDUPE_SEC
+    ) {
+      return;
+    }
+
+    this.lastVoiceWakeUtterance = dedupeKey;
+    this.lastVoiceWakeAt = getTime();
+    this.speechRecognition.clearUtteranceState();
+    this.speechRecognition.markCommandHandled();
+
+    if (finalPrompt) {
+      const prompt = this.normalizeAgentPrompt(finalPrompt);
+      if (this.debugLogging) {
+        print(`[ArvisAgentChat] Voice wake → ${prompt}`);
+      }
+      this.sendMessage(prompt);
+      return;
+    }
+
+    if (this.debugLogging) {
+      print(`[ArvisAgentChat] Voice wake open mic (${wakeCandidate})`);
+    }
+    this.beginWakeListening();
   }
 
   public beginWakeListening(): void {
@@ -167,6 +270,10 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
 
+    if (looksLikeIncompleteAgentPrompt(finalText)) {
+      return;
+    }
+
     const wake = parseArvisWakePhrase(finalText.toLowerCase());
     if (wake.triggered && !hasWakeFollowUp(wake.message)) {
       this.consumedWakeFinal = finalText;
@@ -178,7 +285,11 @@ export class ArvisAgentChat extends BaseScriptComponent {
     this.resetListeningBoardCache();
     const transcript = this.speechRecognition.endAgentSessionPreserveListening();
     this.speechRecognition.clearFinalTranscript();
-    const question = String(transcript || finalText).trim();
+    const question = this.normalizeAgentPrompt(
+      extractAgentPrompt(finalText) ||
+        sanitizeListeningTranscript(finalText) ||
+        String(transcript || finalText).trim()
+    );
     if (!question) {
       this.updateBoard('error', '', 'Did not catch that. Try again.');
       this.setStatus('No speech detected');
@@ -212,7 +323,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     this.resolveDependencies();
-    this.sendMessage(trimmed);
+    this.sendMessage(this.normalizeAgentPrompt(trimmed));
   }
 
   public beginAgentTalk(): void {
@@ -261,7 +372,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
 
-    this.sendMessage(transcript);
+    this.sendMessage(this.normalizeAgentPrompt(transcript));
   }
 
   public cancelAgentTalk(): void {
@@ -340,6 +451,32 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
   }
 
+  private canSendToAgent(): boolean {
+    if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+      return false;
+    }
+    if (this.specsApi.isEditorMockActive()) {
+      return true;
+    }
+    if (this.deviceRegistry.getDeviceSecret().length > 0) {
+      return true;
+    }
+    return this.deviceRegistry.isPaired();
+  }
+
+  private normalizeAgentPrompt(message: string): string {
+    const trimmed = String(message || '').trim();
+    if (!trimmed) {
+      return '';
+    }
+    return (
+      normalizeMeshPrompt(trimmed) ||
+      normalizeImagePrompt(trimmed) ||
+      normalizeMusicPrompt(trimmed) ||
+      trimmed
+    );
+  }
+
   private sendMessage(message: string): void {
     if (this.sending) {
       return;
@@ -350,21 +487,73 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
 
+    const outbound = this.normalizeAgentPrompt(trimmed);
     this.resolveDependencies();
     if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
-      this.updateBoard('error', trimmed, 'Missing Specs API wiring');
+      this.updateBoard('error', outbound, 'Missing Specs API wiring');
       return;
     }
 
-    if (!this.deviceRegistry.isPaired() && !this.specsApi.isEditorMockActive()) {
-      this.updateBoard('error', trimmed, 'Pair at arvis.space/specs first');
-      this.setStatus('Device not paired');
+    const imageRequest = isImageQuery(outbound);
+
+    if (!this.canSendToAgent() && !imageRequest) {
+      this.updateBoard('error', outbound, 'Pair at arvis.space/specs to use remote agents.');
+      this.setStatus('Connecting to arvis.space…');
       return;
+    }
+
+    if (imageRequest && !this.deviceRegistry.isPaired()) {
+      if (this.specsApi.isCredentialPairInFlight()) {
+        this.setStatus('Pairing with arvis.space…');
+        this.updateBoard('thinking', outbound, 'Signing in and pairing your device…');
+        const retryEvent = this.createEvent('DelayedCallbackEvent');
+        retryEvent.bind(() => {
+          this.sendMessage(message);
+        });
+        retryEvent.reset(1.5);
+        return;
+      }
+      if (
+        this.specsApi.isAutoPairWithCredentialsEnabled() &&
+        this.deviceRegistry.getDeviceSecret().length > 0
+      ) {
+        this.setStatus('Pairing with arvis.space…');
+        this.specsApi.tryAutoPairWithCredentials(
+          this.deviceRegistry.getDeviceId(),
+          (ok, _userEmail, pairError) => {
+            if (ok) {
+              this.deviceRegistry.setPaired(true);
+              this.sendMessage(message);
+              return;
+            }
+            this.updateBoard(
+              'error',
+              outbound,
+              pairError || 'Could not pair with arvis.space — check test@user.com credentials'
+            );
+            this.setStatus(pairError || 'Pairing failed');
+          }
+        );
+        return;
+      }
     }
 
     this.sending = true;
-    this.updateBoard('thinking', trimmed, null);
-    this.setStatus('Thinking…');
+    const meshRequest = isMeshQuery(outbound);
+    const musicRequest = isMusicQuery(outbound);
+    const thinkingStatus = meshRequest
+      ? 'Generating 3D…'
+      : imageRequest
+        ? 'Generating image…'
+        : musicRequest
+          ? 'Generating music…'
+          : 'Thinking…';
+    this.updateBoard(
+      'thinking',
+      outbound,
+      imageRequest ? 'Generating your image…' : null
+    );
+    this.setStatus(thinkingStatus);
 
     const payloadHistory = this.history.map((entry) => ({
       role: entry.role,
@@ -374,24 +563,27 @@ export class ArvisAgentChat extends BaseScriptComponent {
     this.specsApi.chatWithAgent(
       this.deviceRegistry.getDeviceId(),
       this.deviceRegistry.getDeviceSecret(),
-      trimmed,
+      outbound,
       this.agentName,
       payloadHistory,
       (result, error) => {
         this.sending = false;
         if (!result) {
-          this.updateBoard('error', trimmed, error || 'unknown');
+          this.updateBoard('error', outbound, error || 'unknown');
           this.setStatus('');
           return;
         }
 
-        this.pushHistory('user', trimmed);
+        this.pushHistory('user', outbound);
         this.pushHistory('assistant', result.response);
         const label = result.agentName || this.agentName;
-        this.updateBoard('reply', trimmed, result.response, label, result.imageUrl || null);
+        this.updateBoard('reply', outbound, result.response, label, result.imageUrl || null);
         this.setStatus('');
         if (this.debugLogging) {
           print(`[ArvisAgentChat] ${label}: ${result.response}`);
+          if (result.imageUrl) {
+            print(`[ArvisAgentChat] image ${String(result.imageUrl).slice(0, 120)}`);
+          }
         }
         this.speakAgentResponse(result.response, label);
       }

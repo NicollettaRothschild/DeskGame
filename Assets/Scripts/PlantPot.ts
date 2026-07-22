@@ -118,6 +118,23 @@ export class PlantPot extends BaseScriptComponent {
     this.attachPlant(plant);
   }
 
+  public tryAttachSeed(plant: PlantLifecycle): boolean {
+    if (this.hasPlant() || isNull(plant)) {
+      return this.hasPlant();
+    }
+
+    if (plant.getIsPlanted()) {
+      return true;
+    }
+
+    if (this.onlyAcceptSeeds && plant.getSaveState().stage !== PlantStage.Seed) {
+      return false;
+    }
+
+    this.attachPlant(plant);
+    return true;
+  }
+
   public getPlantedLifecycle(): PlantLifecycle | null {
     return this.plantedPlant;
   }

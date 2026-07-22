@@ -21,7 +21,7 @@ export type InteractionSoundTracks = {
 export class InteractionSoundRegistry {
   private static tracks: InteractionSoundTracks = {};
   private static players: AudioComponent[] = [];
-  private static volume = 1.25;
+  private static volume = 0.6;
   private static minReplayInterval = 0.05;
   private static debugLogging = true;
   private static lastPlayTimes: Record<string, number> = {};
@@ -31,7 +31,7 @@ export class InteractionSoundRegistry {
   public static configure(
     host: SceneObject,
     tracks: InteractionSoundTracks,
-    volume = 1.25,
+    volume = 0.6,
     debugLogging = true
   ): void {
     InteractionSoundRegistry.tracks = tracks;

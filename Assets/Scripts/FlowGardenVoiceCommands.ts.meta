@@ -22,6 +22,7 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
+  VersionPrerelease: ""
   ComponentUid: e732258a-4248-4ddf-a369-966e3a70ed36
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
@@ -45,10 +46,10 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - speechRecognition: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+    - speechRecognition: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       taskBerryManager: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-      specsApi: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
-      deviceRegistry: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      specsApi: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      deviceRegistry: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       seedSource: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       waterSource: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       potSource: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
@@ -59,10 +60,10 @@
     -
       {}
   InputLines:
-    - // @input AssignableType speechRecognition
+    - // @input AssignableType_1 speechRecognition
     - // @input Component.ScriptComponent taskBerryManager
-    - // @input AssignableType_1 specsApi
-    - // @input AssignableType_2 deviceRegistry
+    - // @input AssignableType_2 specsApi
+    - // @input AssignableType_3 deviceRegistry
     - // @input Component.ScriptComponent seedSource
     - // @input Component.ScriptComponent waterSource
     - // @input Component.ScriptComponent potSource

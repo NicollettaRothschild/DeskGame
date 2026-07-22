@@ -89,6 +89,10 @@ export class FlowGardenTTS extends BaseScriptComponent {
     return this.speaking;
   }
 
+  public isBlockingVoiceCommands(): boolean {
+    return this.speaking;
+  }
+
   private speakViaArvis(text: string, onDone: (ok: boolean) => void): void {
     if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
       onDone(false);

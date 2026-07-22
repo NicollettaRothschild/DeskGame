@@ -22,6 +22,7 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
+  VersionPrerelease: ""
   ComponentUid: 6ebe5680-4812-41e2-97a9-fbd6d7a56116
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
@@ -29,6 +30,7 @@
     anchorController: false
     debugLogging: false
     destroyOverlapCooldown: false
+    enableDeleteSmokePuff: false
     fitVisualRadiusMultiplier: false
     grabCollider: false
     trashColliderRadius: false
@@ -53,6 +55,7 @@
       useProximityTrash: false
       destroyOverlapCooldown: 0.350000
       debugLogging: false
+      enableDeleteSmokePuff: true
   ScriptTypes:
     -
       {}
@@ -66,3 +69,4 @@
     - // @input bool useProximityTrash
     - // @input float destroyOverlapCooldown = 0.35
     - // @input bool debugLogging = true
+    - // @input bool enableDeleteSmokePuff = true

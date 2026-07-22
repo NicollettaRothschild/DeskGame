@@ -103,6 +103,8 @@ export class SpeechRecognition extends BaseScriptComponent {
   private lastLoggedHeard = '';
   private isListening = false;
   private listeningWindowEvent: DelayedCallbackEvent | null = null;
+  private lastHeardChangeTime = 0;
+  private suppressVoiceCommandsUntil = 0;
 
   onAwake(): void {
     if (this.startupDisabled) {
@@ -267,6 +269,39 @@ export class SpeechRecognition extends BaseScriptComponent {
     this.lastCommandTime = getTime();
   }
 
+  public getStableUtterance(stableSec: number = 1.0): string {
+    if (this.isSuppressingVoiceCommands()) {
+      return '';
+    }
+
+    const text = this.getLiveTranscript();
+    if (!text) {
+      return '';
+    }
+
+    if (getTime() - this.lastHeardChangeTime < Math.max(0.35, stableSec)) {
+      return '';
+    }
+
+    return text;
+  }
+
+  public suppressVoiceCommandsFor(seconds: number): void {
+    this.suppressVoiceCommandsUntil = getTime() + Math.max(0, seconds);
+  }
+
+  public isSuppressingVoiceCommands(): boolean {
+    return getTime() < this.suppressVoiceCommandsUntil;
+  }
+
+  public clearUtteranceState(): void {
+    this.finalTranscript = '';
+    this.interimTranscript = '';
+    this.lastHeard = '';
+    this.lastLoggedHeard = '';
+    this.lastPushedTranscriptKey = '';
+  }
+
   private bindVoiceEvents(): void {
     if (!this.voiceMLModule || !this.listeningOptions) {
       return;
@@ -312,6 +347,7 @@ export class SpeechRecognition extends BaseScriptComponent {
       }
 
       this.lastHeard = text;
+      this.lastHeardChangeTime = getTime();
       this.setTranscriptText(text);
       if (!eventArgs.isFinalTranscription) {
         this.interimTranscript = text;

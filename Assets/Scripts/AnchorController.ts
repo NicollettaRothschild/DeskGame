@@ -6,18 +6,28 @@ import { Anchor } from 'Spatial Anchors.lspkg/Anchor';
 import { AnchorModule } from 'Spatial Anchors.lspkg/AnchorModule';
 import { AnchorComponent } from 'Spatial Anchors.lspkg/AnchorComponent';
 import { WorldAnchor } from 'Spatial Anchors.lspkg/WorldAnchor';
-import { PlantLifecycle, PlantLifecycleSaveState } from './PlantLifecycle';
+import { PlantLifecycle, PlantLifecycleSaveState, PlantStage } from './PlantLifecycle';
 import { PlantSpawnConfig } from './PlantSpawnConfig';
 import { InteractionSoundRegistry, playInteractionSound } from './InteractionSoundRegistry';
+import { configureWaterSplashVfx } from './WaterSplashVfx';
 import { prepareSceneObjectForDestroy } from './FlowGardenDestroyHooks';
 import { SpecsApiClient } from './SpecsApiClient';
-import { armGardenSourceStartupSpawnBlock } from './GardenSourceSpawnGuard';
+import {
+  armGardenSourceStartupSpawnBlock,
+  isGardenSourceSpawnBlocked,
+} from './GardenSourceSpawnGuard';
+import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
+import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
 
 const ANCHOR_CONTROLLER_VERSION = 'v32-garden-source-anchors';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
-// Seeds sack spawn collider overlaps the default corner handle — push it further out.
+const TRASH_BIN_SOURCE_NAME = 'TrashBin';
+const GARDEN_MOVE_HANDLE_REFERENCE_SOURCE = 'Water Source';
+const TRASH_MOVE_HANDLE_REFERENCE_SOURCE = 'Planter';
+// Larger meshes overlap the default corner handle — push handles further out.
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_OFFSETS: { [sourceName: string]: vec3 } = {
+  'Water Source': new vec3(1.35, 0.08, 1.35),
   Seeds: new vec3(1.25, 0.08, 1.25),
 };
 const SEEDS_STATIC_CHILD_NAMES = new Set([
@@ -94,12 +104,14 @@ export class AnchorController extends BaseScriptComponent {
   @input plantPrefab!: ObjectPrefab;
   @input
   potPrefabs: ObjectPrefab[] = [];
-  @input textlog!: Text;
+  @input
+  @allowUndefined
+  textlog!: Text;
   @input
   plantConfigs: PlantSpawnConfig[] = [];
 
   @input('float')
-  soundVolume: number = 1.25;
+  soundVolume: number = 0.6;
 
   @input
   soundDebugLogging: boolean = true;
@@ -135,6 +147,19 @@ export class AnchorController extends BaseScriptComponent {
   @input
   @allowUndefined
   placeObjectTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  waterSplashPrefab!: ObjectPrefab;
+
+  @input('float')
+  waterSplashLifetime: number = 1.2;
+
+  @input('float')
+  waterSplashIntensity: number = 0.55;
+
+  @input('int')
+  waterSplashMaxParticles: number = 1000;
 
   @input
   @allowUndefined
@@ -182,7 +207,6 @@ export class AnchorController extends BaseScriptComponent {
 
   private anchorSession?: AnchorSession;
   private clonedSackMaterial: Material | null = null;
-  private clonedHandleOuterGlowMaterial: Material | null = null;
   private wrappers: SceneObject[] = [];
   private objs: SceneObject[] = [];
   private objectKinds: string[] = [];
@@ -224,6 +248,7 @@ export class AnchorController extends BaseScriptComponent {
   private readonly aiContainerPersistIntervalSec = 0.35;
   private readonly aiContainerMoveEpsilon = 0.5;
   private activeManipulatedRoot: SceneObject | null = null;
+  private trashReleaseRetryToken = 0;
   private lastSaveObjectPositionAt = -1;
   private readonly saveObjectPositionCooldownSec = 0.1;
   private trashReleaseWiredObjects: SceneObject[] = [];
@@ -243,6 +268,13 @@ export class AnchorController extends BaseScriptComponent {
     this.createEvent('OnStartEvent').bind(() => this.onStart());
   }
 
+  private setStatusText(message: string): void {
+    if (isNull(this.textlog)) {
+      return;
+    }
+    this.textlog.text = message;
+  }
+
   private setupInteractionSounds(): void {
     InteractionSoundRegistry.configure(
       this.getSceneObject(),
@@ -260,6 +292,22 @@ export class AnchorController extends BaseScriptComponent {
         hover: this.hoverTrack ?? this.placeObjectTrack,
       },
       this.soundVolume,
+      this.soundDebugLogging
+    );
+    this.setupWaterSplashVfx();
+  }
+
+  private setupWaterSplashVfx(): void {
+    if (isNull(this.waterSplashPrefab)) {
+      return;
+    }
+
+    configureWaterSplashVfx(
+      this.waterSplashPrefab,
+      this.getSceneObject(),
+      this.waterSplashLifetime,
+      this.waterSplashIntensity,
+      this.waterSplashMaxParticles,
       this.soundDebugLogging
     );
   }
@@ -286,9 +334,8 @@ export class AnchorController extends BaseScriptComponent {
     const hasSavedPlants =
       !editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0;
 
-    if (!isNull(this.menuRoot)) {
-      this.menuRoot.enabled = true;
-    }
+    // Leave AIContainer/menuRoot enabled-state as authored in the scene
+    // (currently hidden; ArvisGhost lives at scene root separately).
 
     if (hasSavedPlants) {
       print('Saved plants found: minimal boot (no anchor or background loops)');
@@ -314,13 +361,14 @@ export class AnchorController extends BaseScriptComponent {
       }
       this.applyGardenSourcesSavedPoses();
       this.wireTrashBinMovement();
-      this.wireGardenSourceMoveHandles();
+      this.scheduleGardenAndTrashHandleWiring();
       this.restoreGardenSpawnSourcesLayout('minimal-boot');
       this.hasRestored = true;
-      this.textlog.text =
+      this.setStatusText(
         this.objs.length > 0
           ? `Restored ${this.objs.length} object(s)`
-          : 'Garden restored';
+          : 'Garden restored'
+      );
       print(`Minimal boot complete (${this.objs.length} object(s))`);
       return;
     }
@@ -346,7 +394,7 @@ export class AnchorController extends BaseScriptComponent {
 
     this.startAnchorSaveLoop();
     this.wireTrashBinMovement();
-    this.wireGardenSourceMoveHandles();
+    this.scheduleGardenAndTrashHandleWiring();
     this.wireAIContainerMovement();
     this.startAIContainerPersistenceLoop();
 
@@ -408,7 +456,7 @@ export class AnchorController extends BaseScriptComponent {
 
     if (!this.ensureAnchorModuleActive()) {
       print('Anchor session skipped: AnchorModule unavailable');
-      this.textlog.text = 'Desk anchor unavailable';
+      this.setStatusText('Desk anchor unavailable');
       this.usingWorldSpace = true;
       this.aiContainerPersistencePaused = false;
       return;
@@ -423,7 +471,7 @@ export class AnchorController extends BaseScriptComponent {
       print('Anchor session ready');
     } catch (error) {
       print('Anchor session unavailable: ' + error);
-      this.textlog.text = 'Desk anchor unavailable';
+      this.setStatusText('Desk anchor unavailable');
       this.usingWorldSpace = true;
       this.aiContainerPersistencePaused = false;
       return;
@@ -455,9 +503,11 @@ export class AnchorController extends BaseScriptComponent {
       this.startupRebindInProgress = false;
       this.anchorRestorePending = false;
       print('Anchor bind timeout; continuing in world space');
-      this.textlog.text = this.hasRestored
-        ? `Restored ${this.objs.length} object(s)`
-        : 'Desk anchor unavailable';
+      this.setStatusText(
+        this.hasRestored
+          ? `Restored ${this.objs.length} object(s)`
+          : 'Desk anchor unavailable'
+      );
     }, ANCHOR_BIND_TIMEOUT_SEC);
   }
 
@@ -619,7 +669,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     print(`Anchor found: ${anchorId}`);
-    this.textlog.text = 'Anchor found';
+    this.setStatusText('Anchor found');
     const hadWorldFallback = this.hasRestored && this.restoredFromWorldFallback;
     const worldSnapshots =
       this.objs.length > 0 ? this.capturePlantWorldTransforms() : [];
@@ -655,7 +705,7 @@ export class AnchorController extends BaseScriptComponent {
         this.finishStartupRebind(worldSnapshots, 'Attach existing plants');
         this.hasRestored = true;
         this.skipStartupWorldFallback = true;
-        this.textlog.text = `Restored ${this.objs.length} plant(s)`;
+        this.setStatusText(`Restored ${this.objs.length} plant(s)`);
         return;
       }
 
@@ -837,7 +887,7 @@ export class AnchorController extends BaseScriptComponent {
     this.usingWorldSpace = false;
     this.restoredFromWorldFallback = false;
     this.anchorComponent.enabled = true;
-    this.textlog.text = 'Creating desk anchor...';
+    this.setStatusText('Creating desk anchor...');
     print('Creating desk anchor');
     this.anchorSession!.createWorldAnchor(spawnWorldMat)
       .then((anchor) => {
@@ -867,7 +917,7 @@ export class AnchorController extends BaseScriptComponent {
         this.anchorComponent.anchor = anchor;
         this.anchorPersisted = false;
         this.anchorCreationInProgress = false;
-        this.textlog.text = 'Mapping desk... look around slowly';
+        this.setStatusText('Mapping desk... look around slowly');
         print('World anchor created at desk contact, waiting to persist');
         this.scheduleAnchorStableRestore(() => {
           this.finishStartupRebind(worldSnapshots, 'New session anchor');
@@ -876,7 +926,7 @@ export class AnchorController extends BaseScriptComponent {
       })
       .catch((error) => {
         print('Error creating anchor: ' + error);
-        this.textlog.text = 'Could not create desk anchor';
+        this.setStatusText('Could not create desk anchor');
         this.usingWorldSpace = true;
         this.anchorCreationInProgress = false;
         this.anchorComponent.enabled = false;
@@ -909,7 +959,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     this.anchorSaveInProgress = true;
-    this.textlog.text = 'Mapping desk... look around slowly';
+    this.setStatusText('Mapping desk... look around slowly');
     this.anchorSession!.saveAnchor(this.currentAnchor)
       .then(() => {
         this.anchorPersisted = true;
@@ -918,14 +968,14 @@ export class AnchorController extends BaseScriptComponent {
         if (this.currentAnchor) {
           this.rememberPreferredAnchor(String(this.currentAnchor.id || ''));
         }
-        this.textlog.text = 'Anchor saved';
+        this.setStatusText('Anchor saved');
         print('Anchor saved successfully');
         this.persistPlantTransforms();
         this.anchorSaveInProgress = false;
       })
       .catch((e) => {
         print('Anchor save pending: ' + e);
-        this.textlog.text = 'Mapping desk... stay in place';
+        this.setStatusText('Mapping desk... stay in place');
         this.anchorSaveInProgress = false;
       });
   }
@@ -940,22 +990,22 @@ export class AnchorController extends BaseScriptComponent {
     const hasWorldData = store.has('has_world_data') && store.getBool('has_world_data');
     if (!hasWorldData) {
       print('No world preview data yet, deferring restore');
-      this.textlog.text = 'Scanning for desk anchor...';
+      this.setStatusText('Scanning for desk anchor...');
       this.scheduleWorldFallbackRestore(WORLD_PREVIEW_FALLBACK_SEC, deferAnchorCreation);
       return;
     }
 
     print('Fast restore: world preview while Snap anchor scans in background');
-    this.textlog.text = 'Restoring saved plants...';
+    this.setStatusText('Restoring saved plants...');
     this.restoreSavedObjects(false);
     if (this.objs.length > 0) {
       if (deferAnchorCreation) {
-        this.textlog.text = `Restored ${this.objs.length} object(s)`;
+        this.setStatusText(`Restored ${this.objs.length} object(s)`);
       } else {
         this.ensureDeskAnchorForRestoredPlants();
       }
     } else {
-      this.textlog.text = 'Could not restore saved plants';
+      this.setStatusText('Could not restore saved plants');
       this.aiContainerPersistencePaused = false;
     }
   }
@@ -970,12 +1020,12 @@ export class AnchorController extends BaseScriptComponent {
       this.restoreSavedObjects(false);
       if (this.objs.length > 0) {
         if (deferAnchorCreation && !this.anchorSession) {
-          this.textlog.text = `Restored ${this.objs.length} object(s)`;
+          this.setStatusText(`Restored ${this.objs.length} object(s)`);
         } else {
           this.ensureDeskAnchorForRestoredPlants();
         }
       } else {
-        this.textlog.text = 'Could not restore saved plants';
+        this.setStatusText('Could not restore saved plants');
       }
     }, delaySec);
   }
@@ -986,9 +1036,11 @@ export class AnchorController extends BaseScriptComponent {
         return;
       }
       print('Still scanning for saved desk anchor');
-      this.textlog.text = this.hasRestored
-        ? 'Look at your desk slowly to lock saved anchor'
-        : 'Look at your desk slowly to find saved anchor';
+      this.setStatusText(
+        this.hasRestored
+          ? 'Look at your desk slowly to lock saved anchor'
+          : 'Look at your desk slowly to find saved anchor'
+      );
     }, delaySec);
   }
 
@@ -1016,14 +1068,14 @@ export class AnchorController extends BaseScriptComponent {
     const preferredId = this.getPreferredAnchorId();
     if (this.usesSavedAnchorSpace() || preferredId) {
       print('Saved Snap anchor expected; waiting for scan without creating new session anchor');
-      this.textlog.text = 'Look at your desk slowly to lock saved anchor';
+      this.setStatusText('Look at your desk slowly to lock saved anchor');
       return;
     }
 
     print(
       `Waiting ${ANCHOR_CREATE_GRACE_SEC}s for nearby anchor scan before creating session anchor`
     );
-    this.textlog.text = 'Scanning for saved desk anchor...';
+    this.setStatusText('Scanning for saved desk anchor...');
     this.scheduleDelayed(() => {
       if (
         this.isResetting ||
@@ -1039,7 +1091,7 @@ export class AnchorController extends BaseScriptComponent {
       }
 
       print('No saved Snap anchor on device; creating session anchor at restored plants');
-      this.textlog.text = `Anchoring ${this.objs.length} restored plant(s) to desk...`;
+      this.setStatusText(`Anchoring ${this.objs.length} restored plant(s) to desk...`);
       this.startWorldAnchorCreation(this.getPlantAnchorWorldMatrix());
     }, ANCHOR_CREATE_GRACE_SEC);
   }
@@ -1194,7 +1246,94 @@ export class AnchorController extends BaseScriptComponent {
     return true;
   }
 
-  private removeTrackedObjectAt(index: number): void {
+  public stashTrackedObjectInTrash(candidate: SceneObject): boolean {
+    const index = this.findTrackedObjectIndex(candidate);
+    if (index < 0) {
+      return false;
+    }
+
+    const label = !isNull(this.wrappers[index]) ? this.wrappers[index].name : 'tracked';
+    this.removeTrackedObjectAt(index);
+    print(`Deleted tracked object ${label} in TrashBin`);
+    return true;
+  }
+
+  /** Pots and watered/planted plants must not be deleted by pinch-up release near TrashBin. */
+  public shouldProtectFromReleaseTrash(candidate: SceneObject): boolean {
+    const index = this.findTrackedObjectIndex(candidate);
+    if (index < 0) {
+      return false;
+    }
+
+    const objectKind = this.objectKinds[index] || OBJECT_KIND_PLANT;
+    if (objectKind === OBJECT_KIND_POT) {
+      return true;
+    }
+
+    const obj = this.objs[index];
+    if (isNull(obj)) {
+      return false;
+    }
+
+    const plant = this.findPlantLifecycle(obj);
+    if (isNull(plant)) {
+      return false;
+    }
+
+    if (plant.getIsPlanted()) {
+      return true;
+    }
+
+    const state = plant.getSaveState();
+    return state.hasBeenWatered || state.stage !== PlantStage.Seed;
+  }
+
+  private cancelPendingTrashReleaseRetry(): void {
+    this.trashReleaseRetryToken++;
+  }
+
+  public reinsertTrackedObject(
+    entry: TrashStashEntry,
+    worldPos: vec3,
+    worldRot: quat
+  ): boolean {
+    if (isNull(entry.wrapper) || isNull(entry.content)) {
+      return false;
+    }
+
+    const newIndex = this.wrappers.length;
+    entry.wrapper.setParent(this.getSpawnParent());
+    entry.wrapper.getTransform().setWorldPosition(worldPos);
+    entry.wrapper.getTransform().setWorldRotation(worldRot);
+    entry.wrapper.getTransform().setLocalScale(new vec3(1, 1, 1));
+    entry.wrapper.enabled = true;
+    entry.content.enabled = true;
+
+    this.wrappers.push(entry.wrapper);
+    this.objs.push(entry.content);
+    this.objectKinds.push(entry.objectKind);
+    this.objectPrefabIndices.push(entry.prefabIndex);
+    this.writeObjectSlotSnapshot(newIndex, entry.storeSnapshot);
+
+    const store = global.persistentStorageSystem.store;
+    store.putInt('widget_count', this.wrappers.length);
+    store.putBool('has_world_data', true);
+    this.wirePotPersistence(entry.content);
+    this.restorePlantState(store, newIndex, entry.content);
+    this.wirePlantLifecycle(entry.content);
+    this.persistPlantTransforms();
+    this.wireTrashReleaseTracking(entry.content, entry.wrapper);
+    this.notifyTrashSpawnGrace(entry.wrapper, 2);
+    this.notifyTrashSpawnGrace(entry.content, 2);
+    this.setStatusText(`${this.objs.length} object(s) remaining`);
+    print(`Restored ${entry.wrapper.name} from TrashBin`);
+    return true;
+  }
+
+  private removeTrackedObjectAt(
+    index: number,
+    options?: { preserveWrapper?: boolean }
+  ): void {
     if (index < 0 || index >= this.wrappers.length) {
       return;
     }
@@ -1209,7 +1348,7 @@ export class AnchorController extends BaseScriptComponent {
     this.objectKinds.splice(index, 1);
     this.objectPrefabIndices.splice(index, 1);
 
-    if (!isNull(wrapper)) {
+    if (!isNull(wrapper) && !options?.preserveWrapper) {
       prepareSceneObjectForDestroy(wrapper);
       const wrapperRef = wrapper;
       this.scheduleDelayed(() => {
@@ -1227,8 +1366,12 @@ export class AnchorController extends BaseScriptComponent {
 
     this.trimStoredObjectSlots(store, this.wrappers.length, oldCount);
     this.persistPlantTransforms();
-    this.textlog.text = `${this.objs.length} object(s) remaining`;
-    print(`Removed tracked object at index ${index}`);
+    this.setStatusText(`${this.objs.length} object(s) remaining`);
+    if (options?.preserveWrapper) {
+      print(`Detached tracked object at index ${index} for TrashBin stash`);
+    } else {
+      print(`Removed tracked object at index ${index}`);
+    }
   }
 
   private trimStoredObjectSlots(
@@ -1250,6 +1393,10 @@ export class AnchorController extends BaseScriptComponent {
       this.floatingRoot = global.scene.createSceneObject('PlantFloatingRoot');
     }
     return this.floatingRoot;
+  }
+
+  public getTrackedSpawnParent(): SceneObject {
+    return this.getSpawnParent();
   }
 
   private getSpawnParent(): SceneObject {
@@ -2188,6 +2335,14 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
+    if (isGardenSourceSpawnBlocked(trashObject)) {
+      return;
+    }
+
+    if (!isNull(this.activeManipulatedRoot) && this.activeManipulatedRoot === trashObject) {
+      return;
+    }
+
     trashObject.getTransform().setWorldPosition(this.trashFixedWorldPosition);
   }
 
@@ -2198,6 +2353,10 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     if (this.anchorRestorePending || this.startupRebindInProgress) {
+      return;
+    }
+
+    if (isGardenSourceSpawnBlocked(trashObject)) {
       return;
     }
 
@@ -2354,15 +2513,382 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private wireTrashBinMovement(): void {
-    const trash = this.trashBin as {
-      wireMoveInteraction?: () => void;
-    };
-    if (!isNull(trash) && typeof trash.wireMoveInteraction === 'function') {
-      trash.wireMoveInteraction();
+    const trash = this.trashBin as TrashBin;
+    if (!isNull(trash)) {
+      if (typeof trash.setUseExternalMoveHandle === 'function') {
+        trash.setUseExternalMoveHandle(true);
+      }
+      if (typeof trash.bindStashRestore === 'function') {
+        trash.bindStashRestore(this);
+      }
+    }
+  }
+
+  private scheduleGardenAndTrashHandleWiring(): void {
+    this.scheduleDelayed(() => {
+      this.wireGardenSourceMoveHandles();
+      this.ensureTrashBinMoveHandle();
+    }, 0.3);
+    // TrashBin is much smaller than garden sources — retry once if copySceneObject races a reset.
+    this.scheduleDelayed(() => {
+      this.ensureTrashBinMoveHandle();
+    }, 0.75);
+  }
+
+  private findMoveHandleTemplate(): SceneObject | null {
+    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
+      const source = this.findGardenSpawnSource(GARDEN_SPAWN_SOURCE_NAMES[i]);
+      if (isNull(source)) {
+        continue;
+      }
+
+      const handle = this.findNamedChild(source, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+      if (!isNull(handle)) {
+        return handle;
+      }
+    }
+
+    return null;
+  }
+
+  private findTrashMoveHandleTemplate(): SceneObject | null {
+    const planter = this.findGardenSpawnSource(TRASH_MOVE_HANDLE_REFERENCE_SOURCE);
+    if (!isNull(planter)) {
+      const handle = this.findNamedChild(planter, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+      if (!isNull(handle)) {
+        return handle;
+      }
+    }
+
+    return this.findMoveHandleTemplate();
+  }
+
+  private ensureTrashBinMoveHandle(): void {
+    const trash = this.getTrashSceneObject();
+    const template = this.findTrashMoveHandleTemplate();
+    if (isNull(trash)) {
+      print('TrashBin move handle skipped: trash scene object not found');
+      return;
+    }
+    if (isNull(template)) {
+      print('TrashBin move handle skipped: no garden source MoveHandle template found');
+      return;
+    }
+
+    let handle = this.findNamedChild(trash, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+    if (!isNull(handle) && !this.hasGardenSourceMoveHandleScript(handle)) {
+      handle.destroy();
+      handle = null;
+    }
+    if (isNull(handle)) {
+      handle = this.createMoveHandleFromTemplate(trash, template);
+    }
+    if (isNull(handle)) {
+      print('TrashBin move handle skipped: failed to create MoveHandle');
+      return;
+    }
+
+    handle.enabled = true;
+    this.applyTrashBinMoveHandleLayout(handle, trash, template);
+    this.applyGardenSourceMoveHandleVisual(handle);
+    this.applyGardenSourceMoveHandleGlow(handle);
+
+    // Container hover on, root grab/manipulation off — child MoveHandle owns movement.
+    this.setTrashRootMoveEnabled(false);
+    this.configureTrashBinForExternalHandle(trash);
+    const trashComponent = this.trashBin as TrashBin;
+    if (!isNull(trashComponent) && typeof trashComponent.setUseExternalMoveHandle === 'function') {
+      trashComponent.setUseExternalMoveHandle(true);
+    }
+
+    let wired = false;
+    const scripts = handle.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i] as GardenSourceMoveHandle;
+      if (isNull(script) || typeof script.wireMoveInteraction !== 'function') {
+        continue;
+      }
+
+      script.sourceRoot = trash;
+      script.sourceName = TRASH_BIN_SOURCE_NAME;
+      script.anchorController = this;
+      if (!isNull(this.moveHandleMaterial)) {
+        script.handleMaterial = this.moveHandleMaterial;
+      }
+      if (!isNull(this.moveHandleGlowMaterial)) {
+        script.glowMaterial = this.moveHandleGlowMaterial;
+      }
+      script.wireMoveInteraction();
+      if (typeof script.refreshManipulationRootBinding === 'function') {
+        script.refreshManipulationRootBinding();
+      }
+      this.bindTrashHandleManipulationRoot(handle, trash);
+      if (typeof script.refreshHandlePresentation === 'function') {
+        script.refreshHandlePresentation();
+      }
+      wired = true;
+    }
+
+    // Keep corner layout after wire/visual setup (glow helpers must not fight position).
+    this.applyTrashBinMoveHandleLayout(handle, trash, template);
+    this.configureTrashBinForExternalHandle(trash);
+
+    if (wired) {
+      const worldPos = handle.getTransform().getWorldPosition();
+      const trashWorldPos = trash.getTransform().getWorldPosition();
+      const localPos = handle.getTransform().getLocalPosition();
+      const manipRoot = this.getHandleManipulationRootName(handle);
+      print(
+        `TrashBin move handle local ${localPos.toString()} world ${worldPos.toString()} (trash ${trashWorldPos.toString()}, manipRoot=${manipRoot})`
+      );
+    } else {
+      print('TrashBin move handle created but GardenSourceMoveHandle script was not found');
+    }
+  }
+
+  private getHandleManipulationRootName(handle: SceneObject): string {
+    const scripts = handle.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as ScriptComponent & {
+        manipulateRootSceneObject?: SceneObject;
+      };
+      if (!isNull(candidate) && !isNull(candidate.manipulateRootSceneObject)) {
+        return String(candidate.manipulateRootSceneObject.name || '?');
+      }
+    }
+    return 'missing';
+  }
+
+  private hasGardenSourceMoveHandleScript(handle: SceneObject): boolean {
+    const scripts = handle.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i] as GardenSourceMoveHandle;
+      if (!isNull(script) && typeof script.wireMoveInteraction === 'function') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private createMoveHandleFromTemplate(
+    parent: SceneObject,
+    template: SceneObject
+  ): SceneObject | null {
+    if (isNull(parent) || isNull(template)) {
+      return null;
+    }
+
+    try {
+      const handle = parent.copySceneObject(template);
+      if (!isNull(handle)) {
+        handle.name = GARDEN_SOURCE_MOVE_HANDLE_NAME;
+        handle.enabled = true;
+        return handle;
+      }
+    } catch (error) {
+      print(`TrashBin move handle copy failed (parent.copySceneObject): ${error}`);
+    }
+
+    try {
+      const handle = template.copySceneObject(parent);
+      if (!isNull(handle)) {
+        handle.name = GARDEN_SOURCE_MOVE_HANDLE_NAME;
+        handle.enabled = true;
+        return handle;
+      }
+    } catch (error) {
+      print(`TrashBin move handle copy failed (template.copySceneObject): ${error}`);
+    }
+
+    return null;
+  }
+
+  private applyTrashBinMoveHandleLayout(
+    handle: SceneObject,
+    trash: SceneObject,
+    template: SceneObject
+  ): void {
+    const templateTransform = template.getTransform();
+    const templateScale = templateTransform.getLocalScale();
+    const scaleCompensation = this.getTrashMoveHandleScaleCompensation(trash);
+    handle.getTransform().setLocalScale(
+      new vec3(
+        templateScale.x * scaleCompensation,
+        templateScale.y * scaleCompensation,
+        templateScale.z * scaleCompensation
+      )
+    );
+
+    const referenceSource = this.findGardenSpawnSource(TRASH_MOVE_HANDLE_REFERENCE_SOURCE);
+    const referenceHandle = isNull(referenceSource)
+      ? null
+      : this.findNamedChild(referenceSource, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+    if (!isNull(referenceSource) && !isNull(referenceHandle)) {
+      const referenceLocal = referenceHandle.getTransform().getLocalPosition();
+      const referenceScale = referenceSource.getTransform().getLocalScale();
+      const trashScale = trash.getTransform().getLocalScale();
+      // Planter uses local (0.88,-0.05,0.88) on scale ~8. Trash root scale is much smaller,
+      // so convert that corner to trash-local space — same world corner, not center of mesh.
+      handle.getTransform().setLocalPosition(
+        new vec3(
+          (referenceLocal.x * referenceScale.x) / Math.max(trashScale.x, 0.001),
+          (referenceLocal.y * referenceScale.y) / Math.max(trashScale.y, 0.001),
+          (referenceLocal.z * referenceScale.z) / Math.max(trashScale.z, 0.001)
+        )
+      );
+      return;
+    }
+
+    handle.getTransform().setLocalPosition(templateTransform.getLocalPosition());
+  }
+
+  private bindTrashHandleManipulationRoot(handle: SceneObject, trash: SceneObject): void {
+    const scripts = handle.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const manipulation = scripts[i] as ScriptComponent & {
+        manipulateRootSceneObject?: SceneObject;
+        enableTranslation?: boolean;
+        enableRotation?: boolean;
+        enableScale?: boolean;
+        setManipulateRoot?: (root: Transform) => void;
+      };
+      if (isNull(manipulation) || manipulation.manipulateRootSceneObject === undefined) {
+        continue;
+      }
+
+      manipulation.manipulateRootSceneObject = trash;
+      manipulation.enableTranslation = true;
+      manipulation.enableRotation = false;
+      manipulation.enableScale = false;
+      if (typeof manipulation.setManipulateRoot === 'function') {
+        manipulation.setManipulateRoot(trash.getTransform());
+      }
+      manipulation.enabled = true;
+      return;
+    }
+  }
+
+  private configureTrashBinForExternalHandle(trash: SceneObject): void {
+    const scripts = trash.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as ScriptComponent & {
+        targetingMode?: number;
+        manipulateRootSceneObject?: SceneObject;
+        enableInstantDrag?: boolean;
+      };
+      if (isNull(candidate)) {
+        continue;
+      }
+
+      if (candidate.manipulateRootSceneObject !== undefined) {
+        candidate.enabled = false;
+        continue;
+      }
+
+      if (candidate.targetingMode !== undefined) {
+        // Indirect-only hover on the bin body — direct pinch stays on stashed items.
+        candidate.targetingMode = 2;
+        if (candidate.enableInstantDrag !== undefined) {
+          candidate.enableInstantDrag = false;
+        }
+        candidate.enabled = true;
+      }
+    }
+
+    const triggerCollider = this.findTrashTriggerCollider(trash);
+    const colliders = trash.getComponents('Component.ColliderComponent');
+    for (let i = 0; i < colliders.length; i++) {
+      const collider = colliders[i] as ColliderComponent & {
+        forceCompound?: boolean;
+        intangible?: boolean;
+        enabled?: boolean;
+        shape?: { radius?: number; FitVisual?: boolean };
+      };
+      if (isNull(collider)) {
+        continue;
+      }
+
+      collider.forceCompound = false;
+
+      const shapeRadius = collider.shape?.radius ?? 0;
+      if (collider !== triggerCollider && shapeRadius >= 20) {
+        // Large grab collider must stay off — it steals hover/grab from MoveHandle.
+        collider.enabled = false;
+        collider.intangible = true;
+        continue;
+      }
+
+      if (collider === triggerCollider) {
+        collider.enabled = true;
+        collider.intangible = false;
+        if (collider.shape) {
+          collider.shape.FitVisual = true;
+        }
+      }
+    }
+  }
+
+  private findTrashTriggerCollider(trash: SceneObject): ColliderComponent | null {
+    const trashComponent = this.trashBin as TrashBin;
+    if (!isNull(trashComponent) && !isNull(trashComponent.triggerCollider)) {
+      return trashComponent.triggerCollider;
+    }
+
+    const colliders = trash.getComponents('Component.ColliderComponent');
+    for (let i = 0; i < colliders.length; i++) {
+      const collider = colliders[i] as ColliderComponent & { shape?: { radius?: number } };
+      if (isNull(collider)) {
+        continue;
+      }
+
+      const shapeRadius = collider.shape?.radius ?? 0;
+      if (shapeRadius > 0 && shapeRadius < 20) {
+        return collider;
+      }
+    }
+
+    return colliders.length > 0 ? (colliders[0] as ColliderComponent) : null;
+  }
+
+  private getTrashMoveHandleScaleCompensation(trash: SceneObject): number {
+    const referenceSource = this.findGardenSpawnSource(GARDEN_MOVE_HANDLE_REFERENCE_SOURCE);
+    if (isNull(referenceSource) || isNull(trash)) {
+      return 1;
+    }
+
+    const referenceScale = referenceSource.getTransform().getWorldScale();
+    const trashScale = trash.getTransform().getWorldScale();
+    const referenceAxis = Math.max(referenceScale.x, 0.001);
+    const trashAxis = Math.max(trashScale.x, 0.001);
+    return referenceAxis / trashAxis;
+  }
+
+  private setTrashRootMoveEnabled(enabled: boolean): void {
+    const trash = this.getTrashSceneObject();
+    if (isNull(trash)) {
+      return;
+    }
+
+    const scripts = trash.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i] as ScriptComponent & {
+        manipulateRootSceneObject?: SceneObject;
+      };
+      if (isNull(script) || script.manipulateRootSceneObject === undefined) {
+        continue;
+      }
+
+      script.enabled = enabled;
     }
   }
 
   public persistGardenSourceTransform(sourceName: string): void {
+    if (sourceName === TRASH_BIN_SOURCE_NAME) {
+      this.trashPersistCooldown = 0;
+      this.persistTrashTransform();
+      return;
+    }
+
     const source = this.findGardenSpawnSource(sourceName);
     if (isNull(source)) {
       return;
@@ -2427,11 +2953,18 @@ export class AnchorController extends BaseScriptComponent {
       this.ensureGardenSourceSpawnInteractable(source);
       const scripts = handle.getComponents('Component.ScriptComponent');
       for (let j = 0; j < scripts.length; j++) {
-        const script = scripts[j] as ScriptComponent & {
-          wireMoveInteraction?: () => void;
-        };
+        const script = scripts[j] as GardenSourceMoveHandle;
         if (isNull(script) || typeof script.wireMoveInteraction !== 'function') {
           continue;
+        }
+        script.sourceRoot = source;
+        script.sourceName = name;
+        script.anchorController = this;
+        if (!isNull(this.moveHandleMaterial)) {
+          script.handleMaterial = this.moveHandleMaterial;
+        }
+        if (!isNull(this.moveHandleGlowMaterial)) {
+          script.glowMaterial = this.moveHandleGlowMaterial;
         }
         script.wireMoveInteraction();
       }
@@ -2441,12 +2974,14 @@ export class AnchorController extends BaseScriptComponent {
   private ensureGardenSourceSpawnInteractable(source: SceneObject): void {
     const scripts = source.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
-      const candidate = scripts[i] as ScriptComponent & { targetingMode?: number };
-      if (
-        isNull(candidate) ||
-        candidate.targetingMode === undefined ||
-        candidate.targetingMode === 7
-      ) {
+      const candidate = scripts[i] as ScriptComponent & {
+        targetingMode?: number;
+        manipulateRootSceneObject?: SceneObject;
+      };
+      if (isNull(candidate) || candidate.targetingMode === undefined) {
+        continue;
+      }
+      if (candidate.manipulateRootSceneObject !== undefined) {
         continue;
       }
 
@@ -2465,6 +3000,7 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private applyGardenSourceMoveHandleVisual(handle: SceneObject): void {
+    const glowReady = !isNull(this.moveHandleGlowMaterial) || !isNull(this.moveHandleMaterial);
     const visuals = handle.getComponents('Component.RenderMeshVisual');
     for (let i = 0; i < visuals.length; i++) {
       const visual = visuals[i] as RenderMeshVisual;
@@ -2472,8 +3008,13 @@ export class AnchorController extends BaseScriptComponent {
         continue;
       }
 
-      // Outer glow ring only — hide the solid inner disc mesh.
-      visual.enabled = false;
+      if (glowReady) {
+        // Outer glow ring only — hide the solid inner disc mesh once glow is available.
+        visual.enabled = false;
+      } else if (!isNull(this.moveHandleMaterial)) {
+        visual.enabled = true;
+        visual.mainMaterial = this.moveHandleMaterial;
+      }
     }
   }
 
@@ -2503,8 +3044,8 @@ export class AnchorController extends BaseScriptComponent {
       'GlowHalo',
       1.55,
       8,
-      new vec4(1, 0.86, 0.1, 0.38),
-      new vec3(1.4, 1.1, 0.18)
+      new vec4(1, 0.86, 0.1, 0.36),
+      new vec3(0.72, 0.58, 0.1)
     );
   }
 
@@ -2537,14 +3078,8 @@ export class AnchorController extends BaseScriptComponent {
     layerVisual.mesh = mesh;
     layerVisual.renderOrder = renderOrder;
 
-    let layerMaterial = this.clonedHandleOuterGlowMaterial;
-    if (isNull(layerMaterial)) {
-      layerMaterial = this.moveHandleGlowMaterial.clone();
-      const sourcePass = this.moveHandleGlowMaterial.mainPass;
-      layerMaterial.mainPass.baseTex = sourcePass.baseTex;
-      this.clonedHandleOuterGlowMaterial = layerMaterial;
-    }
-
+    const layerMaterial = this.moveHandleGlowMaterial.clone();
+    layerMaterial.mainPass.baseTex = this.moveHandleGlowMaterial.mainPass.baseTex;
     layerMaterial.mainPass.baseColor = baseColor;
     const passAny = layerMaterial.mainPass as { Port_Emissive_N006?: vec3 };
     if (passAny.Port_Emissive_N006 !== undefined) {
@@ -2623,6 +3158,33 @@ export class AnchorController extends BaseScriptComponent {
     return false;
   }
 
+  /** Always runs on pinch-up — not gated by saveObjectPosition cooldown. */
+  public attemptTrashOnManipulatedRelease(): boolean {
+    const releaseRoot = this.resolveReleasedTrackedRoot();
+    this.activeManipulatedRoot = null;
+    this.cancelPendingTrashReleaseRetry();
+    const retryToken = this.trashReleaseRetryToken;
+
+    let trashedOnRelease = this.tryTrashTrackedOnRelease(releaseRoot);
+    if (!trashedOnRelease && !isNull(releaseRoot)) {
+      const releaseRef = releaseRoot;
+      this.scheduleDelayed(() => {
+        if (retryToken !== this.trashReleaseRetryToken) {
+          return;
+        }
+        if (isNull(releaseRef) || !releaseRef.enabled) {
+          return;
+        }
+        if (this.isObjectInTrashSpawnGrace(releaseRef)) {
+          return;
+        }
+        this.tryTrashTrackedOnRelease(releaseRef);
+      }, 0.1);
+    }
+
+    return trashedOnRelease;
+  }
+
   private tryTrashTrackedOnRelease(releasedRoot?: SceneObject | null): boolean {
     const trash = this.trashBin as {
       tryTrashReleasedObject?: (root?: SceneObject | null) => boolean;
@@ -2682,12 +3244,15 @@ export class AnchorController extends BaseScriptComponent {
           onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
           onTranslationEnd?: { add: (cb: () => void) => void };
           onMoveEnd?: { add: (cb: () => void) => void };
+          onManipulationStart?: { add: (cb: () => void) => void };
+          onManipulationEnd?: { add: (cb: () => void) => void };
         };
         if (isNull(script) || !this.isTrashTrackingInteractionScript(script)) {
           continue;
         }
 
         const markActive = (): void => {
+          this.cancelPendingTrashReleaseRetry();
           this.activeManipulatedRoot = trackedRoot;
         };
         const onRelease = (): void => {
@@ -2703,6 +3268,9 @@ export class AnchorController extends BaseScriptComponent {
         }
         if (script.onInteractorTriggerStart) {
           script.onInteractorTriggerStart.add(markActive);
+        }
+        if (script.onManipulationStart) {
+          script.onManipulationStart.add(markActive);
         }
 
         if (script.onDragEnd) {
@@ -2725,6 +3293,9 @@ export class AnchorController extends BaseScriptComponent {
         }
         if (script.onMoveEnd) {
           script.onMoveEnd.add(onRelease);
+        }
+        if (script.onManipulationEnd) {
+          script.onManipulationEnd.add(onRelease);
         }
       }
     }
@@ -2877,7 +3448,7 @@ export class AnchorController extends BaseScriptComponent {
       obj = prefab.instantiate(wrapper);
     } catch (e) {
       print('spawnObject failed: ' + e);
-      this.textlog.text = 'Spawn error';
+      this.setStatusText('Spawn error');
       wrapper.destroy();
       return null;
     }
@@ -2952,6 +3523,8 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
+    const trashedOnRelease = this.attemptTrashOnManipulatedRelease();
+
     const now = getTime();
     if (now - this.lastSaveObjectPositionAt < this.saveObjectPositionCooldownSec) {
       return;
@@ -2968,21 +3541,6 @@ export class AnchorController extends BaseScriptComponent {
       this.maintainGardenSourceAnchorBindings();
     }
     this.lockSpacePanelAtDesk();
-    const releaseRoot = this.resolveReleasedTrackedRoot();
-    this.activeManipulatedRoot = null;
-    let trashedOnRelease = this.tryTrashTrackedOnRelease(releaseRoot);
-    if (!trashedOnRelease && !isNull(releaseRoot)) {
-      const releaseRef = releaseRoot;
-      this.scheduleDelayed(() => {
-        if (isNull(releaseRef) || !releaseRef.enabled) {
-          return;
-        }
-        if (this.isObjectInTrashSpawnGrace(releaseRef)) {
-          return;
-        }
-        this.tryTrashTrackedOnRelease(releaseRef);
-      }, 0.1);
-    }
 
     if (
       !this.startupWorldOnlySession &&
@@ -3097,7 +3655,7 @@ export class AnchorController extends BaseScriptComponent {
       print(
         `Saved ${this.objectKinds[memoryIndex] || OBJECT_KIND_PLANT} ${memoryIndex} local: ${pos.toString()} world: ${worldPos.toString()}`
       );
-      this.textlog.text = 'Saved garden layout';
+      this.setStatusText('Saved garden layout');
     }
   }
 
@@ -3244,7 +3802,21 @@ export class AnchorController extends BaseScriptComponent {
       }
     }
 
-    const floatKeys = ['plant_baby_remaining', 'plant_growth_elapsed', 'plant_base_y', 'plant_align_cx', 'plant_align_cz', 'plant_align_y', 'plant_growth_x', 'plant_growth_y', 'plant_growth_z', 'plant_wrw', 'plant_wrx', 'plant_wry', 'plant_wrz'];
+    const floatKeys = [
+      'plant_baby_remaining',
+      'plant_growth_elapsed',
+      'plant_base_y',
+      'plant_align_cx',
+      'plant_align_cz',
+      'plant_align_y',
+      'plant_growth_x',
+      'plant_growth_y',
+      'plant_growth_z',
+      'plant_wrw',
+      'plant_wrx',
+      'plant_wry',
+      'plant_wrz',
+    ];
     for (let i = 0; i < floatKeys.length; i++) {
       const key = floatKeys[i];
       const sourceKey = `w${fromIndex}_${key}`;
@@ -3277,6 +3849,111 @@ export class AnchorController extends BaseScriptComponent {
     }
   }
 
+  private captureObjectSlotSnapshot(index: number): TrashObjectStoreSnapshot {
+    const store = global.persistentStorageSystem.store;
+    const snapshot: TrashObjectStoreSnapshot = {
+      floats: {},
+      ints: {},
+      bools: {},
+      strings: {},
+    };
+
+    const floatSuffixes = [
+      'x',
+      'y',
+      'z',
+      'rx',
+      'ry',
+      'rz',
+      'rw',
+      'wx',
+      'wy',
+      'wz',
+      'wrx',
+      'wry',
+      'wrz',
+      'wrw',
+      'plant_baby_remaining',
+      'plant_growth_elapsed',
+      'plant_base_y',
+      'plant_align_cx',
+      'plant_align_cz',
+      'plant_align_y',
+      'plant_growth_x',
+      'plant_growth_y',
+      'plant_growth_z',
+      'plant_wrw',
+      'plant_wrx',
+      'plant_wry',
+      'plant_wrz',
+    ];
+    for (let i = 0; i < floatSuffixes.length; i++) {
+      const suffix = floatSuffixes[i];
+      const key = `w${index}_${suffix}`;
+      if (store.has(key)) {
+        snapshot.floats[suffix] = store.getFloat(key);
+      }
+    }
+
+    const intSuffixes = ['prefab', 'plant_lifecycle_version', 'plant_stage'];
+    for (let i = 0; i < intSuffixes.length; i++) {
+      const suffix = intSuffixes[i];
+      const key = `w${index}_${suffix}`;
+      if (store.has(key)) {
+        snapshot.ints[suffix] = store.getInt(key);
+      }
+    }
+
+    const boolSuffixes = ['plant_watered', 'plant_planted'];
+    for (let i = 0; i < boolSuffixes.length; i++) {
+      const suffix = boolSuffixes[i];
+      const key = `w${index}_${suffix}`;
+      if (store.has(key)) {
+        snapshot.bools[suffix] = store.getBool(key);
+      }
+    }
+
+    if (store.has(`w${index}_object_kind`)) {
+      snapshot.strings.object_kind = store.getString(`w${index}_object_kind`);
+    }
+    if (store.has(`w${index}_plant_type`)) {
+      snapshot.strings.plant_type = store.getString(`w${index}_plant_type`);
+    }
+
+    return snapshot;
+  }
+
+  private writeObjectSlotSnapshot(
+    index: number,
+    snapshot: TrashObjectStoreSnapshot
+  ): void {
+    const store = global.persistentStorageSystem.store;
+    const floatKeys = Object.keys(snapshot.floats);
+    for (let i = 0; i < floatKeys.length; i++) {
+      const suffix = floatKeys[i];
+      store.putFloat(`w${index}_${suffix}`, snapshot.floats[suffix]);
+    }
+
+    const intKeys = Object.keys(snapshot.ints);
+    for (let i = 0; i < intKeys.length; i++) {
+      const suffix = intKeys[i];
+      store.putInt(`w${index}_${suffix}`, snapshot.ints[suffix]);
+    }
+
+    const boolKeys = Object.keys(snapshot.bools);
+    for (let i = 0; i < boolKeys.length; i++) {
+      const suffix = boolKeys[i];
+      store.putBool(`w${index}_${suffix}`, snapshot.bools[suffix]);
+    }
+
+    if (snapshot.strings.object_kind !== undefined) {
+      store.putString(`w${index}_object_kind`, snapshot.strings.object_kind);
+    }
+    if (snapshot.strings.plant_type !== undefined) {
+      store.putString(`w${index}_plant_type`, snapshot.strings.plant_type);
+    }
+  }
+
   private clearStoredObjectSlot(store: GeneralDataStore, index: number): void {
     ['x', 'y', 'z', 'rx', 'ry', 'rz', 'rw', 'wx', 'wy', 'wz', 'wrx', 'wry', 'wrz', 'wrw']
       .forEach((key) => store.remove(`w${index}_${key}`));
@@ -3306,7 +3983,7 @@ export class AnchorController extends BaseScriptComponent {
     const hasWorldData = store.has('has_world_data') && store.getBool('has_world_data');
     if (!useAnchorLocal && !hasWorldData) {
       print('No world-space data yet, cannot fallback restore');
-      this.textlog.text = 'Place a plant again to enable restore';
+      this.setStatusText('Place a plant again to enable restore');
       return;
     }
 
@@ -3488,15 +4165,17 @@ export class AnchorController extends BaseScriptComponent {
     store.putInt('widget_count', this.wrappers.length);
     this.hasRestored = true;
     this.syncPlantCycleFromCount();
-    this.textlog.text = restoredCount > 0
-      ? `Restored ${restoredCount} object(s)`
-      : 'Could not restore saved objects';
+    this.setStatusText(
+      restoredCount > 0
+        ? `Restored ${restoredCount} object(s)`
+        : 'Could not restore saved objects'
+    );
     return restoredCount;
   }
 
   undoLast() {
     if (this.objs.length === 0) {
-      this.textlog.text = 'Nothing to undo';
+      this.setStatusText('Nothing to undo');
       return;
     }
 
@@ -3521,7 +4200,7 @@ export class AnchorController extends BaseScriptComponent {
       store.remove('uses_anchor_space');
     }
 
-    this.textlog.text = `${this.objs.length} plant(s) remaining`;
+    this.setStatusText(`${this.objs.length} plant(s) remaining`);
     print(`Undo: removed plant ${lastIndex}`);
   }
 
@@ -3613,8 +4292,8 @@ export class AnchorController extends BaseScriptComponent {
     this.anchorSaveInProgress = false;
     this.restoreGardenSpawnSourcesAfterReset();
     this.wireTrashBinMovement();
-    this.wireGardenSourceMoveHandles();
-    this.textlog.text = 'Desk reset';
+    this.scheduleGardenAndTrashHandleWiring();
+    this.setStatusText('Desk reset');
     this.keepAIControlButtonsVisible();
     const restoreControlsEvent = this.createEvent('DelayedCallbackEvent');
     restoreControlsEvent.bind(() => this.keepAIControlButtonsVisible());
@@ -3860,7 +4539,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     print(`Spawned ${resolvedConfig.plantTypeId} (next cycle index ${this.nextPlantSpawnIndex})`);
-    this.textlog.text = `Placed ${resolvedConfig.plantTypeId}`;
+    this.setStatusText(`Placed ${resolvedConfig.plantTypeId}`);
   }
 
   private findPlantConfig(plantTypeId: string): PlantSpawnConfig | null {

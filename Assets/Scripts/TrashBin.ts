@@ -1,13 +1,49 @@
 import { playInteractionSound } from './InteractionSoundRegistry';
-import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
+import { prepareSceneObjectForDestroy, scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
+import { playTrashDeleteSmokePuff } from './TrashDeleteSmokePuff';
+
+export type TrashObjectStoreSnapshot = {
+  floats: { [key: string]: number };
+  ints: { [key: string]: number };
+  bools: { [key: string]: boolean };
+  strings: { [key: string]: string };
+};
+
+export type TrashStashEntry = {
+  wrapper: SceneObject;
+  content: SceneObject;
+  objectKind: string;
+  prefabIndex: number;
+  storeSnapshot: TrashObjectStoreSnapshot;
+};
 
 type AnchorTrashHandler = {
   getTrackedContentRoot?: (candidate: SceneObject) => SceneObject | null;
   getTrackedContentRoots?: () => SceneObject[];
   getTrackedWrapperRoots?: () => SceneObject[];
   destroyTrackedObject?: (candidate: SceneObject) => boolean;
+  stashTrackedObjectInTrash?: (candidate: SceneObject) => boolean;
+  reinsertTrackedObject?: (
+    entry: TrashStashEntry,
+    worldPos: vec3,
+    worldRot: quat
+  ) => boolean;
+  getTrackedSpawnParent?: () => SceneObject;
+  setActiveManipulatedRoot?: (root: SceneObject | null) => void;
   persistTrashTransform?: () => void;
+  shouldProtectFromReleaseTrash?: (candidate: SceneObject) => boolean;
 };
+
+type StashedItemRecord = {
+  entry: TrashStashEntry;
+  pullActive: boolean;
+};
+
+const STASH_CONTAINER_NAME = 'Stash';
+const STASH_LOCAL_OFFSET = new vec3(0, 22, 0);
+const STASH_ITEM_SCALE = 0.34;
+const STASH_ITEM_SPACING = 16;
+const STASH_GRID_COLUMNS = 3;
 
 type InteractableLike = ScriptComponent & {
   onDragStart?: { add: (cb: () => void) => void };
@@ -80,6 +116,9 @@ export class TrashBin extends BaseScriptComponent {
   @input
   debugLogging: boolean = true;
 
+  @input
+  enableDeleteSmokePuff: boolean = true;
+
   private readonly protectedRootNames = [
     'TrashBin',
     'Planter',
@@ -101,8 +140,14 @@ export class TrashBin extends BaseScriptComponent {
   private moveInteractionWired = false;
   private bindAttempts = 0;
   private trashMoveActive = false;
+  private useExternalMoveHandle = true;
+  private stashRestoreAnchor: ScriptComponent | null = null;
+  private stashedItems: StashedItemRecord[] = [];
+  private stashPullWiredObjects: SceneObject[] = [];
+  private activeStashPull: StashedItemRecord | null = null;
 
   onAwake(): void {
+    this.clearLegacyStash();
     this.ensureGrabCollider();
     const collider = this.getTriggerCollider();
     if (!isNull(collider)) {
@@ -117,7 +162,11 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     this.createEvent('UpdateEvent').bind(() => this.checkProximityTrash());
-    this.createEvent('OnStartEvent').bind(() => this.tryWireMoveInteraction());
+    this.createEvent('OnStartEvent').bind(() => {
+      const deferRootMove = this.createEvent('DelayedCallbackEvent');
+      deferRootMove.bind(() => this.tryWireMoveInteraction());
+      deferRootMove.reset(0.35);
+    });
   }
 
   public wireMoveInteraction(): void {
@@ -125,6 +174,136 @@ export class TrashBin extends BaseScriptComponent {
     this.bindAttempts = 0;
     this.ensureGrabCollider();
     this.tryWireMoveInteraction();
+  }
+
+  public setUseExternalMoveHandle(useExternal: boolean): void {
+    this.useExternalMoveHandle = useExternal;
+    if (useExternal) {
+      // Container Interactable stays on for hover; MoveHandle owns grab + movement.
+      this.setRootMoveEnabled(false);
+      this.configureRootContainerInteractable(true);
+      this.setGrabColliderEnabled(false);
+      this.setTriggerColliderHoverTarget(true);
+      this.setRootCollidersForceCompound(false);
+      return;
+    }
+
+    this.setTriggerColliderHoverTarget(false);
+    this.setRootCollidersForceCompound(true);
+    this.setGrabColliderEnabled(true);
+    this.configureRootContainerInteractable(true);
+  }
+
+  private setGrabColliderEnabled(enabled: boolean): void {
+    const grab = this.getGrabCollider();
+    if (isNull(grab)) {
+      return;
+    }
+
+    grab.enabled = enabled;
+    (grab as unknown as { intangible?: boolean }).intangible = !enabled;
+  }
+
+  private setRootCollidersForceCompound(forceCompound: boolean): void {
+    const root = this.getSceneObject();
+    const colliders = root.getComponents('Component.ColliderComponent');
+    for (let i = 0; i < colliders.length; i++) {
+      const collider = colliders[i] as ColliderComponent & { forceCompound?: boolean };
+      if (isNull(collider)) {
+        continue;
+      }
+      collider.forceCompound = forceCompound;
+    }
+  }
+
+  private setRootInteractableEnabled(enabled: boolean): void {
+    this.configureRootContainerInteractable(enabled);
+  }
+
+  private configureRootContainerInteractable(enabled: boolean): void {
+    const root = this.getSceneObject();
+    const scripts = root.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i] as ScriptComponent & {
+        targetingMode?: number;
+        manipulateRootSceneObject?: SceneObject;
+        enableInstantDrag?: boolean;
+      };
+      if (isNull(script) || script.targetingMode === undefined) {
+        continue;
+      }
+      // Skip InteractableManipulation — handled by setRootMoveEnabled.
+      if (script.manipulateRootSceneObject !== undefined) {
+        continue;
+      }
+
+      if (this.useExternalMoveHandle) {
+        // Indirect-only hover on the bin body — direct pinch stays on stashed items.
+        script.targetingMode = 2;
+        if (script.enableInstantDrag !== undefined) {
+          script.enableInstantDrag = false;
+        }
+      }
+      script.enabled = enabled;
+    }
+  }
+
+  private setTriggerColliderHoverTarget(forHover: boolean): void {
+    const trigger = this.getTriggerCollider();
+    if (isNull(trigger)) {
+      return;
+    }
+
+    const triggerLike = trigger as unknown as {
+      intangible?: boolean;
+      forceCompound?: boolean;
+    };
+    triggerLike.forceCompound = false;
+    // Tangible collider so SIK can target the bin body for container hover.
+    triggerLike.intangible = !forHover;
+  }
+
+  public bindStashRestore(anchor: ScriptComponent): void {
+    this.stashRestoreAnchor = anchor;
+  }
+
+  public acceptStashedTrackedObject(
+    entry: TrashStashEntry,
+    anchor?: ScriptComponent | null
+  ): void {
+    if (!isNull(anchor)) {
+      this.stashRestoreAnchor = anchor;
+    }
+
+    if (isNull(entry.wrapper) || isNull(entry.content)) {
+      return;
+    }
+
+    const stashContainer = this.ensureStashContainer();
+    if (isNull(stashContainer)) {
+      return;
+    }
+
+    entry.wrapper.enabled = true;
+    entry.content.enabled = true;
+    entry.wrapper.setParent(stashContainer);
+    this.setInteractionEnabledOnHierarchy(entry.wrapper, true);
+    this.setManipulationEnabledOnHierarchy(entry.wrapper, true);
+
+    const record: StashedItemRecord = {
+      entry: entry,
+      pullActive: false,
+    };
+    this.stashedItems.push(record);
+    this.layoutStashedItems();
+    this.wireStashPullInteraction(record);
+    print(
+      `[TrashBin] stashed ${entry.wrapper.name} (${this.stashedItems.length} item(s) in bin)`
+    );
+  }
+
+  public getStashedItemCount(): number {
+    return this.stashedItems.length;
   }
 
   public containsTrashBinObject(candidate: SceneObject): boolean {
@@ -189,13 +368,18 @@ export class TrashBin extends BaseScriptComponent {
       forceCompound?: boolean;
       shape?: { radius?: number; FitVisual?: boolean };
     };
-    colliderLike.intangible = false;
-    colliderLike.forceCompound = true;
+    // Never compound while the external MoveHandle is active — that absorbs the handle collider.
+    const allowCompound = !this.useExternalMoveHandle;
+    colliderLike.intangible = this.useExternalMoveHandle ? true : false;
+    colliderLike.forceCompound = allowCompound;
+    if (this.useExternalMoveHandle) {
+      collider.enabled = false;
+    }
 
     const trigger = this.getTriggerCollider();
     if (!isNull(trigger)) {
       const triggerLike = trigger as unknown as { forceCompound?: boolean };
-      triggerLike.forceCompound = true;
+      triggerLike.forceCompound = allowCompound;
     }
 
     if (!colliderLike.shape) {
@@ -265,7 +449,11 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   private tryWireMoveInteraction(): void {
-    if (this.moveInteractionWired) {
+    if (this.moveInteractionWired || this.useExternalMoveHandle) {
+      if (this.useExternalMoveHandle) {
+        // Re-assert external-handle mode every retry.
+        this.setUseExternalMoveHandle(true);
+      }
       return;
     }
 
@@ -579,12 +767,25 @@ export class TrashBin extends BaseScriptComponent {
       return false;
     }
 
+    if (this.shouldProtectFromReleaseTrash(trackedRoot)) {
+      if (this.debugLogging) {
+        this.debugLog(`release protected ${trackedRoot.name}`);
+      }
+      return false;
+    }
+
     const now = getTime();
     if (this.isInSpawnGraceAt(trackedRoot, now) || this.isInSpawnGraceAt(destroyRoot, now)) {
       return false;
     }
 
     if (!this.isTrackedRootInTrashVolume(trackedRoot)) {
+      if (this.debugLogging) {
+        const distance = this.getDistanceToTrash(trackedRoot);
+        this.debugLog(
+          `release miss ${trackedRoot.name} dist=${distance.toFixed(1)} radius=${this.computeReleaseTrashRadius().toFixed(1)}`
+        );
+      }
       return false;
     }
 
@@ -613,9 +814,12 @@ export class TrashBin extends BaseScriptComponent {
     return this.isTrackedRootWithinTrashRadius(root, this.computeReleaseTrashRadius());
   }
 
-  /** Release checks use a tighter radius than overlap/FitVisual padding. */
+  /** Release checks use a tighter radius so moving plants near TrashBin does not delete them. */
   private computeReleaseTrashRadius(): number {
-    return Math.max(this.trashRadius, this.computeColliderTrashRadius(false));
+    return Math.max(
+      this.trashRadius,
+      this.computeColliderTrashRadius(false)
+    );
   }
 
   private isDestroyRootInTrashForRelease(destroyRoot: SceneObject): boolean {
@@ -893,6 +1097,7 @@ export class TrashBin extends BaseScriptComponent {
 
     if (isTracked) {
       if (this.destroyViaAnchor(destroyRoot)) {
+        this.playDeleteSmokePuff(destroyRoot);
         this.recordDestroyed(destroyRoot, now);
         playInteractionSound((sounds) => sounds.playPlaceObject());
         this.debugLog(`trashed tracked object ${label}`);
@@ -900,6 +1105,7 @@ export class TrashBin extends BaseScriptComponent {
       }
 
       if (!isNull(trackedRoot) && this.destroyViaAnchor(trackedRoot)) {
+        this.playDeleteSmokePuff(trackedRoot);
         this.recordDestroyed(trackedRoot, now);
         playInteractionSound((sounds) => sounds.playPlaceObject());
         this.debugLog(`trashed tracked object ${trackedRoot.name}`);
@@ -911,6 +1117,8 @@ export class TrashBin extends BaseScriptComponent {
       }
     }
 
+    this.playDeleteSmokePuff(destroyRoot);
+
     const isWater = !isNull(this.findWateringObject(destroyRoot));
     scheduleDeferredDestroy(this, destroyRoot, () => {
       this.recordDestroyed(destroyRoot, now);
@@ -921,13 +1129,40 @@ export class TrashBin extends BaseScriptComponent {
     });
   }
 
+  private playDeleteSmokePuff(destroyRoot: SceneObject): void {
+    if (!this.enableDeleteSmokePuff || isNull(destroyRoot)) {
+      return;
+    }
+
+    playTrashDeleteSmokePuff(this.getDeletePuffWorldPosition(destroyRoot), this);
+  }
+
+  private getDeletePuffWorldPosition(destroyRoot: SceneObject): vec3 {
+    const objectPos = destroyRoot.getTransform().getWorldPosition();
+    const trashCenter = this.getTrashWorldCenter();
+    const blend = 0.35;
+    return new vec3(
+      objectPos.x + (trashCenter.x - objectPos.x) * blend,
+      objectPos.y + (trashCenter.y - objectPos.y) * blend + 4.0,
+      objectPos.z + (trashCenter.z - objectPos.z) * blend
+    );
+  }
+
   private destroyViaAnchor(candidate: SceneObject): boolean {
     const handler = this.getAnchorTrashHandler();
-    if (isNull(handler) || typeof handler.destroyTrackedObject !== 'function') {
+    if (isNull(handler)) {
       return false;
     }
 
-    return handler.destroyTrackedObject(candidate);
+    if (typeof handler.destroyTrackedObject === 'function') {
+      return handler.destroyTrackedObject(candidate);
+    }
+
+    if (typeof handler.stashTrackedObjectInTrash === 'function') {
+      return handler.stashTrackedObjectInTrash(candidate);
+    }
+
+    return false;
   }
 
   private isWaterDestroyRoot(destroyRoot: SceneObject): boolean {
@@ -1034,7 +1269,35 @@ export class TrashBin extends BaseScriptComponent {
       return false;
     }
 
-    return !isNull(this.findFreePlantLifecycle(destroyRoot));
+    const freePlant = this.findFreePlantLifecycle(destroyRoot);
+    if (isNull(freePlant)) {
+      return false;
+    }
+
+    const candidate = freePlant as PlantLifecycleLike & {
+      getSaveState?: () => { stage?: number; hasBeenWatered?: boolean };
+    };
+    if (typeof candidate.getSaveState !== 'function') {
+      return true;
+    }
+
+    const state = candidate.getSaveState();
+    if (state.hasBeenWatered) {
+      return false;
+    }
+
+    return state.stage === 0 || state.stage === undefined;
+  }
+
+  private shouldProtectFromReleaseTrash(root: SceneObject): boolean {
+    const handler = this.getAnchorTrashHandler();
+    if (
+      isNull(handler) ||
+      typeof handler.shouldProtectFromReleaseTrash !== 'function'
+    ) {
+      return false;
+    }
+    return handler.shouldProtectFromReleaseTrash(root);
   }
 
   private findFreePlantLifecycle(sceneObject: SceneObject): PlantLifecycleLike | null {
@@ -1080,6 +1343,9 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   private getAnchorTrashHandler(): AnchorTrashHandler | null {
+    if (!isNull(this.stashRestoreAnchor)) {
+      return this.stashRestoreAnchor as unknown as AnchorTrashHandler;
+    }
     if (isNull(this.anchorController)) {
       return null;
     }
@@ -1277,5 +1543,325 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
     print(`[TrashBin] ${message}`);
+  }
+
+  private clearLegacyStash(): void {
+    const root = this.getSceneObject();
+    const stash = this.findChildByName(root, STASH_CONTAINER_NAME);
+    if (isNull(stash)) {
+      this.stashedItems = [];
+      return;
+    }
+
+    for (let i = stash.getChildrenCount() - 1; i >= 0; i--) {
+      const child = stash.getChild(i);
+      if (isNull(child)) {
+        continue;
+      }
+      prepareSceneObjectForDestroy(child);
+      child.destroy();
+    }
+
+    this.stashedItems = [];
+  }
+
+  private ensureStashContainer(): SceneObject | null {
+    const root = this.getSceneObject();
+    let stash = this.findChildByName(root, STASH_CONTAINER_NAME);
+    if (isNull(stash)) {
+      stash = global.scene.createSceneObject(STASH_CONTAINER_NAME);
+      stash.setParent(root);
+    }
+
+    stash.enabled = true;
+    stash.getTransform().setLocalPosition(STASH_LOCAL_OFFSET);
+    return stash;
+  }
+
+  private layoutStashedItems(): void {
+    const stash = this.ensureStashContainer();
+    if (isNull(stash)) {
+      return;
+    }
+
+    for (let i = 0; i < this.stashedItems.length; i++) {
+      const record = this.stashedItems[i];
+      if (isNull(record.entry.wrapper)) {
+        continue;
+      }
+
+      const column = i % STASH_GRID_COLUMNS;
+      const row = Math.floor(i / STASH_GRID_COLUMNS);
+      const offsetX = (column - (STASH_GRID_COLUMNS - 1) * 0.5) * STASH_ITEM_SPACING;
+      const offsetZ = row * STASH_ITEM_SPACING;
+      record.entry.wrapper.setParent(stash);
+      record.entry.wrapper.getTransform().setLocalPosition(
+        new vec3(offsetX, 0, offsetZ)
+      );
+      record.entry.wrapper.getTransform().setLocalRotation(quat.quatIdentity());
+      record.entry.wrapper.getTransform().setLocalScale(
+        new vec3(STASH_ITEM_SCALE, STASH_ITEM_SCALE, STASH_ITEM_SCALE)
+      );
+      record.entry.wrapper.enabled = true;
+      record.entry.content.enabled = true;
+    }
+  }
+
+  private wireStashPullInteraction(record: StashedItemRecord): void {
+    if (isNull(record.entry.wrapper)) {
+      return;
+    }
+
+    this.bindStashPullOnHierarchy(record.entry.wrapper, record);
+    this.bindStashPullOnHierarchy(record.entry.content, record);
+  }
+
+  private bindStashPullOnHierarchy(node: SceneObject, record: StashedItemRecord): void {
+    if (isNull(node)) {
+      return;
+    }
+
+    if (!this.isStashPullWired(node)) {
+      this.markStashPullWired(node);
+      const scripts = node.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i] as ScriptComponent & {
+          onDragStart?: { add: (cb: () => void) => void };
+          onDragEnd?: { add: (cb: () => void) => void };
+          onTriggerStart?: { add: (cb: () => void) => void };
+          onTriggerEnd?: { add: (cb: () => void) => void };
+          onTriggerEndOutside?: { add: (cb: () => void) => void };
+          onInteractorTriggerStart?: { add: (cb: () => void) => void };
+          onInteractorTriggerEnd?: { add: (cb: () => void) => void };
+          onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
+        };
+        if (isNull(script) || !this.isStashPullInteractionScript(script)) {
+          continue;
+        }
+
+        if (script.targetingMode !== undefined) {
+          script.targetingMode = 7;
+        }
+        if (script.ignoreInteractionPlane !== undefined) {
+          script.ignoreInteractionPlane = true;
+        }
+        script.enabled = true;
+
+        const onGrabStart = (): void => {
+          this.onStashPullStart(record);
+        };
+        const onRelease = (): void => {
+          this.onStashPullRelease(record);
+        };
+
+        if (script.onDragStart) {
+          script.onDragStart.add(onGrabStart);
+        }
+        if (script.onTriggerStart) {
+          script.onTriggerStart.add(onGrabStart);
+        }
+        if (script.onInteractorTriggerStart) {
+          script.onInteractorTriggerStart.add(onGrabStart);
+        }
+
+        if (script.onDragEnd) {
+          script.onDragEnd.add(onRelease);
+        }
+        if (script.onTriggerEnd) {
+          script.onTriggerEnd.add(onRelease);
+        }
+        if (script.onTriggerEndOutside) {
+          script.onTriggerEndOutside.add(onRelease);
+        }
+        if (script.onInteractorTriggerEnd) {
+          script.onInteractorTriggerEnd.add(onRelease);
+        }
+        if (script.onInteractorTriggerEndOutside) {
+          script.onInteractorTriggerEndOutside.add(onRelease);
+        }
+      }
+    }
+
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      this.bindStashPullOnHierarchy(node.getChild(i), record);
+    }
+  }
+
+  private isStashPullInteractionScript(script: ScriptComponent): boolean {
+    const candidate = script as unknown as Record<string, unknown>;
+    if (Array.isArray(candidate.onPinchUp_Select)) {
+      return false;
+    }
+    if (candidate.manipulateRootSceneObject !== undefined) {
+      return true;
+    }
+    return candidate.targetingMode !== undefined && candidate.onTriggerStart !== undefined;
+  }
+
+  private isStashPullWired(node: SceneObject): boolean {
+    for (let i = this.stashPullWiredObjects.length - 1; i >= 0; i--) {
+      const wired = this.stashPullWiredObjects[i];
+      if (isNull(wired)) {
+        this.stashPullWiredObjects.splice(i, 1);
+        continue;
+      }
+      if (wired === node) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private markStashPullWired(node: SceneObject): void {
+    if (this.isStashPullWired(node)) {
+      return;
+    }
+    this.stashPullWiredObjects.push(node);
+  }
+
+  private onStashPullStart(record: StashedItemRecord): void {
+    if (isNull(record.entry.wrapper) || record.pullActive) {
+      return;
+    }
+
+    record.pullActive = true;
+    this.activeStashPull = record;
+
+    const handler = this.getAnchorTrashHandler();
+    const spawnParent =
+      !isNull(handler) && typeof handler.getTrackedSpawnParent === 'function'
+        ? handler.getTrackedSpawnParent()
+        : null;
+    const wrapper = record.entry.wrapper;
+    const worldPos = wrapper.getTransform().getWorldPosition();
+    const worldRot = wrapper.getTransform().getWorldRotation();
+    const worldScale = wrapper.getTransform().getWorldScale();
+
+    if (!isNull(spawnParent)) {
+      wrapper.setParent(spawnParent);
+    }
+    wrapper.getTransform().setWorldPosition(worldPos);
+    wrapper.getTransform().setWorldRotation(worldRot);
+    wrapper.getTransform().setWorldScale(worldScale);
+
+    if (!isNull(handler) && typeof handler.setActiveManipulatedRoot === 'function') {
+      handler.setActiveManipulatedRoot(record.entry.content);
+    }
+
+    playInteractionSound((sounds) => sounds.playGrabObject());
+  }
+
+  private onStashPullRelease(record: StashedItemRecord): void {
+    if (!record.pullActive) {
+      return;
+    }
+
+    record.pullActive = false;
+    if (this.activeStashPull === record) {
+      this.activeStashPull = null;
+    }
+
+    const wrapper = record.entry.wrapper;
+    if (isNull(wrapper)) {
+      return;
+    }
+
+    const worldPos = wrapper.getTransform().getWorldPosition();
+    const worldRot = wrapper.getTransform().getWorldRotation();
+    const outsideTrash = !this.isWorldPositionInTrash(worldPos);
+    const handler = this.getAnchorTrashHandler();
+
+    if (
+      outsideTrash &&
+      !isNull(handler) &&
+      typeof handler.reinsertTrackedObject === 'function' &&
+      handler.reinsertTrackedObject(record.entry, worldPos, worldRot)
+    ) {
+      this.removeStashedRecord(record);
+      playInteractionSound((sounds) => sounds.playPlaceObject());
+      this.debugLog(`restored ${record.entry.wrapper.name} from stash`);
+      return;
+    }
+
+    this.returnRecordToStash(record);
+    playInteractionSound((sounds) => sounds.playReleaseObject());
+  }
+
+  private returnRecordToStash(record: StashedItemRecord): void {
+    record.pullActive = false;
+    this.layoutStashedItems();
+  }
+
+  private removeStashedRecord(record: StashedItemRecord): void {
+    for (let i = this.stashedItems.length - 1; i >= 0; i--) {
+      if (this.stashedItems[i] === record) {
+        this.stashedItems.splice(i, 1);
+        break;
+      }
+    }
+    this.layoutStashedItems();
+  }
+
+  private setRootMoveEnabled(enabled: boolean): void {
+    const root = this.getSceneObject();
+    const scripts = root.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i] as ScriptComponent & {
+        manipulateRootSceneObject?: SceneObject;
+      };
+      if (isNull(script) || script.manipulateRootSceneObject === undefined) {
+        continue;
+      }
+
+      script.enabled = enabled;
+    }
+  }
+
+  private setInteractionEnabledOnHierarchy(root: SceneObject, enabled: boolean): void {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i] as ScriptComponent & { targetingMode?: number };
+        if (isNull(script) || script.targetingMode === undefined) {
+          continue;
+        }
+        script.enabled = enabled;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+  }
+
+  private setManipulationEnabledOnHierarchy(root: SceneObject, enabled: boolean): void {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i] as ScriptComponent & {
+          manipulateRootSceneObject?: SceneObject;
+        };
+        if (isNull(script) || script.manipulateRootSceneObject === undefined) {
+          continue;
+        }
+        script.enabled = enabled;
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
   }
 }

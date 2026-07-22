@@ -1,0 +1,78 @@
+- !<AssetImportMetadata/7a8b9c0d-1e2f-4a3b-9c8d-7e6f5a4b3c2d>
+  ImportedAssetIds:
+    ObjectPrefab: !<reference> 3d91a6fc-5579-4bf9-a021-43e96fca1024
+  ImporterName: ObjectPrefabImporter
+  PrimaryAsset: !<reference> 3d91a6fc-5579-4bf9-a021-43e96fca1024
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    ObjectPrefab: !<own> 8b9c0d1e-2f3a-4b5c-9d8e-7f6a5b4c3d2e
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ScriptComponent/88389e8e-0eeb-4361-993f-4569dc2e0a90>
+  PrefabRemaps:
+    []
+  Name: WaterSplashBurst
+  Enabled: true
+  ScriptAsset: !<reference> 82a3c105-bc7e-4ce8-a316-371394aae6a0
+  ScriptInputsDefault:
+    burstIntensity: true
+    lifetime: true
+    maxParticles: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      particleVisual: !<reference.RenderMeshVisual> 9cf9acf2-1c72-4289-b2f8-67f1a48857f1
+      burstIntensity: 0.550000
+      maxParticles: 1000
+      lifetime: 1.200000
+  ScriptTypes:
+    "":
+      {}
+- !<ObjectPrefabAssetData/8b9c0d1e-2f3a-4b5c-9d8e-7f6a5b4c3d2e>
+  Prototype: !<ObjectOwner/9c0d1e2f-3a4b-4c5d-9e8f-7a6b5c4d3e2f>
+    PackagePath: ""
+    objects:
+      - !<own> a0d1e2f3-4b5c-4d6e-9f8a-7b6c5d4e3f2a
+- !<RenderMeshVisual/9cf9acf2-1c72-4289-b2f8-67f1a48857f1>
+  PrefabRemaps:
+    []
+  Name: Splash Particles
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 0.200000
+  Materials:
+    - !<reference> 2e32adf1-a153-4e34-ae20-9fb9607bd44c
+  Mesh: !<reference> 5dfab5df-e9f1-4806-9b4b-7efdebef0cd1
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/a0d1e2f3-4b5c-4d6e-9f8a-7b6c5d4e3f2a>
+  PrefabRemaps:
+    []
+  Name: Water Splash
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 0.250000, y: 0.250000, z: 0.250000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 9cf9acf2-1c72-4289-b2f8-67f1a48857f1
+    - !<own> 88389e8e-0eeb-4361-993f-4569dc2e0a90

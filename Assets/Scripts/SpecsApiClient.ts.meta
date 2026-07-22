@@ -22,17 +22,27 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
+  VersionPrerelease: ""
   ComponentUid: 37f07cc4-ad7d-44eb-8eea-06bffc0fac29
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     apiBaseUrl: false
+    arvisSupabaseAnonKey: false
+    arvisSupabaseUrl: false
+    autoPairEmail: false
+    autoPairPassword: false
+    autoPairWithCredentials: false
     debugLogging: false
     editorAutoPairDelaySec: false
     editorStartPaired: false
+    imageRequestTimeoutSec: false
     internetModule: false
+    meshRequestTimeoutSec: false
+    musicRequestTimeoutSec: false
     requestTimeoutSec: false
     useEditorMockWhenOffline: false
+    useMockFallbackWhenUnpaired: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -45,9 +55,18 @@
     - internetModule: !<reference.InternetModule> 00000000-0000-0000-0000-000000000000
       apiBaseUrl: "https://arvis.space"
       requestTimeoutSec: !<float> 20.000000
+      imageRequestTimeoutSec: !<float> 60.000000
+      musicRequestTimeoutSec: !<float> 90.000000
+      meshRequestTimeoutSec: !<float> 90.000000
       useEditorMockWhenOffline: true
       editorStartPaired: false
+      useMockFallbackWhenUnpaired: true
       editorAutoPairDelaySec: !<float> 12.000000
+      autoPairWithCredentials: true
+      autoPairEmail: test@user.com
+      autoPairPassword: test321
+      arvisSupabaseUrl: "https://bigsedudegjukszrfyil.supabase.co"
+      arvisSupabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo
       debugLogging: true
   ScriptTypes:
     -
@@ -56,7 +75,16 @@
     - // @input Asset.InternetModule internetModule
     - '// @input string apiBaseUrl = "https://arvis.space"'
     - // @input float requestTimeoutSec = 20
+    - // @input float imageRequestTimeoutSec = 60
+    - // @input float musicRequestTimeoutSec = 90
+    - // @input float meshRequestTimeoutSec = 90
     - // @input bool useEditorMockWhenOffline = true
     - // @input bool editorStartPaired
+    - // @input bool useMockFallbackWhenUnpaired = true
     - // @input float editorAutoPairDelaySec = 12
+    - // @input bool autoPairWithCredentials = true
+    - '// @input string autoPairEmail = "test@user.com"'
+    - '// @input string autoPairPassword = "test321"'
+    - '// @input string arvisSupabaseUrl = "https://bigsedudegjukszrfyil.supabase.co"'
+    - '// @input string arvisSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo"'
     - // @input bool debugLogging = true

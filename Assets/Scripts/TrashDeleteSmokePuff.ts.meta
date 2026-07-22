@@ -1,20 +1,20 @@
-- !<AssetImportMetadata/0ce922a4-f2a8-4d82-9a25-bfc6e5efc754>
+- !<AssetImportMetadata/637ec86d-2449-40d9-b3c1-db18de1ad9e1>
   ImportedAssetIds:
-    TypeScriptAsset: !<reference> f9be78a1-ab64-406f-b6f3-f1c54455ff24
+    TypeScriptAsset: !<reference> e9c099a1-4b7b-460d-9a31-9c46344edb95
   ImporterName: TypeScriptAssetImporter
-  PrimaryAsset: !<reference> f9be78a1-ab64-406f-b6f3-f1c54455ff24
+  PrimaryAsset: !<reference> e9c099a1-4b7b-460d-9a31-9c46344edb95
   PackageType: NotAPackage
   LegacyPackagePolicy: ~
   ExtraData:
     {}
   AssetDataMap:
-    TypeScriptAsset: !<own> abc0a978-8ebc-483b-ae0e-972011dfaae2
+    TypeScriptAsset: !<own> 453c64fa-a8ad-4508-8ecb-2cd1da330e09
   DependentFiles:
     []
   ImporterSettings: !<AssetImporterSettings>
     {}
   CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
-- !<TypeScriptAssetData/abc0a978-8ebc-483b-ae0e-972011dfaae2>
+- !<TypeScriptAssetData/453c64fa-a8ad-4508-8ecb-2cd1da330e09>
   SvgIcon: ""
   SetupScript:
     code: ""
@@ -23,11 +23,13 @@
   VersionMinor: 0
   VersionPatch: 0
   VersionPrerelease: ""
-  ComponentUid: 46b25445-a726-4446-9f70-8ca76420e3b0
+  ComponentUid: 07593a57-01b9-45f8-9e43-dd42746719c4
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    {}
+    particleMaterial: false
+    particleMesh: false
+    puffLifetimeSec: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -37,10 +39,13 @@
   Attachments:
     []
   DefaultScriptInputs:
-    -
-      {}
+    - particleMesh: !<reference.RenderMesh> 00000000-0000-0000-0000-000000000000
+      particleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      puffLifetimeSec: 1.350000
   ScriptTypes:
     -
       {}
   InputLines:
-    []
+    - // @input Asset.RenderMesh particleMesh
+    - // @input Asset.Material particleMaterial
+    - // @input float puffLifetimeSec = 1.35
