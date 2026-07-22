@@ -7,7 +7,7 @@ const WAKE_GREETING = '(?:hey|hi|ok(?:ay)?|yo|the|okay)';
 
 /** Explicit ASR mishearings of the agent name "arvis". */
 const AGENT_WAKE_ALIASES =
-  'arvis|arvis\'?s?|arvest|arviz|arvin|arvus|avis|armis|harvis|jarvis|airvis|arvos|arbus|harvest|ars|argos|argo|obis|orbis|arbes|arbeu';
+  'arvis|arvisu|arvissu|arvis\'?s?|arvest|arviz|arvin|arvus|avis|armis|harvis|jarvis|airvis|arvos|arbus|harvest|ars|argos|argo|obis|orbis|arbes|arbeu|arvice|arviss';
 
 /** Spaced or split tokens ASR emits for the agent name. */
 const AGENT_WAKE_COMPOUND = 'har\\s*vest|a\\s*vis|a\\s*r\\s*vis|our\\s*vis|are\\s*vis';
@@ -106,7 +106,21 @@ export function isWakeOnlyFragment(text: string): boolean {
   if (normalized.length < 3) {
     return true;
   }
-  return /^(?:hey|hi|hello|ok|okay|yo|the|arvis)(?:[\s,!.?]|$)+$/i.test(normalized);
+  // Bare greeting / name, or truncated wake while ASR is still catching up.
+  if (
+    /^(?:hey|hi|hello|ok|okay|yo|the|arvis)(?:[\s,!.?]+(?:hey|hi|hello|ok|okay|yo|the|arvis)?)*$/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^(?:hey|hi|ok|okay|yo|the)[\s,]+(?:a|ar|arg|ars|arv|arvi|arvis)?\.?$/i.test(normalized)
+  ) {
+    return true;
+  }
+  const wake = parseArvisWakePhrase(normalized);
+  return wake.triggered && !normalizeWakeMessage(wake.message);
 }
 
 export function looksLikeAssistantEcho(text: string): boolean {
@@ -126,6 +140,15 @@ export function looksLikeAssistantEcho(text: string): boolean {
     /\bwhat do you want to do\b/.test(normalized) ||
     /\bwhat can i help with\b/.test(normalized) ||
     /\bi can'?t fetch live news\b/.test(normalized) ||
+    /\bi couldn'?t reach\b/.test(normalized) ||
+    /\blive news feed\b/.test(normalized) ||
+    /\bnews feed just now\b/.test(normalized) ||
+    /\bpair your device for live\b/.test(normalized) ||
+    /\bfor live headlines\b/.test(normalized) ||
+    /\btry again in a moment\b/.test(normalized) ||
+    /\bstill help with your garden\b/.test(normalized) ||
+    /\bheadlines, or try again\b/.test(normalized) ||
+    (/\bpair your device\b/.test(normalized) && /\bheadlines\b/.test(normalized)) ||
     /\blens studio editor preview\b/.test(normalized) ||
     /\bi can help with flow garden\b/.test(normalized) ||
     /\bi can help with your garden\b/.test(normalized) ||
@@ -181,14 +204,24 @@ export function stripAssistantEchoPrefix(text: string): string {
 /** Clean live/listening transcripts before display or auto-send. */
 export function sanitizeListeningTranscript(text: string): string {
   const cleaned = stripAssistantEchoPrefix(text);
-  if (!cleaned || isIgnorableUtterance(cleaned) || looksLikeAssistantEcho(cleaned)) {
+  if (
+    !cleaned ||
+    isIgnorableUtterance(cleaned) ||
+    looksLikeAssistantEcho(cleaned) ||
+    isWakeOnlyFragment(cleaned)
+  ) {
     return '';
   }
 
   const wake = parseArvisWakePhrase(cleaned);
   if (wake.triggered) {
     const prompt = stripConversationalFiller(normalizeWakeMessage(wake.message));
-    return isWakeOnlyFragment(prompt) ? '' : prompt;
+    return !prompt || isWakeOnlyFragment(prompt) ? '' : prompt;
+  }
+
+  // Incomplete wake in progress ("hey" / "hey a") — keep bubble on Listening…
+  if (looksLikePossibleAgentWake(cleaned) && !extractAgentPrompt(cleaned)) {
+    return '';
   }
 
   return cleaned;
@@ -196,7 +229,7 @@ export function sanitizeListeningTranscript(text: string): string {
 
 export function extractAgentPrompt(text: string): string {
   const sanitized = stripAssistantEchoPrefix(text);
-  const wake = parseArvisWakePhrase(sanitized);
+  const wake = findArvisWakeInTranscript(sanitized);
   if (wake.triggered && hasWakeFollowUp(wake.message)) {
     const prompt = stripConversationalFiller(normalizeWakeMessage(wake.message));
     return isWakeOnlyFragment(prompt) ? '' : prompt;
@@ -243,7 +276,63 @@ export function parseArvisWakePhrase(text: string): ArvisWakeParseResult {
     }
   }
 
-  return { triggered: false, message: normalized };
+  return { triggered: false, message: '' };
+}
+
+/**
+ * Find the last "hey arvis …" (or alias) even inside noisy / ambient transcripts.
+ * VoiceML in editor often appends TV/mic bleed before the wake phrase.
+ */
+export function findArvisWakeInTranscript(text: string): ArvisWakeParseResult {
+  const normalized = canonicalizeAgentWakeNames(normalizeAsrTranscript(text));
+  if (!normalized) {
+    return { triggered: false, message: '' };
+  }
+
+  const direct = parseArvisWakePhrase(normalized);
+  if (direct.triggered) {
+    return direct;
+  }
+
+  const wakeToken = new RegExp(`(?:${WAKE_GREETING})[,\\s]+arvis\\b[,\\s.]*`, 'gi');
+  let lastStart = -1;
+  let lastLen = 0;
+  let match: RegExpExecArray | null = wakeToken.exec(normalized);
+  while (match) {
+    lastStart = match.index;
+    lastLen = match[0].length;
+    match = wakeToken.exec(normalized);
+  }
+
+  if (lastStart < 0) {
+    // Bare "arvis" as its own clause near the end.
+    const bare = normalized.match(/(?:^|[.!?;]\s+)(arvis)\b[,\\s.]*(.*)$/i);
+    if (bare) {
+      return {
+        triggered: true,
+        message: normalizeWakeMessage(bare[2] || ''),
+      };
+    }
+    return { triggered: false, message: '' };
+  }
+
+  return {
+    triggered: true,
+    message: normalizeWakeMessage(normalized.slice(lastStart + lastLen)),
+  };
+}
+
+/** Long non-wake finals are usually ambient TV / room bleed in editor VoiceML. */
+export function isLikelyAmbientTranscript(text: string): boolean {
+  const normalized = normalizeAsrTranscript(text);
+  if (!normalized) {
+    return false;
+  }
+  if (findArvisWakeInTranscript(normalized).triggered) {
+    return false;
+  }
+  const words = normalized.split(/\s+/).filter((w) => w.length > 0);
+  return normalized.length >= 48 || words.length >= 8;
 }
 
 /** ASR partials like "can you generate an-" should not be sent to the agent yet. */
@@ -284,6 +373,7 @@ export function getAgentWakeVocabHints(): string[] {
     'hey arvest',
     'hey arviz',
     'hey avis',
+    'hey arvisu',
     'hey harvest',
     'hey armis',
     'hey jarvis',

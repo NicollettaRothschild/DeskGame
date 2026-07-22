@@ -181,6 +181,15 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   public setPhase(phase: ArvisGhostPhase): void {
+    this.applyPhaseVisuals(phase, true);
+  }
+
+  /** Soft idle / phase change that does not dismiss an active reply bubble. */
+  public setPhaseKeepBubble(phase: ArvisGhostPhase): void {
+    this.applyPhaseVisuals(phase, false);
+  }
+
+  private applyPhaseVisuals(phase: ArvisGhostPhase, hideBubbleOnIdle: boolean): void {
     this.phase = phase;
 
     if (phase === 'listening') {
@@ -197,7 +206,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
     this.refreshGhostColor();
     this.applyMaterialColor(1);
-    if (phase === 'idle') {
+    if (hideBubbleOnIdle && phase === 'idle') {
       this.hideSpeechBubble();
     }
     if (this.debugLogging) {
@@ -803,12 +812,16 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       this.talkDragStarted = true;
     };
     const onTalkUp = (): void => {
-      if (this.talkDragStarted) {
+      const duration = getTime() - this.talkTapDownTime;
+      // InteractableManipulation almost always fires drag — still treat short pinches as talk.
+      if (duration < 0.04 || duration > 0.55) {
         return;
       }
-      const duration = getTime() - this.talkTapDownTime;
-      if (duration > 0.32) {
+      if (this.talkDragStarted && duration > 0.4) {
         return;
+      }
+      if (this.debugLogging) {
+        print(`[ArvisGhostBlob] pinch-to-talk (${duration.toFixed(2)}s)`);
       }
       this.toggleGhostAgentTalk();
     };

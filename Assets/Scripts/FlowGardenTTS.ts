@@ -1,6 +1,15 @@
-import { registerFlowGardenTts } from './FlowGardenServiceRegistry';
+import { getSharedSpeechRecognition, registerFlowGardenTts } from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
+
+/** Estimate spoken duration so we keep the mic suppressed while TTS is audible. */
+export function estimateSpeechDurationSec(text: string): number {
+  const words = String(text || '')
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word.length > 0).length;
+  return Math.max(1.4, Math.min(18, words * 0.5 + 0.4));
+}
 
 /**
  * Flow Garden TTS — Lens native VoiceML TTS with optional Arvis ElevenLabs when paired.
@@ -35,8 +44,11 @@ export class FlowGardenTTS extends BaseScriptComponent {
   @input
   debugLogging: boolean = true;
 
+  private static readonly VOICE_COMMAND_SUPPRESS_SEC = 5;
+
   private audioPlayer: AudioComponent | null = null;
   private speaking = false;
+  private suppressVoiceCommandsUntil = 0;
 
   onAwake(): void {
     registerFlowGardenTts(this);
@@ -59,9 +71,27 @@ export class FlowGardenTTS extends BaseScriptComponent {
     }
 
     this.speaking = true;
+    this.beginVoiceCommandSuppression(spokenText);
     if (this.debugLogging) {
       print('[FlowGardenTTS] Speaking: ' + spokenText.slice(0, 120));
     }
+
+    const finish = (ok: boolean): void => {
+      // Native/cloud play() returns immediately — wait out spoken duration before unblocking mic.
+      const delay = this.createEvent('DelayedCallbackEvent');
+      delay.bind(() => {
+        this.speaking = false;
+        this.beginVoiceCommandSuppression(spokenText);
+        const speech = getSharedSpeechRecognition();
+        if (!isNull(speech)) {
+          speech.clearUtteranceState();
+        }
+        if (onDone) {
+          onDone(ok);
+        }
+      });
+      delay.reset(estimateSpeechDurationSec(spokenText));
+    };
 
     if (
       this.preferArvisVoiceWhenPaired &&
@@ -71,26 +101,40 @@ export class FlowGardenTTS extends BaseScriptComponent {
     ) {
       this.speakViaArvis(spokenText, (ok) => {
         if (ok) {
-          this.speaking = false;
-          if (onDone) {
-            onDone(true);
-          }
+          finish(true);
           return;
         }
-        this.speakViaNative(spokenText, onDone);
+        this.speakViaNative(spokenText, (nativeOk) => finish(!!nativeOk));
       });
       return;
     }
 
-    this.speakViaNative(spokenText, onDone);
+    this.speakViaNative(spokenText, (nativeOk) => finish(!!nativeOk));
   }
 
   public isSpeaking(): boolean {
-    return this.speaking;
+    return this.speaking || getTime() < this.suppressVoiceCommandsUntil;
   }
 
   public isBlockingVoiceCommands(): boolean {
-    return this.speaking;
+    return this.speaking || getTime() < this.suppressVoiceCommandsUntil;
+  }
+
+  private beginVoiceCommandSuppression(spokenText?: string): void {
+    const textLen = String(spokenText || '').length;
+    const seconds = Math.min(
+      20,
+      Math.max(FlowGardenTTS.VOICE_COMMAND_SUPPRESS_SEC, textLen * 0.06)
+    );
+    this.suppressVoiceCommandsUntil = Math.max(
+      this.suppressVoiceCommandsUntil,
+      getTime() + seconds
+    );
+    const speech = getSharedSpeechRecognition();
+    if (!isNull(speech)) {
+      speech.clearUtteranceState();
+      speech.suppressVoiceCommandsFor(seconds);
+    }
   }
 
   private speakViaArvis(text: string, onDone: (ok: boolean) => void): void {
@@ -128,42 +172,71 @@ export class FlowGardenTTS extends BaseScriptComponent {
       if (this.debugLogging) {
         print('[FlowGardenTTS] Missing TextToSpeechModule asset');
       }
-      this.speaking = false;
       if (onDone) {
         onDone(false);
       }
       return;
     }
 
-    const options = TextToSpeech.Options.create();
-    options.voiceName = this.voiceName;
+    const nativeText = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 380);
+    if (!nativeText) {
+      if (onDone) {
+        onDone(false);
+      }
+      return;
+    }
 
-    this.ttsModule.synthesize(
-      text,
-      options,
-      (audioTrack) => {
-        if (isNull(this.audioPlayer)) {
-          this.speaking = false;
-          if (onDone) {
-            onDone(false);
-          }
-          return;
-        }
-        this.audioPlayer.audioTrack = audioTrack;
-        this.audioPlayer.play(1);
-        this.speaking = false;
-        if (onDone) {
-          onDone(true);
-        }
-      },
-      (error, description) => {
-        print('[FlowGardenTTS] Native TTS error ' + error + ': ' + description);
-        this.speaking = false;
+    const voices = [this.voiceName, 'Sasha', 'Sam', 'Voice 1'].filter((name, index, all) => {
+      return !!name && all.indexOf(name) === index;
+    });
+
+    const tryVoice = (voiceIndex: number): void => {
+      if (voiceIndex >= voices.length) {
         if (onDone) {
           onDone(false);
         }
+        return;
       }
-    );
+
+      try {
+        const options = TextToSpeech.Options.create();
+        options.voiceName = voices[voiceIndex];
+        this.ttsModule.synthesize(
+          nativeText,
+          options,
+          (audioTrack) => {
+            if (isNull(this.audioPlayer)) {
+              if (onDone) {
+                onDone(false);
+              }
+              return;
+            }
+            this.audioPlayer.audioTrack = audioTrack;
+            this.audioPlayer.play(1);
+            if (this.debugLogging) {
+              print('[FlowGardenTTS] Native voice played voice=' + voices[voiceIndex]);
+            }
+            if (onDone) {
+              onDone(true);
+            }
+          },
+          (error, description) => {
+            print(
+              `[FlowGardenTTS] Native TTS error ${error}: ${description} (voice=${voices[voiceIndex]})`
+            );
+            tryVoice(voiceIndex + 1);
+          }
+        );
+      } catch (e) {
+        print('[FlowGardenTTS] Native TTS threw: ' + e);
+        tryVoice(voiceIndex + 1);
+      }
+    };
+
+    tryVoice(0);
   }
 
   private playBase64Audio(base64: string, onDone: (ok: boolean) => void): void {

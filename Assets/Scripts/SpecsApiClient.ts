@@ -861,40 +861,53 @@ export class SpecsApiClient extends BaseScriptComponent {
     message: string,
     onDone: (result: { response: string; agentName: string; imageUrl?: string } | null, error?: string) => void
   ): void {
-    this.resolveInternetModule();
-    if (isNull(this.internetModule)) {
-      onDone(null, 'InternetModule not configured (enable Internet Access capability)');
+    const finishWithMock = (reason: string): void => {
+      const mock = SpecsEditorMock.chatWithAgent(agentName, message, []);
+      if (this.debugLogging) {
+        print(
+          `[SpecsApi] News browse fallback (${reason}) — ${mock.response.slice(0, 100)}`
+        );
+      }
+      onDone({
+        response: mock.response,
+        agentName: mock.agent.name,
+        imageUrl: extractImageUrlFromAgentResponse(
+          mock.response,
+          mock.imageUrl,
+          this.normalizeBaseUrl()
+        ),
+      });
+    };
+
+    if (!this.isNetworkAvailable()) {
+      finishWithMock('HTTP unavailable on simulated platform');
       return;
     }
 
-    fetchNewsHeadlinesBrief(this.internetModule, message, (summary, error) => {
-      if (!summary) {
-        const mock = SpecsEditorMock.chatWithAgent(agentName, message, []);
+    this.resolveInternetModule();
+    if (isNull(this.internetModule)) {
+      finishWithMock('InternetModule not configured');
+      return;
+    }
+
+    try {
+      fetchNewsHeadlinesBrief(this.internetModule, message, (summary, error) => {
+        if (!summary) {
+          finishWithMock(error || 'unknown');
+          return;
+        }
+
         if (this.debugLogging) {
-          print(
-            `[SpecsApi] News browse failed (${error || 'unknown'}) — mock fallback ${mock.response.slice(0, 100)}`
-          );
+          print(`[SpecsApi] News browse skill ${summary.slice(0, 120)}`);
         }
         onDone({
-          response: mock.response,
-          agentName: mock.agent.name,
-          imageUrl: extractImageUrlFromAgentResponse(
-            mock.response,
-            mock.imageUrl,
-            this.normalizeBaseUrl()
-          ),
+          response: summary,
+          agentName: agentName || 'Arvis',
         });
-        return;
-      }
-
-      if (this.debugLogging) {
-        print(`[SpecsApi] News browse skill ${summary.slice(0, 120)}`);
-      }
-      onDone({
-        response: summary,
-        agentName: agentName || 'Arvis',
       });
-    });
+    } catch (e) {
+      finishWithMock(String(e));
+    }
   }
 
   private scheduleEditorAutoPair(): void {

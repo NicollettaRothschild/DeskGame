@@ -46,10 +46,10 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - startupDisabled: false
+    - startupDisabled: true
       languageCode: en_US
       autoStartListening: true
-      startupListenDelaySec: !<float> 2.500000
+      startupListenDelaySec: !<float> 10.000000
       tapToListen: true
       listeningWindowSec: !<float> 8.000000
       debugLogging: true

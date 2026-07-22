@@ -1353,7 +1353,7 @@
   PrefabRemaps:
     []
   Name: TaskBerryManager
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> 8f1e933e-b14e-4e42-ad12-3d136deefba5
   ScriptInputsDefault:
     apiBaseUrl: true
@@ -2987,7 +2987,7 @@
   PrefabRemaps:
     []
   Name: Text3D UserID
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 27.054745, y: 0.000000, z: -72.451370}
@@ -5992,7 +5992,7 @@
   PrefabRemaps:
     []
   Name: SpecsDeviceRegistry
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> 1913c950-c77f-4843-8d15-c562e49b1c89
   ScriptInputsDefault:
     {}

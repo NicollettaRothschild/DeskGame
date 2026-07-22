@@ -12,6 +12,18 @@ export function isNewsQuery(message: string): boolean {
   return NEWS_KEYWORD_PATTERN.test(text) || NEWS_PHRASE_PATTERN.test(text);
 }
 
+/** Stricter news intent for auto-forwarding — avoids TTS echo fragments that merely contain "news". */
+export function isNewsIntentQuery(message: string): boolean {
+  const text = String(message || '').trim();
+  if (!text) {
+    return false;
+  }
+  if (NEWS_PHRASE_PATTERN.test(text)) {
+    return true;
+  }
+  return /^(?:what(?:'s| is)|any|latest|today'?s|tell me|give me)\b[\s\S]*\bnews\b/i.test(text);
+}
+
 export function fetchNewsHeadlinesBrief(
   internetModule: InternetModule,
   query: string,
@@ -22,30 +34,46 @@ export function fetchNewsHeadlinesBrief(
     return;
   }
 
-  const request = RemoteServiceHttpRequest.create();
-  request.url = 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en';
-  request.method = RemoteServiceHttpRequest.HttpRequestMethod.Get;
+  let request: RemoteServiceHttpRequest;
+  try {
+    request = RemoteServiceHttpRequest.create();
+  } catch (e) {
+    // Editor/simulated preview often cannot create HTTP requests.
+    onDone(null, 'News HTTP unavailable on this platform: ' + e);
+    return;
+  }
 
-  internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
-    const status = response.statusCode;
-    const raw = String(response.body || '');
-    if (status < 200 || status >= 300) {
-      onDone(null, `News feed HTTP ${status}`);
-      return;
-    }
+  try {
+    request.url = 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en';
+    request.method = RemoteServiceHttpRequest.HttpRequestMethod.Get;
 
-    const headlines = parseRssTitles(raw, 5);
-    if (!headlines.length) {
-      onDone(null, 'Could not parse headlines');
-      return;
-    }
+    internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
+      try {
+        const status = response.statusCode;
+        const raw = String(response.body || '');
+        if (status < 200 || status >= 300) {
+          onDone(null, `News feed HTTP ${status}`);
+          return;
+        }
 
-    const body = headlines
-      .map((headline, index) => `${index + 1}. ${headline}`)
-      .join(' ');
+        const headlines = parseRssTitles(raw, 5);
+        if (!headlines.length) {
+          onDone(null, 'Could not parse headlines');
+          return;
+        }
 
-    onDone(body);
-  });
+        const body = headlines
+          .map((headline, index) => `${index + 1}. ${headline}`)
+          .join(' ');
+
+        onDone(body);
+      } catch (e) {
+        onDone(null, String(e));
+      }
+    });
+  } catch (e) {
+    onDone(null, 'News request failed: ' + e);
+  }
 }
 
 function parseRssTitles(xml: string, maxCount: number): string[] {

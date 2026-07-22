@@ -2,7 +2,12 @@ import {
   getSharedFlowGardenSpacePanel,
   registerSpeechRecognition,
 } from './FlowGardenServiceRegistry';
-import { getAgentWakeVocabHints } from './ArvisWakePhrase';
+import {
+  findArvisWakeInTranscript,
+  getAgentWakeVocabHints,
+  isLikelyAmbientTranscript,
+  looksLikePossibleAgentWake,
+} from './ArvisWakePhrase';
 
 /**
  * Speech-to-text for Flow Garden / Arvis.
@@ -499,6 +504,11 @@ export class SpeechRecognition extends BaseScriptComponent {
   }
 
   private applyTranscript(rawText: string, isFinal: boolean): void {
+    // Drop mic bleed from our own TTS — prevents news/reply echo loops in preview.
+    if (this.isSuppressingVoiceCommands() && !this.agentSessionActive) {
+      return;
+    }
+
     const text = String(rawText || '').trim().toLowerCase();
     if (!text) {
       if (this.debugLogging && this.emptyUpdateLogCount < 3) {
@@ -518,6 +528,13 @@ export class SpeechRecognition extends BaseScriptComponent {
     this.setTranscriptText(text);
     if (!isFinal) {
       this.interimTranscript = text;
+      // Surface embedded wake early from noisy interim streams.
+      const interimWake = findArvisWakeInTranscript(text);
+      if (interimWake.triggered && !this.agentSessionActive) {
+        this.finalTranscript = interimWake.message
+          ? `hey arvis ${interimWake.message}`
+          : 'hey arvis';
+      }
     }
     if (this.debugLogging && text !== this.lastLoggedHeard) {
       this.lastLoggedHeard = text;
@@ -526,8 +543,26 @@ export class SpeechRecognition extends BaseScriptComponent {
     }
 
     if (isFinal) {
-      this.finalTranscript = text;
-      this.interimTranscript = '';
+      const wake = findArvisWakeInTranscript(text);
+      if (wake.triggered) {
+        this.finalTranscript = wake.message ? `hey arvis ${wake.message}` : 'hey arvis';
+        this.interimTranscript = '';
+      } else if (!this.agentSessionActive && isLikelyAmbientTranscript(text)) {
+        // Drop TV / room bleed so it cannot block the next "hey arvis".
+        if (this.debugLogging) {
+          print(
+            `[SpeechRecognition] Ignoring ambient transcript (${text.split(/\s+/).length} words)`
+          );
+        }
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+      } else if (!this.agentSessionActive && !looksLikePossibleAgentWake(text) && text.length > 24) {
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+      } else {
+        this.finalTranscript = text;
+        this.interimTranscript = '';
+      }
     }
 
     this.pushTranscriptToSpacePanel(true);

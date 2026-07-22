@@ -9,7 +9,7 @@ import {
 import { isImageQuery } from './ArvisImageSkill';
 import { isMeshQuery } from './ArvisMeshSkill';
 import { isMusicQuery } from './ArvisMusicSkill';
-import { isNewsQuery } from './ArvisNewsSkill';
+import { isNewsIntentQuery } from './ArvisNewsSkill';
 import {
   getSharedArvisAgentChat,
   getSharedFlowGardenTts,
@@ -232,8 +232,12 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       isImageQuery(trimmed) ||
       isMeshQuery(trimmed) ||
       isMusicQuery(trimmed) ||
-      isNewsQuery(trimmed);
+      isNewsIntentQuery(trimmed);
     if (!isAgentIntent) {
+      return false;
+    }
+
+    if (looksLikeAssistantEcho(trimmed)) {
       return false;
     }
 
