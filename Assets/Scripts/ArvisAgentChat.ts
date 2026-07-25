@@ -507,6 +507,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
     if (this.deviceRegistry.getDeviceSecret().length > 0) {
       return true;
     }
+    if (this.specsApi.isAutoPairWithCredentialsEnabled()) {
+      return true;
+    }
     return this.deviceRegistry.isPaired();
   }
 
@@ -548,7 +551,8 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
 
-    if (imageRequest && !this.deviceRegistry.isPaired()) {
+    // Auto-pair via Supabase credentials before any live agent call (news/chat/image).
+    if (!this.deviceRegistry.isPaired() && this.specsApi.isAutoPairWithCredentialsEnabled()) {
       if (this.specsApi.isCredentialPairInFlight()) {
         this.setStatus('Pairing with arvis.space…');
         this.updateBoard('thinking', outbound, 'Signing in and pairing your device…');
@@ -559,11 +563,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
         retryEvent.reset(1.5);
         return;
       }
-      if (
-        this.specsApi.isAutoPairWithCredentialsEnabled() &&
-        this.deviceRegistry.getDeviceSecret().length > 0
-      ) {
+      if (this.deviceRegistry.getDeviceSecret().length > 0) {
         this.setStatus('Pairing with arvis.space…');
+        this.updateBoard('thinking', outbound, 'Signing in and pairing your device…');
         this.specsApi.tryAutoPairWithCredentials(
           this.deviceRegistry.getDeviceId(),
           (ok, _userEmail, pairError) => {

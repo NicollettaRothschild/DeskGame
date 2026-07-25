@@ -17,5 +17,6 @@
       position: Float
       tangent: Float
       texture0: Float
-  CompressionSettings: !<FileCompressionSettings>
-    {}
+  CompressionSettings: !<SingleCompressionSettings>
+    CompressorName: None
+    CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000

@@ -2108,7 +2108,7 @@
       startupDisabled: false
       languageCode: en_US
       autoStartListening: true
-      startupListenDelaySec: !<float> 2.500000
+      startupListenDelaySec: 2.500000
       tapToListen: true
       listeningWindowSec: !<float> 8.000000
       debugLogging: true
@@ -4627,6 +4627,7 @@
     enableSpeechOutput: true
     agentName: true
     maxHistoryTurns: true
+    debugLogging: true
     transcriptOnlyMode: true
   ScriptTypesDefault:
     {}

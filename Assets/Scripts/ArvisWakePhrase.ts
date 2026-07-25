@@ -7,7 +7,7 @@ const WAKE_GREETING = '(?:hey|hi|ok(?:ay)?|yo|the|okay)';
 
 /** Explicit ASR mishearings of the agent name "arvis". */
 const AGENT_WAKE_ALIASES =
-  'arvis|arvisu|arvissu|arvis\'?s?|arvest|arviz|arvin|arvus|avis|armis|harvis|jarvis|airvis|arvos|arbus|harvest|ars|argos|argo|obis|orbis|arbes|arbeu|arvice|arviss';
+  'arvis|arvison|arvisu|arvissu|arvis\'?s?|arvest|arviz|arvin|arvus|avis|armis|harvis|jarvis|airvis|arvos|arbus|harvest|ars|argos|argo|obis|orbis|arbes|arbeu|arvice|arviss';
 
 /** Spaced or split tokens ASR emits for the agent name. */
 const AGENT_WAKE_COMPOUND = 'har\\s*vest|a\\s*vis|a\\s*r\\s*vis|our\\s*vis|are\\s*vis';

@@ -11,7 +11,7 @@ import {
   normalizeMusicPrompt,
 } from './ArvisMusicSkill';
 import { isMeshQuery, normalizeMeshPrompt } from './ArvisMeshSkill';
-import { fetchNewsHeadlinesBrief, isNewsQuery } from './ArvisNewsSkill';
+import { isNewsQuery } from './ArvisNewsSkill';
 import { SpecsEditorMock } from './SpecsEditorMock';
 
 export type SpecsTask = {
@@ -114,10 +114,39 @@ export class SpecsApiClient extends BaseScriptComponent {
   private editorAutoPairScheduled = false;
   private credentialPairInFlight = false;
   private credentialPairFailed = false;
+  private simulatedPlatformWarned = false;
 
   onAwake(): void {
     registerSpecsApi(this);
     this.resolveInternetModule();
+  }
+
+  /** Preview without Device Type Override = Spectacles blocks InternetModule.fetch/create. */
+  private formatNetworkError(error: unknown): string {
+    const raw = String(error || '');
+    if (/simulated platform|API not available/i.test(raw)) {
+      this.warnSimulatedPlatformOnce(raw);
+      return (
+        'Internet blocked in Preview — set Preview Device Type Override to Spectacles ' +
+        '(not Desktop/Phone), then restart Preview'
+      );
+    }
+    return raw || 'Network request failed';
+  }
+
+  private warnSimulatedPlatformOnce(detail: string): void {
+    if (this.simulatedPlatformWarned) {
+      return;
+    }
+    this.simulatedPlatformWarned = true;
+    this.networkChecked = true;
+    this.networkAvailable = false;
+    print(
+      '[SpecsApi] InternetModule blocked on simulated platform. ' +
+        'Preview panel → Device Type Override → Spectacles, then restart Preview. ' +
+        'Supabase plugin Import Credentials is editor-only and does not unlock Lens runtime HTTP. Detail: ' +
+        detail
+    );
   }
 
   private resolveInternetModule(): void {
@@ -136,12 +165,38 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   public isNetworkAvailable(): boolean {
-    if (!this.networkChecked) {
+    this.resolveInternetModule();
+    if (isNull(this.internetModule)) {
       this.networkChecked = true;
-      try {
-        RemoteServiceHttpRequest.create();
+      this.networkAvailable = false;
+      return false;
+    }
+
+    // Do NOT treat InternetModule.fetch existing as proof it works — on Desktop/Phone
+    // preview the method exists but invoking it throws "API not available on the
+    // simulated platform". Only Device Type Override = Spectacles enables runtime HTTP.
+    if (this.networkChecked) {
+      return this.networkAvailable;
+    }
+
+    this.networkChecked = true;
+    try {
+      RemoteServiceHttpRequest.create();
+      this.networkAvailable = true;
+    } catch (e) {
+      // Fetch may still work when create() is blocked (Spectacles preview).
+      const fetchFn = (
+        this.internetModule as InternetModule & {
+          fetch?: (url: string, init?: unknown) => Promise<Response>;
+        }
+      ).fetch;
+      if (typeof fetchFn === 'function') {
+        // Optimistic until first invoke; formatNetworkError clears this on simulated fail.
         this.networkAvailable = true;
-      } catch (e) {
+        if (this.debugLogging) {
+          print('[SpecsApi] HTTP create() blocked; will try fetch (needs Spectacles preview)');
+        }
+      } else {
         this.networkAvailable = false;
         if (this.debugLogging) {
           print('[SpecsApi] HTTP unavailable on this platform: ' + e);
@@ -168,7 +223,8 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   public registerDevice(deviceId: string, onDone: (result: SpecsDeviceRegistration | null, error?: string) => void): void {
-    if (this.isEditorMockActive()) {
+    // With credential auto-pair, always register against arvis.space from editor preview.
+    if (this.isEditorMockActive() && !this.autoPairWithCredentials) {
       const result = SpecsEditorMock.register(deviceId);
       if (this.shouldAutoPairInEditorMock() && !result.paired) {
         SpecsEditorMock.markPaired();
@@ -188,6 +244,11 @@ export class SpecsApiClient extends BaseScriptComponent {
       { device_id: deviceId, device_label: 'Flow Garden' },
       (data, err) => {
         if (err || !data) {
+          if (this.useEditorMockWhenOffline && this.isEditorMockActive()) {
+            const result = SpecsEditorMock.register(deviceId);
+            onDone(result);
+            return;
+          }
           onDone(null, err || 'register failed');
           return;
         }
@@ -201,7 +262,17 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   public isAutoPairWithCredentialsEnabled(): boolean {
-    return this.autoPairWithCredentials && !this.isEditorMockActive();
+    // Credential pair talks to Supabase + arvis.space — allow it even when the
+    // offline mock probe is active so editor preview can still use the live backend.
+    return this.autoPairWithCredentials;
+  }
+
+  /** Prefer live arvis.space when we have a device secret or credential auto-pair. */
+  private shouldPreferLiveAgent(deviceSecret?: string): boolean {
+    if (String(deviceSecret || '').trim().length > 0) {
+      return true;
+    }
+    return this.autoPairWithCredentials && !this.credentialPairFailed;
   }
 
   public isCredentialPairInFlight(): boolean {
@@ -294,40 +365,36 @@ export class SpecsApiClient extends BaseScriptComponent {
       return;
     }
 
-    const request = this.createRequest((_data, err) => {
-      onDone(null, err || 'Network unavailable');
-    });
-    if (!request) {
-      return;
-    }
+    this.requestJson(
+      `${supabaseUrl}/auth/v1/token?grant_type=password`,
+      'POST',
+      { email, password },
+      {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+      },
+      (data, err) => {
+        if (err || !data) {
+          onDone(null, err || 'Supabase sign-in failed');
+          return;
+        }
 
-    request.url = `${supabaseUrl}/auth/v1/token?grant_type=password`;
-    request.method = RemoteServiceHttpRequest.HttpRequestMethod.Post;
-    request.setHeader('Content-Type', 'application/json');
-    request.setHeader('apikey', anonKey);
-    request.body = JSON.stringify({ email, password });
+        const user = data.user as JsonRecord | undefined;
+        const userId = String(user?.id || '').trim();
+        const accessToken = String(data.access_token || '').trim();
+        if (!userId || !accessToken) {
+          const description = String(data.error_description || data.msg || 'Missing access_token');
+          onDone(null, description);
+          return;
+        }
 
-    this.performRequest(request, (data, err) => {
-      if (err || !data) {
-        onDone(null, err || 'Supabase sign-in failed');
-        return;
+        onDone({
+          userId,
+          accessToken,
+          email: user?.email ? String(user.email) : null,
+        });
       }
-
-      const user = data.user as JsonRecord | undefined;
-      const userId = String(user?.id || '').trim();
-      const accessToken = String(data.access_token || '').trim();
-      if (!userId || !accessToken) {
-        const description = String(data.error_description || data.msg || 'Missing access_token');
-        onDone(null, description);
-        return;
-      }
-
-      onDone({
-        userId,
-        accessToken,
-        email: user?.email ? String(user.email) : null,
-      });
-    });
+    );
   }
 
   public fetchPairStatus(
@@ -488,12 +555,10 @@ export class SpecsApiClient extends BaseScriptComponent {
     const meshRequest = isMeshQuery(outboundMessage);
     const musicRequest = isMusicQuery(outboundMessage);
 
-    if (isNewsQuery(outboundMessage)) {
-      this.replyWithNewsBrowseFallback(agent, outboundMessage, onDone);
-      return;
-    }
+    // News goes through arvis.space agent chat (Supabase-paired) — do NOT scrape Google RSS
+    // in-Lens. That bypass skipped the live backend and forced editor mock replies.
 
-    if (this.isEditorMockActive()) {
+    if (this.isEditorMockActive() && !this.shouldPreferLiveAgent(deviceSecret)) {
       const mock = SpecsEditorMock.chatWithAgent(agent, outboundMessage, history);
       const imageUrl = extractImageUrlFromAgentResponse(
         mock.response,
@@ -521,6 +586,10 @@ export class SpecsApiClient extends BaseScriptComponent {
       });
       delayEvent.reset(imageRequest || meshRequest || musicRequest ? 1.2 : 0.4);
       return;
+    }
+
+    if (this.debugLogging && isNewsQuery(outboundMessage)) {
+      print('[SpecsApi] News query → arvis.space /api/specs/agent/chat');
     }
 
     const requestTimeoutSec = meshRequest
@@ -740,13 +809,7 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   private getJson(path: string, onDone: (data: JsonRecord | null, error?: string) => void): void {
-    const request = this.createRequest(onDone);
-    if (!request) {
-      return;
-    }
-    request.url = this.normalizeBaseUrl() + path;
-    request.method = RemoteServiceHttpRequest.HttpRequestMethod.Get;
-    this.performRequest(request, onDone);
+    this.requestJson(this.normalizeBaseUrl() + path, 'GET', null, null, onDone);
   }
 
   private postJson(
@@ -755,53 +818,167 @@ export class SpecsApiClient extends BaseScriptComponent {
     onDone: (data: JsonRecord | null, error?: string) => void,
     timeoutSec?: number
   ): void {
-    const request = this.createRequest(onDone, timeoutSec);
-    if (!request) {
-      return;
-    }
-    request.url = this.normalizeBaseUrl() + path;
-    request.method = RemoteServiceHttpRequest.HttpRequestMethod.Post;
-    request.setHeader('Content-Type', 'application/json');
-    request.body = JSON.stringify(body);
-    this.performRequest(request, onDone);
+    this.requestJson(
+      this.normalizeBaseUrl() + path,
+      'POST',
+      body,
+      { 'Content-Type': 'application/json' },
+      onDone,
+      timeoutSec
+    );
   }
 
-  private createRequest(
+  /**
+   * Prefer InternetModule.fetch (same path SnapCloud/Supabase uses in editor preview).
+   * Fall back to RemoteServiceHttpRequest only when fetch is unavailable.
+   */
+  private requestJson(
+    url: string,
+    method: 'GET' | 'POST',
+    body: JsonRecord | null,
+    headers: Record<string, string> | null,
     onDone: (data: JsonRecord | null, error?: string) => void,
-    timeoutSec?: number
-  ): RemoteServiceHttpRequest | null {
-    if (!this.isNetworkAvailable()) {
-      const message = this.useEditorMockWhenOffline
-        ? 'Network unavailable in editor preview'
-        : 'Network unavailable';
-      onDone(null, message);
-      return null;
+    _timeoutSec?: number
+  ): void {
+    this.resolveInternetModule();
+    if (isNull(this.internetModule)) {
+      onDone(null, 'InternetModule not configured (enable Internet Access capability)');
+      return;
     }
 
-    try {
-      return RemoteServiceHttpRequest.create();
-    } catch (e) {
-      this.networkAvailable = false;
-      if (this.debugLogging) {
-        print('[SpecsApi] HTTP request create failed: ' + e);
+    const fetchFn = (
+      this.internetModule as InternetModule & {
+        fetch?: (resource: string, options?: unknown) => Promise<Response>;
       }
-      onDone(null, 'Network unavailable');
-      return null;
+    ).fetch;
+
+    if (typeof fetchFn === 'function') {
+      this.requestJsonViaFetch(url, method, body, headers, onDone);
+      return;
     }
+
+    this.requestJsonViaRemoteService(url, method, body, headers, onDone);
+  }
+
+  private requestJsonViaFetch(
+    url: string,
+    method: 'GET' | 'POST',
+    body: JsonRecord | null,
+    headers: Record<string, string> | null,
+    onDone: (data: JsonRecord | null, error?: string) => void
+  ): void {
+    const options: Record<string, unknown> = {
+      method,
+      headers: headers || {},
+    };
+    if (method !== 'GET' && body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const run = async (): Promise<void> => {
+      try {
+        if (this.debugLogging) {
+          print(`[SpecsApi] fetch ${method} ${url}`);
+        }
+        const response = await (this.internetModule as InternetModule).fetch(url, options);
+        const status = response.status;
+        const raw = await response.text();
+        if (this.debugLogging) {
+          print(`[SpecsApi] ${status} ${url}`);
+        }
+        if (status < 200 || status >= 300) {
+          let message = `HTTP ${status}`;
+          try {
+            const parsed = JSON.parse(raw) as JsonRecord;
+            if (parsed.error) {
+              message = String(parsed.error);
+            } else if (parsed.error_description) {
+              message = String(parsed.error_description);
+            } else if (parsed.msg) {
+              message = String(parsed.msg);
+            }
+          } catch {
+            // keep status message
+          }
+          onDone(null, message);
+          return;
+        }
+
+        this.networkChecked = true;
+        this.networkAvailable = true;
+
+        if (!raw) {
+          onDone({});
+          return;
+        }
+        try {
+          onDone(JSON.parse(raw) as JsonRecord);
+        } catch {
+          onDone(null, 'Invalid JSON response');
+        }
+      } catch (e) {
+        if (this.debugLogging) {
+          print('[SpecsApi] fetch failed: ' + e);
+        }
+        onDone(null, this.formatNetworkError(e));
+      }
+    };
+
+    run();
+  }
+
+  private requestJsonViaRemoteService(
+    url: string,
+    method: 'GET' | 'POST',
+    body: JsonRecord | null,
+    headers: Record<string, string> | null,
+    onDone: (data: JsonRecord | null, error?: string) => void
+  ): void {
+    let request: RemoteServiceHttpRequest;
+    try {
+      request = RemoteServiceHttpRequest.create();
+    } catch (e) {
+      onDone(null, this.formatNetworkError(e));
+      return;
+    }
+
+    request.url = url;
+    request.method =
+      method === 'GET'
+        ? RemoteServiceHttpRequest.HttpRequestMethod.Get
+        : RemoteServiceHttpRequest.HttpRequestMethod.Post;
+    if (headers) {
+      const keys = Object.keys(headers);
+      for (let i = 0; i < keys.length; i++) {
+        request.setHeader(keys[i], headers[keys[i]]);
+      }
+    }
+    if (method !== 'GET' && body) {
+      request.body = JSON.stringify(body);
+    }
+
+    this.internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
+      try {
+        this.handleHttpResponse(request, response, onDone);
+      } catch (e) {
+        onDone(null, String(e));
+      }
+    });
   }
 
   private shouldUseUnpairedMockFallback(error?: string, message?: string): boolean {
     if (!this.useMockFallbackWhenUnpaired || this.isEditorMockActive()) {
       return false;
     }
-    if (this.isAutoPairWithCredentialsEnabled()) {
+    if (this.isAutoPairWithCredentialsEnabled() && !this.credentialPairFailed) {
       return false;
     }
     if (isMusicQuery(String(message || ''))) {
       return false;
     }
+    // News is handled by arvis.space agent chat — never divert to Google RSS mock.
     if (isNewsQuery(String(message || ''))) {
-      return true;
+      return false;
     }
     if (isImageQuery(String(message || ''))) {
       return false;
@@ -823,11 +1000,6 @@ export class SpecsApiClient extends BaseScriptComponent {
       error?: string
     ) => void
   ): void {
-    if (isNewsQuery(message)) {
-      this.replyWithNewsBrowseFallback(agentName, message, onDone);
-      return;
-    }
-
     const mock = SpecsEditorMock.chatWithAgent(agentName, message, history);
     if (this.debugLogging) {
       print(
@@ -856,60 +1028,6 @@ export class SpecsApiClient extends BaseScriptComponent {
     delayEvent.reset(isImageQuery(message) || isMeshQuery(message) || isMusicQuery(message) ? 1.0 : 0.35);
   }
 
-  private replyWithNewsBrowseFallback(
-    agentName: string,
-    message: string,
-    onDone: (result: { response: string; agentName: string; imageUrl?: string } | null, error?: string) => void
-  ): void {
-    const finishWithMock = (reason: string): void => {
-      const mock = SpecsEditorMock.chatWithAgent(agentName, message, []);
-      if (this.debugLogging) {
-        print(
-          `[SpecsApi] News browse fallback (${reason}) — ${mock.response.slice(0, 100)}`
-        );
-      }
-      onDone({
-        response: mock.response,
-        agentName: mock.agent.name,
-        imageUrl: extractImageUrlFromAgentResponse(
-          mock.response,
-          mock.imageUrl,
-          this.normalizeBaseUrl()
-        ),
-      });
-    };
-
-    if (!this.isNetworkAvailable()) {
-      finishWithMock('HTTP unavailable on simulated platform');
-      return;
-    }
-
-    this.resolveInternetModule();
-    if (isNull(this.internetModule)) {
-      finishWithMock('InternetModule not configured');
-      return;
-    }
-
-    try {
-      fetchNewsHeadlinesBrief(this.internetModule, message, (summary, error) => {
-        if (!summary) {
-          finishWithMock(error || 'unknown');
-          return;
-        }
-
-        if (this.debugLogging) {
-          print(`[SpecsApi] News browse skill ${summary.slice(0, 120)}`);
-        }
-        onDone({
-          response: summary,
-          agentName: agentName || 'Arvis',
-        });
-      });
-    } catch (e) {
-      finishWithMock(String(e));
-    }
-  }
-
   private scheduleEditorAutoPair(): void {
     if (this.editorAutoPairScheduled || this.editorAutoPairDelaySec <= 0) {
       return;
@@ -928,56 +1046,37 @@ export class SpecsApiClient extends BaseScriptComponent {
     this.editorAutoPairEvent.reset(Math.max(1, this.editorAutoPairDelaySec));
   }
 
-  private performRequest(
-    request: RemoteServiceHttpRequest,
-    onDone: (data: JsonRecord | null, error?: string) => void
-  ): void {
-    this.resolveInternetModule();
-    if (isNull(this.internetModule)) {
-      onDone(null, 'InternetModule not configured (enable Internet Access capability)');
-      return;
-    }
-
-    this.internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
-      try {
-        this.handleHttpResponse(request, response, onDone);
-      } catch (e) {
-        onDone(null, String(e));
-      }
-    });
-  }
-
   private handleHttpResponse(
     request: RemoteServiceHttpRequest,
     response: RemoteServiceHttpResponse,
     onDone: (data: JsonRecord | null, error?: string) => void
   ): void {
-      const status = response.statusCode;
-      const raw = String(response.body || '');
-      if (this.debugLogging) {
-        print(`[SpecsApi] ${status} ${request.url}`);
-      }
-      if (status < 200 || status >= 300) {
-        let message = `HTTP ${status}`;
-        try {
-          const parsed = JSON.parse(raw) as JsonRecord;
-          if (parsed.error) message = String(parsed.error);
-        } catch {
-          // keep status message
-        }
-        onDone(null, message);
-        return;
-      }
-
-      if (!raw) {
-        onDone({});
-        return;
-      }
-
+    const status = response.statusCode;
+    const raw = String(response.body || '');
+    if (this.debugLogging) {
+      print(`[SpecsApi] ${status} ${request.url}`);
+    }
+    if (status < 200 || status >= 300) {
+      let message = `HTTP ${status}`;
       try {
-        onDone(JSON.parse(raw) as JsonRecord);
+        const parsed = JSON.parse(raw) as JsonRecord;
+        if (parsed.error) message = String(parsed.error);
       } catch {
-        onDone(null, 'Invalid JSON response');
+        // keep status message
       }
+      onDone(null, message);
+      return;
+    }
+
+    if (!raw) {
+      onDone({});
+      return;
+    }
+
+    try {
+      onDone(JSON.parse(raw) as JsonRecord);
+    } catch {
+      onDone(null, 'Invalid JSON response');
+    }
   }
 }
