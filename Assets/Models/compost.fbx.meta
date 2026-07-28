@@ -44,23 +44,8 @@
   Prototype: !<ObjectOwner/acda2cc7-7d4a-48f0-a0a4-7b89ea708747>
     PackagePath: ""
     objects:
-      - !<own> b7e1da8e-af42-4cc5-62d8-160b9be818db
-- !<SceneObject/869a4247-e2d5-4c87-41fc-8efb464ae0e3>
-  PrefabRemaps:
-    []
-  Name: Compost thing
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> aba3366f-89d6-4d49-6f9c-629a3b4605f2
-- !<RenderMeshVisual/aba3366f-89d6-4d49-6f9c-629a3b4605f2>
+      - !<own> 789acf74-f281-4055-762c-40f98202dd51
+- !<RenderMeshVisual/6267af5a-0092-4011-49c8-da131b1d0f6a>
   PrefabRemaps:
     []
   Name: component_0
@@ -80,7 +65,7 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/b7e1da8e-af42-4cc5-62d8-160b9be818db>
+- !<SceneObject/789acf74-f281-4055-762c-40f98202dd51>
   PrefabRemaps:
     []
   Name: compost
@@ -92,6 +77,21 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    - !<own> 869a4247-e2d5-4c87-41fc-8efb464ae0e3
+    - !<own> 7ddc319e-93d1-496e-607b-de579dbd3c90
   Components:
     []
+- !<SceneObject/7ddc319e-93d1-496e-607b-de579dbd3c90>
+  PrefabRemaps:
+    []
+  Name: Compost thing
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 6267af5a-0092-4011-49c8-da131b1d0f6a
