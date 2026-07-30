@@ -9,7 +9,7 @@
     []
   Name: BézierCurve.007
   Enabled: true
-  RenderOrder: 0
+  RenderOrder: 1
   StretchMode: Stretch
   VerticalAlignment: Center
   HorizontalAlignment: Center
@@ -37,7 +37,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> fdca29bc-14fd-403c-95e6-a2ec6e3846a1
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
   Mesh: !<reference> bf38b7b4-0944-4142-8a79-44de0065143c
   Skin: !<reference> d7e3ef91-863f-40c0-9990-efc710646b02
   BlendShapesEnabled: true
@@ -200,7 +200,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 6c5f1309-41a3-4403-bb87-8517bfde80b4
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
   Mesh: !<reference> 26144497-fade-429a-a808-53eb39b984f0
   Skin: !<reference> d7e3ef91-863f-40c0-9990-efc710646b02
   BlendShapesEnabled: true
@@ -303,6 +303,60 @@
     []
   Components:
     []
+- !<ScriptComponent/81f01e5b-60d1-4f18-8bae-ea3cac06637f>
+  PrefabRemaps:
+    []
+  Name: FriendGrab
+  Enabled: true
+  ScriptAsset: !<reference> e062addd-fd4b-4ff9-8ca0-7ba90a2eb46c
+  ScriptInputsDefault:
+    debugLogging: true
+    colliderSize: true
+    grabSoundVolume: true
+    releaseSoundVolume: true
+    enableGrabSounds: true
+    enableSpeechBubble: true
+    enableTts: true
+    grabBubbleText: true
+    releaseBubbleText: true
+    speechBubbleHideDelaySec: true
+    bubbleScaleCompensation: true
+    bubbleForwardOffset: true
+    enableLookAt: true
+    lookAtTurnSpeed: true
+    enableIdleBob: true
+    idleBobAmplitudeCm: true
+    idleBobSpeed: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      debugLogging: false
+      colliderSize: !<Vec3> {x: 1.500000, y: 2.200000, z: 1.500000}
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
+      grabSoundVolume: 0.850000
+      releaseSoundVolume: 0.800000
+      enableGrabSounds: true
+      enableSpeechBubble: true
+      enableTts: true
+      agentTts: !<MappingBased.AssignableType> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      grabBubbleText: Whee!
+      releaseBubbleText: Thanks!
+      speechBubbleHideDelaySec: !<float> 4.000000
+      bubbleScaleCompensation: !<float> 3.000000
+      bubbleHeightOffset: !<float> 5.000000
+      bubbleForwardOffset: 0.150000
+      enableLookAt: true
+      lookAtDistanceMeters: 0.200000
+      lookAtExitPaddingMeters: 0.050000
+      lookAtTurnSpeed: !<float> 6.000000
+      enableIdleBob: true
+      idleBobAmplitudeCm: 1.500000
+      idleBobSpeed: 1.800000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/88f8ddc6-8c0c-4df3-8793-44ffb8ddd2a6>
   PrefabRemaps:
     []
@@ -317,7 +371,7 @@
   Children:
     - !<own> f6824eac-48a6-4784-bcfe-f2204d1c788d
   Components:
-    []
+    - !<own> f9d6a98d-983d-42fe-aaad-51a7bdd320ee
 - !<SceneObject/8cc55e61-6c12-4f8a-bdec-c788efc5bf50>
   PrefabRemaps:
     []
@@ -426,7 +480,7 @@
       Offset: 0.000000
       Reversed: false
       Disabled: false
-      BlendMode: Default
+      BlendMode: Additive
       ScaleMode: Multiply
       PlaybackMode: Loop
 - !<RenderMeshVisual/a5a99346-39c7-46a1-b4c6-d0b0a1abc1db>
@@ -442,7 +496,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 6c5f1309-41a3-4403-bb87-8517bfde80b4
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
   Mesh: !<reference> 08809a2f-224d-4672-96ae-368107199cb0
   Skin: !<reference> d7e3ef91-863f-40c0-9990-efc710646b02
   BlendShapesEnabled: true
@@ -492,7 +546,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> fdca29bc-14fd-403c-95e6-a2ec6e3846a1
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
   Mesh: !<reference> 7501a91c-7692-4055-8d0b-8e91e178f340
   Skin: !<reference> d7e3ef91-863f-40c0-9990-efc710646b02
   BlendShapesEnabled: true
@@ -606,6 +660,45 @@
     - !<own> 4802fbea-8bff-4e5c-b03e-2732dfd4eb61
   Components:
     []
+- !<ScriptComponent/f9d6a98d-983d-42fe-aaad-51a7bdd320ee>
+  PrefabRemaps:
+    []
+  Name: 2ChainController
+  Enabled: true
+  ScriptAsset: !<reference> cbdd63a9-bfb6-4125-88b2-fd616b8f7083
+  ScriptInputsDefault:
+    type: true
+    timeSpeed: true
+    isRelative: true
+    relativeTo: true
+    useCollider: true
+    collider: true
+    colliderForce: true
+    sizeMutiplier: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      joints: !<reference.SceneObject[]>
+        - !<reference> 4802fbea-8bff-4e5c-b03e-2732dfd4eb61
+        - !<reference> f6824eac-48a6-4784-bcfe-f2204d1c788d
+        - !<reference> 88f8ddc6-8c0c-4df3-8793-44ffb8ddd2a6
+      anchorCount: 2
+      stiffness: 0.510000
+      type: 0
+      iterations: 7
+      timeSpeed: !<float> 1.000000
+      force: !<Vec3> {x: 0.000000, y: 0.040000, z: 0.000000}
+      isRelative: false
+      relativeTo: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      addRotation: true
+      useCollider: false
+      collider: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      colliderForce: !<float> 0.000000
+      sizeMutiplier: !<float> 6.000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/fe380c20-2825-4760-986d-dc5b1a31a186>
   PrefabRemaps:
     - 14c57fd0-e123-42bb-8617-5953bce46167: 14c57fd0-e123-42bb-79e8-a6ac431b9e98
@@ -626,6 +719,7 @@
     - 59e1592c-0271-47a4-8509-4e84d7338a28: 59e1592c-0271-47a4-7af6-b17b28cc75d7
     - 5f212d94-02e3-4c85-86cc-95a66dde62f4: 5f212d94-02e3-4c85-7933-6a5992219d0b
     - 70801643-b2b2-4ca5-b3cd-edd9c31924bf: 70801643-b2b2-4ca5-4c32-12263ce6db40
+    - 81f01e5b-60d1-4f18-8bae-ea3cac06637f: 25e3036e-132f-4dd5-8fe2-08fa69237615
     - 88f8ddc6-8c0c-4df3-8793-44ffb8ddd2a6: 88f8ddc6-8c0c-4df3-786c-bb0047222d59
     - 8cc55e61-6c12-4f8a-bdec-c788efc5bf50: 8cc55e61-6c12-4f8a-4213-3877103a40af
     - 8daeb384-9969-4bfa-9cbb-014f4fd2c403: 8daeb384-9969-4bfa-6344-feb0b02d3bfc
@@ -643,6 +737,7 @@
     - ea9a49c3-2b10-43c9-91be-0daedc34ab44: ea9a49c3-2b10-43c9-6e41-f25123cb54bb
     - eacf9c2f-f87a-4b13-b14d-15018ea33728: eacf9c2f-f87a-4b13-4eb2-eafe715cc8d7
     - f6824eac-48a6-4784-bcfe-f2204d1c788d: f6824eac-48a6-4784-4301-0ddfb2e38772
+    - f9d6a98d-983d-42fe-aaad-51a7bdd320ee: 1160f6a5-e646-4b4f-b382-b815faddf82b
     - fe380c20-2825-4760-986d-dc5b1a31a186: fe380c20-2825-4760-6792-23a4e5ce5e79
   Name: friend
   Enabled: true
@@ -655,4 +750,4 @@
   Children:
     - !<own> 22023803-e2e9-48f1-a28a-03e56f251242
   Components:
-    []
+    - !<own> 81f01e5b-60d1-4f18-8bae-ea3cac06637f
