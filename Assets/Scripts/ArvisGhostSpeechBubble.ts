@@ -49,6 +49,8 @@ export class ArvisGhostSpeechBubble {
   private readonly maxCharacters: number;
   private readonly hideDelaySec: number;
   private readonly debugLogging: boolean;
+  private readonly bubbleBaseY: number;
+  private readonly bubbleBaseZ: number;
 
   private bubbleRoot: SceneObject | null = null;
   private bubbleText: Text3D | null = null;
@@ -68,6 +70,9 @@ export class ArvisGhostSpeechBubble {
       maxCharacters?: number;
       hideDelaySec?: number;
       debugLogging?: boolean;
+      /** Local Y above followRoot — raise for taller characters. */
+      bubbleBaseY?: number;
+      bubbleBaseZ?: number;
     }
   ) {
     this.followRoot = followRoot;
@@ -76,6 +81,10 @@ export class ArvisGhostSpeechBubble {
     this.maxCharacters = Math.max(40, options?.maxCharacters ?? DEFAULT_MAX_CHARACTERS);
     this.hideDelaySec = Math.max(2, options?.hideDelaySec ?? 14);
     this.debugLogging = options?.debugLogging ?? false;
+    this.bubbleBaseY =
+      typeof options?.bubbleBaseY === 'number' ? options.bubbleBaseY : BUBBLE_BASE_Y;
+    this.bubbleBaseZ =
+      typeof options?.bubbleBaseZ === 'number' ? options.bubbleBaseZ : BUBBLE_BASE_Z;
   }
 
   public showAgentChat(
@@ -140,8 +149,8 @@ export class ArvisGhostSpeechBubble {
     const worldMatrix = bodyTransform.getWorldTransform();
     const bodyWorldScale = bodyTransform.getWorldScale();
     const invWorldScaleY = 1.0 / Math.max(0.001, bodyWorldScale.y);
-    const baseY = BUBBLE_BASE_Y * Math.max(0.75, ySquash);
-    const anchorLocal = new vec3(0, baseY, BUBBLE_BASE_Z);
+    const baseY = this.bubbleBaseY * Math.max(0.75, ySquash);
+    const anchorLocal = new vec3(0, baseY, this.bubbleBaseZ);
     const anchorWorld = worldMatrix.multiplyPoint(anchorLocal);
 
     const displacementY = applyShaderDisplacement
@@ -154,7 +163,7 @@ export class ArvisGhostSpeechBubble {
       : 0;
 
     this.bubbleRoot.getTransform().setLocalPosition(
-      new vec3(0, baseY + displacementY * invWorldScaleY, BUBBLE_BASE_Z)
+      new vec3(0, baseY + displacementY * invWorldScaleY, this.bubbleBaseZ)
     );
     this.bubbleRoot.getTransform().setLocalRotation(quat.quatIdentity());
   }
@@ -212,7 +221,7 @@ export class ArvisGhostSpeechBubble {
     root.enabled = true;
     root.setParent(this.followRoot);
     root.layer = this.followRoot.layer;
-    root.getTransform().setLocalPosition(new vec3(0, BUBBLE_BASE_Y, BUBBLE_BASE_Z));
+    root.getTransform().setLocalPosition(new vec3(0, this.bubbleBaseY, this.bubbleBaseZ));
     root.getTransform().setLocalRotation(quat.quatIdentity());
     root.getTransform().setLocalScale(new vec3(inv, inv, inv));
 
