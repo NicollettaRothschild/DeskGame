@@ -875,12 +875,12 @@
   PrefabRemaps:
     []
   Name: Dirt
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Position: {x: 0.000000, y: 0.000003, z: -0.000001}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    Scale: {x: 0.800000, y: 0.800000, z: 0.800000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -1213,7 +1213,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> fdca29bc-14fd-403c-95e6-a2ec6e3846a1
+    - !<reference> afca2c2e-b0cf-4b1d-b02c-71c19b9780fd
   Mesh: !<reference> 7501a91c-7692-4055-8d0b-8e91e178f340
   Skin: !<reference> eb681460-c41a-4fda-b80e-1f5dbab9c110
   BlendShapesEnabled: true
@@ -2181,6 +2181,60 @@
   Components:
     - !<own> 89838206-d750-4766-a0df-8dc821395207
     - !<own> a3eaaca9-8f88-47d4-9b54-858218eebcfa
+- !<ScriptComponent/4a371610-22e8-4ae2-8beb-d96bbb94304e>
+  PrefabRemaps:
+    []
+  Name: FriendGrab
+  Enabled: true
+  ScriptAsset: !<reference> e062addd-fd4b-4ff9-8ca0-7ba90a2eb46c
+  ScriptInputsDefault:
+    debugLogging: true
+    colliderSize: true
+    grabSoundVolume: true
+    releaseSoundVolume: true
+    enableGrabSounds: true
+    enableSpeechBubble: true
+    enableTts: true
+    grabBubbleText: true
+    releaseBubbleText: true
+    speechBubbleHideDelaySec: true
+    bubbleScaleCompensation: true
+    bubbleForwardOffset: true
+    enableLookAt: true
+    lookAtTurnSpeed: true
+    enableIdleBob: true
+    idleBobAmplitudeCm: true
+    idleBobSpeed: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      debugLogging: false
+      colliderSize: !<Vec3> {x: 1.500000, y: 2.200000, z: 1.500000}
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
+      grabSoundVolume: 0.850000
+      releaseSoundVolume: 0.800000
+      enableGrabSounds: true
+      enableSpeechBubble: true
+      enableTts: true
+      agentTts: !<MappingBased.AssignableType> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      grabBubbleText: Whee!
+      releaseBubbleText: Thanks!
+      speechBubbleHideDelaySec: !<float> 4.000000
+      bubbleScaleCompensation: !<float> 3.000000
+      bubbleHeightOffset: !<float> 5.000000
+      bubbleForwardOffset: 0.150000
+      enableLookAt: true
+      lookAtDistanceMeters: 0.200000
+      lookAtExitPaddingMeters: 0.050000
+      lookAtTurnSpeed: !<float> 6.000000
+      enableIdleBob: true
+      idleBobAmplitudeCm: 1.500000
+      idleBobSpeed: 1.800000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/4a5b8121-c6b6-4979-b003-32917a03aecb>
   PrefabRemaps:
     []
@@ -3201,7 +3255,7 @@
   Children:
     - !<own> f42acd10-fed1-4cc7-8d6e-f86fa0dc7e23
   Components:
-    []
+    - !<own> 4a371610-22e8-4ae2-8beb-d96bbb94304e
 - !<SceneObject/7065bf7b-8d9f-458e-97ab-1b30c9c78244>
   PrefabRemaps:
     []
@@ -3271,7 +3325,7 @@
   PrefabRemaps:
     []
   Name: Text3D UserID
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 27.054745, y: 0.000000, z: -72.451370}
@@ -3454,7 +3508,6 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 91ca1f47-ffea-48f1-93e9-ff31aa5f0e13
-    - !<own> 1a045a8c-5691-4947-967b-b1cb405161bb
     - !<own> 8d61e394-5383-4a7f-ad30-0861e326d6d3
     - !<own> cefe48b2-e8aa-45f4-bf3c-34572970d599
     - !<own> ff882362-b3ec-4400-aac5-88e73f770574
@@ -3537,7 +3590,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 6c5f1309-41a3-4403-bb87-8517bfde80b4
+    - !<reference> afca2c2e-b0cf-4b1d-b02c-71c19b9780fd
   Mesh: !<reference> 26144497-fade-429a-a808-53eb39b984f0
   Skin: !<reference> eb681460-c41a-4fda-b80e-1f5dbab9c110
   BlendShapesEnabled: true
@@ -4974,7 +5027,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 9688c97c-686f-4185-86e9-7517d2c32ede
+    - !<reference> b55dd079-8e1b-4215-acf0-2248b4963232
   Mesh: !<reference> 39c3bb4c-99fb-4c09-94ee-8bc5781f1393
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -5414,7 +5467,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 6c5f1309-41a3-4403-bb87-8517bfde80b4
+    - !<reference> afca2c2e-b0cf-4b1d-b02c-71c19b9780fd
   Mesh: !<reference> 08809a2f-224d-4672-96ae-368107199cb0
   Skin: !<reference> eb681460-c41a-4fda-b80e-1f5dbab9c110
   BlendShapesEnabled: true
@@ -5677,7 +5730,7 @@
   PrefabRemaps:
     []
   Name: AIContainer
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: -10.000000, z: -80.000000}
@@ -6185,6 +6238,7 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 8652c0de-3977-4cd6-88b7-faeb2383977b
+    - !<own> 1a045a8c-5691-4947-967b-b1cb405161bb
     - !<own> c30aa91b-66f5-44f2-9247-3c4ac527b1f8
     - !<own> 2d5827d7-ef24-49d2-8140-eccb09082c5d
   Components:
@@ -6473,7 +6527,7 @@
   PrefabRemaps:
     []
   Name: Cube 1
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
@@ -6859,7 +6913,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> fdca29bc-14fd-403c-95e6-a2ec6e3846a1
+    - !<reference> afca2c2e-b0cf-4b1d-b02c-71c19b9780fd
   Mesh: !<reference> bf38b7b4-0944-4142-8a79-44de0065143c
   Skin: !<reference> eb681460-c41a-4fda-b80e-1f5dbab9c110
   BlendShapesEnabled: true
@@ -6889,7 +6943,7 @@
   PrefabRemaps:
     []
   Name: Render Mesh Visual
-  Enabled: true
+  Enabled: false
   RenderOrder: 0
   StretchMode: Stretch
   VerticalAlignment: Center
@@ -9440,7 +9494,7 @@
   PrefabRemaps:
     []
   Name: ArvisGhost
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: -7.500000, z: -79.650002}

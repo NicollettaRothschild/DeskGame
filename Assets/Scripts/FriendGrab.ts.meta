@@ -102,7 +102,7 @@
     - // @input float bubbleHeightOffset = 5
     - // @input float bubbleForwardOffset = 0.15
     - // @input bool enableLookAt = true
-    - // @input float lookAtDistanceMeters = 0.4
+    - // @input float lookAtDistanceMeters = 0.2
     - // @input float lookAtExitPaddingMeters = 0.05
     - // @input float lookAtTurnSpeed = 6
     - // @input bool enableIdleBob = true
