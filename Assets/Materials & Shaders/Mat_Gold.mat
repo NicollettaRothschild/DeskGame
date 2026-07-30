@@ -24,5 +24,5 @@
       value: 0
     Tweak_N1:
       typeIdx: 5
-      value: {x: 0.968627, y: 0.749020, z: 0.243137, w: 1.000000}
+      value: {x: 0.968627, y: 0.858824, z: 0.231373, w: 1.000000}
   Pass: !<reference> a3cb5aac-d12c-4565-bb77-52ec0b3ba1f6
