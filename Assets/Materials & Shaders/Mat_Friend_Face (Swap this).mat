@@ -6,7 +6,7 @@
   CachedProperties:
     []
   DepthWrite: true
-  DepthTest: true
+  DepthTest: false
   DepthFunction: LessEqual
   TwoSided: true
   ColorMask: {x: true, y: true, z: true, w: true}
