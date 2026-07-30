@@ -92,11 +92,15 @@ export class FriendGrab extends BaseScriptComponent {
 
   /** Distance (meters) at which Friend starts facing the user. */
   @input('float')
-  lookAtDistanceMeters: number = 2.0;
+  lookAtDistanceMeters: number = 0.2;
 
   /** Extra meters beyond lookAtDistance before look-at turns off (reduces flicker). */
   @input('float')
-  lookAtExitPaddingMeters: number = 0.25;
+  lookAtExitPaddingMeters: number = 0.05;
+
+  /** How quickly Friend turns toward the user (higher = snappier). */
+  @input('float')
+  lookAtTurnSpeed: number = 6.0;
 
   @input
   enableIdleBob: boolean = true;
@@ -121,8 +125,9 @@ export class FriendGrab extends BaseScriptComponent {
   private lookAt: LookAtComponent | null = null;
   private lookAtCamera: SceneObject | null = null;
   private lookAtActive = false;
-  private restLocalRotation: quat | null = null;
   private idleBaseLocalPos: vec3 | null = null;
+  private lookAtDistanceLogTimer = 0;
+  private lookAtLoggedSetup = false;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -581,18 +586,11 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private ensureLookAt(): void {
-    if (!this.enableLookAt) {
-      this.setLookAtActive(false);
-      return;
-    }
-
     if (isNull(this.lookAtCamera)) {
       this.lookAtCamera = this.findCameraObject();
     }
     if (isNull(this.lookAtCamera)) {
-      if (this.debugLogging) {
-        print('[FriendGrab] look-at skipped: Camera not found');
-      }
+      print('[FriendGrab] look-at skipped: Camera Object not found');
       return;
     }
 
@@ -604,13 +602,12 @@ export class FriendGrab extends BaseScriptComponent {
 
     lookAt.target = this.lookAtCamera;
     lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
-    // Friend meshes typically face -Z (Lens forward).
-    lookAt.aimVectors = LookAtComponent.AimVectors.NegativeZAimYUp;
+    // Confirmed correct for Friend mesh (+Z toward viewer).
+    lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
     lookAt.worldUpVector = LookAtComponent.WorldUpVector.SceneY;
     lookAt.enabled = false;
 
     this.lookAt = lookAt;
-    this.restLocalRotation = anchor.getTransform().getLocalRotation();
   }
 
   private updateProximityLookAt(): void {
@@ -626,67 +623,118 @@ export class FriendGrab extends BaseScriptComponent {
       }
     }
 
-    // Don't fight grab translation / hand pose while held.
-    if (this.moveActive) {
-      this.setLookAtActive(false);
-      return;
-    }
+    // Always keep component config correct; never leave it enabled by accident.
+    this.lookAt.target = this.lookAtCamera;
+    this.lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
 
     const friendPos = this.getSceneObject().getTransform().getWorldPosition();
     const cameraPos = this.lookAtCamera.getTransform().getWorldPosition();
-    const distanceCm = friendPos.distance(cameraPos);
-    const enterCm = Math.max(1, this.lookAtDistanceMeters) * 100;
-    const exitCm = enterCm + Math.max(0, this.lookAtExitPaddingMeters) * 100;
+    const dx = cameraPos.x - friendPos.x;
+    const dz = cameraPos.z - friendPos.z;
+    const distanceCm = Math.sqrt(dx * dx + dz * dz);
+
+    const enterCm = Math.max(0.05, this.lookAtDistanceMeters) * 100.0;
+    const exitCm = enterCm + Math.max(0, this.lookAtExitPaddingMeters) * 100.0;
+
+    if (!this.lookAtLoggedSetup) {
+      this.lookAtLoggedSetup = true;
+      print(
+        `[FriendGrab] look-at setup dist=${distanceCm.toFixed(1)}cm threshold=${enterCm.toFixed(0)}cm camera=${this.lookAtCamera.name}`
+      );
+    }
+
+    this.lookAtDistanceLogTimer += getDeltaTime();
+    if (this.debugLogging && this.lookAtDistanceLogTimer >= 1.5) {
+      this.lookAtDistanceLogTimer = 0;
+      print(
+        `[FriendGrab] look-at dist=${distanceCm.toFixed(1)}cm active=${this.lookAtActive} (on<=${enterCm.toFixed(0)} off>${exitCm.toFixed(0)})`
+      );
+    }
 
     if (this.lookAtActive) {
       if (distanceCm > exitCm) {
         this.setLookAtActive(false);
+      } else {
+        // Re-assert enabled every frame while in range.
+        this.lookAt.enabled = true;
       }
     } else if (distanceCm <= enterCm) {
       this.setLookAtActive(true);
+    } else {
+      this.lookAt.enabled = false;
     }
   }
 
   private setLookAtActive(active: boolean): void {
     if (this.lookAtActive === active) {
-      if (!active && !isNull(this.lookAt)) {
-        this.lookAt.enabled = false;
+      if (!isNull(this.lookAt)) {
+        this.lookAt.enabled = active;
       }
       return;
     }
 
     this.lookAtActive = active;
-    const anchor = this.getSceneObject();
 
     if (active) {
-      if (isNull(this.restLocalRotation)) {
-        this.restLocalRotation = anchor.getTransform().getLocalRotation();
-      }
       if (!isNull(this.lookAt)) {
         this.lookAt.enabled = true;
       }
-      if (this.debugLogging) {
-        print('[FriendGrab] look-at on');
-      }
+      print('[FriendGrab] look-at ON');
       return;
     }
 
+    // Freeze at the last facing — do not snap back to the original pose.
     if (!isNull(this.lookAt)) {
       this.lookAt.enabled = false;
     }
-    if (!isNull(this.restLocalRotation)) {
-      anchor.getTransform().setLocalRotation(this.restLocalRotation);
-    }
-    if (this.debugLogging) {
-      print('[FriendGrab] look-at off');
-    }
+    print('[FriendGrab] look-at OFF');
   }
 
   private findCameraObject(): SceneObject | null {
+    const preferredNames = ['Camera Object', 'Camera', 'Device Camera'];
+    for (let i = 0; i < preferredNames.length; i++) {
+      const found = this.findObjectByNameInScene(preferredNames[i]);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return this.findObjectWithCameraComponent();
+  }
+
+  private findObjectByNameInScene(name: string): SceneObject | null {
     const count = global.scene.getRootObjectsCount();
     for (let i = 0; i < count; i++) {
       const root = global.scene.getRootObject(i);
-      const found = this.findObjectByName(root, 'Camera');
+      const found = this.findObjectByName(root, name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findObjectWithCameraComponent(): SceneObject | null {
+    const count = global.scene.getRootObjectsCount();
+    for (let i = 0; i < count; i++) {
+      const root = global.scene.getRootObject(i);
+      const found = this.findCameraComponentRecursive(root);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findCameraComponentRecursive(node: SceneObject): SceneObject | null {
+    if (isNull(node)) {
+      return null;
+    }
+    const cam = node.getComponent('Component.Camera') as Camera;
+    if (!isNull(cam)) {
+      return node;
+    }
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      const found = this.findCameraComponentRecursive(node.getChild(i));
       if (!isNull(found)) {
         return found;
       }

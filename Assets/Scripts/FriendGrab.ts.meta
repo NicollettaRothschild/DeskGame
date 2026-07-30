@@ -44,6 +44,7 @@
     idleBobSpeed: false
     lookAtDistanceMeters: false
     lookAtExitPaddingMeters: false
+    lookAtTurnSpeed: false
     releaseBubbleText: false
     releaseSoundTrack: false
     releaseSoundVolume: false
@@ -76,6 +77,7 @@
       enableLookAt: true
       lookAtDistanceMeters: !<float> 2.000000
       lookAtExitPaddingMeters: 0.250000
+      lookAtTurnSpeed: !<float> 6.000000
       enableIdleBob: true
       idleBobAmplitudeCm: 1.500000
       idleBobSpeed: 1.800000
@@ -100,8 +102,9 @@
     - // @input float bubbleHeightOffset = 5
     - // @input float bubbleForwardOffset = 0.15
     - // @input bool enableLookAt = true
-    - // @input float lookAtDistanceMeters = 2
-    - // @input float lookAtExitPaddingMeters = 0.25
+    - // @input float lookAtDistanceMeters = 0.4
+    - // @input float lookAtExitPaddingMeters = 0.05
+    - // @input float lookAtTurnSpeed = 6
     - // @input bool enableIdleBob = true
     - // @input float idleBobAmplitudeCm = 1.5
     - // @input float idleBobSpeed = 1.8
