@@ -24,7 +24,6 @@
     type: true
     timeSpeed: true
     isRelative: true
-    relativeTo: true
     useCollider: true
     collider: true
     colliderForce: true
@@ -44,7 +43,7 @@
       timeSpeed: !<float> 1.000000
       force: !<Vec3> {x: 0.000000, y: 0.040000, z: 0.000000}
       isRelative: false
-      relativeTo: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      relativeTo: !<reference.SceneObject> 2e530456-53b6-4b4f-7756-46c4e5754bde
       addRotation: true
       useCollider: false
       collider: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
@@ -106,6 +105,7 @@
     HasSegmentScaleCompensation: false
   Children:
     - !<own> 43ae6792-5d23-4557-6189-8e45d160ba31
+    - !<own> 1e12c054-b07b-4c60-7131-3d3326b39684
   Components:
     []
 - !<SceneObject/1d8237fb-6fad-4744-4f2f-79d767265095>
@@ -145,8 +145,8 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: -90.000000, y: 0.000000, z: 0.000000}
+    Position: {x: 0.121150, y: -1.583560, z: 1.675869}
+    Rotation: {x: -153.064606, y: 12.130720, z: 6.929450}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
@@ -463,7 +463,6 @@
     - !<own> 9e2926d4-7dd6-4a64-4904-4bbdf9584c18
     - !<own> dbed4862-ae23-4cb4-7d4b-135939d9ffd7
     - !<own> 2e530456-53b6-4b4f-7756-46c4e5754bde
-    - !<own> 1e12c054-b07b-4c60-7131-3d3326b39684
   Components:
     []
 - !<RenderMeshVisual/9dbaeda7-9cd0-4f73-4efa-443e6153137b>
@@ -516,6 +515,44 @@
     []
   Components:
     - !<own> 18352407-bdb7-48a4-6424-416667310fe7
+- !<ScriptComponent/9fc78cd5-567a-4f0c-af55-36e9964fd828>
+  PrefabRemaps:
+    []
+  Name: 2ChainController
+  Enabled: true
+  ScriptAsset: !<reference> cbdd63a9-bfb6-4125-88b2-fd616b8f7083
+  ScriptInputsDefault:
+    type: true
+    timeSpeed: true
+    isRelative: true
+    useCollider: true
+    collider: true
+    colliderForce: true
+    sizeMutiplier: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      joints: !<reference.SceneObject[]>
+        - !<reference> 43ae6792-5d23-4557-6189-8e45d160ba31
+        - !<reference> 1ce593bd-049b-4062-5192-770aada9ae6a
+        - !<reference> c0bcf962-7b83-43ce-6dd8-270015e35c91
+      anchorCount: 2
+      stiffness: 0.510000
+      type: 0
+      iterations: 7
+      timeSpeed: !<float> 1.000000
+      force: !<Vec3> {x: 0.000000, y: 0.040000, z: 0.000000}
+      isRelative: false
+      relativeTo: !<reference.SceneObject> 2e530456-53b6-4b4f-7756-46c4e5754bde
+      addRotation: true
+      useCollider: false
+      collider: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      colliderForce: !<float> 0.000000
+      sizeMutiplier: !<float> 6.000000
+  ScriptTypes:
+    "":
+      {}
 - !<AnimationPlayer/a0eb07d1-829e-40cc-55da-089f321530b0>
   PrefabRemaps:
     []
@@ -586,7 +623,7 @@
   Children:
     - !<own> 1ce593bd-049b-4062-5192-770aada9ae6a
   Components:
-    []
+    - !<own> 9fc78cd5-567a-4f0c-af55-36e9964fd828
 - !<RenderMeshVisual/cabbc189-6026-4113-6a19-f8fcfda91ea6>
   PrefabRemaps:
     []
