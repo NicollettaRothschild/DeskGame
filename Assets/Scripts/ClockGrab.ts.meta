@@ -26,7 +26,13 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    {}
+    colliderSize: false
+    debugLogging: false
+    enableGrabSounds: false
+    grabSoundTrack: false
+    grabSoundVolume: false
+    releaseSoundTrack: false
+    releaseSoundVolume: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -36,10 +42,21 @@
   Attachments:
     []
   DefaultScriptInputs:
-    -
-      {}
+    - debugLogging: false
+      colliderSize: !<Vec3> {x: 80.000000, y: 80.000000, z: 30.000000}
+      grabSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      releaseSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      grabSoundVolume: 0.850000
+      releaseSoundVolume: 0.800000
+      enableGrabSounds: true
   ScriptTypes:
     -
       {}
   InputLines:
-    []
+    - // @input bool debugLogging
+    - "// @input vec3 colliderSize = {80,80,30}"
+    - // @input Asset.AudioTrackAsset grabSoundTrack
+    - // @input Asset.AudioTrackAsset releaseSoundTrack
+    - // @input float grabSoundVolume = 0.85
+    - // @input float releaseSoundVolume = 0.8
+    - // @input bool enableGrabSounds = true
