@@ -627,29 +627,13 @@
     {}
 - !<SceneObject/0c384a6b-e0e5-473f-9eeb-b74a88ed647f>
   PrefabRemaps:
-    - 0c384a6b-e0e5-473f-9eeb-b74a88ed647f: 4766887d-5ca5-4109-7684-4b530d476b08
-    - 3039ae7f-6980-49a3-9496-e708b51b29ae: 6ce9ca28-f106-4f5a-7b63-7e9708374dc9
-    - 30cd3b83-076b-40d0-9731-0b1944d42a9b: 90fd5a57-d662-4ae1-629e-68ab1db646b9
-    - 4301437e-1983-4cf6-9781-91a2e5843904: 32bb6dfc-a87e-4e9a-6d70-e6d699e1919b
-    - 43a713de-f042-4689-a095-c74050fe9b5c: 2221378a-87a4-4285-71d6-0fa48fe7059e
-    - 4a691b33-8429-4a01-91ef-c672e62b3b5e: cbebcead-4330-4eee-62ec-4de8eecf1f4c
-    - 7ef42083-20d6-457c-9a29-6fe47e67a0b9: 96e33a5c-93b9-484f-6ec4-0bfc128045e2
-    - 86abffa7-bc9d-457b-a351-8ca84c5bec91: 3303dc65-e477-40ee-5c1d-73dcab15db39
-    - 86d97d30-7f75-43ed-8a28-bf9002a8fe7d: 42083c7e-4404-41f8-59e4-7fbb206d70eb
-    - 8bb89aa1-0cf6-48b1-a103-1d1b40ec0a92: ad407634-ad20-4e44-4030-1e287d997280
-    - c6facf1b-2a03-4628-ba90-24dd93214965: 625d0446-8a61-40c8-5370-71745821092c
-    - ca12c8e4-cc78-4d09-8b4d-87f9eb1fa61e: 0f1a7258-2a34-4e94-408c-2e7979905480
-    - ca351792-175f-4752-bfc3-c26c49957795: 278af8a5-a9ae-43ec-79e1-abb2051fa719
-    - d9bf518a-6830-46b8-80b1-293e9935735e: dde7b24a-b842-4075-6d4d-2272be94a421
-    - f5260957-8860-4aa6-a689-e397031fef91: e4431cde-21b9-4997-4915-ce8de70affa1
-    - fd0a732e-9433-4662-b855-647e6194b4d5: 3763cda1-ca36-4cc5-5431-c28e8a043f26
-    - fd21fb79-718a-4946-a635-794ceae11c78: 6030954b-a2fb-4914-44c4-8555c721d7f6
+    []
   Name: Clock
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -76.379738}
-    Rotation: {x: -90.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: 180.000000, z: 0.000000}
     Scale: {x: 0.100000, y: 0.100000, z: 0.100000}
     HasSegmentScaleCompensation: false
   Children:
@@ -1723,7 +1707,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> a29147aa-3a5a-48e2-a4d3-3c9d69ee3fc3
+    - !<reference> f9e7bc40-8481-4b64-956c-b3170607a736
   Mesh: !<reference> edb8734f-6ee6-4463-ad9c-941c953bd23f
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -2032,7 +2016,7 @@
     []
   Name: BézierCurve.007
   Enabled: true
-  RenderOrder: 0
+  RenderOrder: 1
   StretchMode: Stretch
   VerticalAlignment: Center
   HorizontalAlignment: Center
@@ -2210,7 +2194,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> a29147aa-3a5a-48e2-a4d3-3c9d69ee3fc3
+    - !<reference> f9e7bc40-8481-4b64-956c-b3170607a736
   Mesh: !<reference> a581c1ba-b7e8-4b65-b301-13a1f12862ca
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -2499,7 +2483,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> a29147aa-3a5a-48e2-a4d3-3c9d69ee3fc3
+    - !<reference> f9e7bc40-8481-4b64-956c-b3170607a736
   Mesh: !<reference> 1c4c0c30-f98f-4ce5-8622-73adc00dc576
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -7145,7 +7129,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> a29147aa-3a5a-48e2-a4d3-3c9d69ee3fc3
+    - !<reference> f9e7bc40-8481-4b64-956c-b3170607a736
   Mesh: !<reference> d3a081b2-2e7d-49e4-85d2-adde8cbbc472
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -7286,7 +7270,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> a29147aa-3a5a-48e2-a4d3-3c9d69ee3fc3
+    - !<reference> f9e7bc40-8481-4b64-956c-b3170607a736
   Mesh: !<reference> 596078c3-3def-4eca-a786-30cd22230994
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -8526,7 +8510,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> a29147aa-3a5a-48e2-a4d3-3c9d69ee3fc3
+    - !<reference> f9e7bc40-8481-4b64-956c-b3170607a736
   Mesh: !<reference> 13dcb4a2-c5f2-47ba-9f36-71d93642efcd
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -10036,7 +10020,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> a29147aa-3a5a-48e2-a4d3-3c9d69ee3fc3
+    - !<reference> f9e7bc40-8481-4b64-956c-b3170607a736
   Mesh: !<reference> 5d9a6543-05da-450c-bc16-38bdc57f4ac2
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -10342,7 +10326,7 @@
   PrefabRemaps:
     []
   Name: Glass
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 2.613519, z: 0.000000}
