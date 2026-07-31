@@ -55,7 +55,7 @@
     -
       {}
   InputLines:
-    - // @input bool runHarness = true
+    - // @input bool runHarness
     - // @input float startupDelaySec = 2
     - // @input bool runOnce = true
     - '// @input string goalText = "I want to walk 20 meters"'

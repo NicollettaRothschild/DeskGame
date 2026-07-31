@@ -356,6 +356,33 @@
     enableGrabSounds: true
     enableSpeechBubble: true
     enableTts: true
+    enableOnboarding: true
+    treatAsNewUser: true
+    onboardingStartDelaySec: true
+    onboardingGapSec: true
+    onboardingPracticeTimeoutSec: true
+    onboardingRequirePractice: true
+    onboardingPresentDistanceCm: true
+    onboardingPresentHeightCm: true
+    onboardingWelcomeLine: true
+    onboardingClosingLine: true
+    onboardingGlobe: true
+    onboardingGlobeLine: true
+    onboardingClock: true
+    onboardingClockLine: true
+    onboardingPalette: true
+    onboardingPaletteLine: true
+    onboardingPlanter: true
+    onboardingPlanterLine: true
+    onboardingPostIt: true
+    onboardingPostItLine: true
+    onboardingTrash: true
+    onboardingTrashLine: true
+    onboardingGoalPromptLine: true
+    onboardingGoalSeedLine: true
+    onboardingGoalListenTimeoutSec: true
+    onboardingGoalFallback: true
+    onboardingRequireGoalPotPractice: true
     grabSpeechTrack: true
     releaseSpeechTrack: true
     grabBubbleText: true
@@ -368,6 +395,14 @@
     enableIdleBob: true
     idleBobAmplitudeCm: true
     idleBobSpeed: true
+    goalCongratsLine: true
+    enableFollowAfterOnboarding: true
+    followDistanceCm: true
+    followSideOffsetCm: true
+    followHeightOffsetCm: true
+    followLerpSpeed: true
+    followMinMoveCm: true
+    workspaceResetLine: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -381,6 +416,33 @@
       enableGrabSounds: true
       enableSpeechBubble: true
       enableTts: true
+      enableOnboarding: false
+      treatAsNewUser: false
+      onboardingStartDelaySec: 2.500000
+      onboardingGapSec: 0.500000
+      onboardingPracticeTimeoutSec: !<float> 14.000000
+      onboardingRequirePractice: true
+      onboardingPresentDistanceCm: !<float> 22.000000
+      onboardingPresentHeightCm: !<float> 0.000000
+      onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
+      onboardingClosingLine: "You're all set! Say hey Arvis if you need help. Have fun!"
+      onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
+      onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
+      onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
+      onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
+      onboardingPostIt: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
+      onboardingTrash: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingTrashLine: "Here's the trash. Drop things into it to clean up."
+      onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
+      onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
+      onboardingGoalListenTimeoutSec: !<float> 22.000000
+      onboardingGoalFallback: I want to run one kilometer
+      onboardingRequireGoalPotPractice: true
       agentTts: !<MappingBased.AssignableType> a1b2c3d4-e5f6-7890-abcd-ef1234567892
       grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       releaseSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -397,6 +459,14 @@
       enableIdleBob: true
       idleBobAmplitudeCm: 1.500000
       idleBobSpeed: 1.800000
+      goalCongratsLine: "Woohoo! You did it! I'm so proud of you — your plant is fully grown!"
+      enableFollowAfterOnboarding: true
+      followDistanceCm: !<float> 55.000000
+      followSideOffsetCm: !<float> 18.000000
+      followHeightOffsetCm: !<float> -25.000000
+      followLerpSpeed: 3.500000
+      followMinMoveCm: !<float> 4.000000
+      workspaceResetLine: "Got it — let's set this space up again. I'll clear the anchors and walk you through onboarding."
   ScriptTypes:
     "":
       {}

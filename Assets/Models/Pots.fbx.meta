@@ -46,7 +46,54 @@
       mesh: None Compression
     Overrides:
       {}
-- !<RenderMeshVisual/2fd6f30f-91e5-4cee-6c49-58b663b49c83>
+- !<SceneObject/04a58b77-8d1e-46fd-6fe7-218117e298f7>
+  PrefabRemaps:
+    []
+  Name: Pots
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> ecc5473d-250a-420c-4e89-8e6638154a77
+    - !<own> a2b16ab6-dac8-4b2b-48fc-648f16b4d57f
+    - !<own> 5190c47a-02c6-4c26-4869-42afae6ffbe7
+  Components:
+    []
+- !<SceneObject/5190c47a-02c6-4c26-4869-42afae6ffbe7>
+  PrefabRemaps:
+    []
+  Name: Pot3
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 100.000000, z: 1788.196533}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> b2f9141d-18bf-421a-59ff-3862c4a45405
+- !<SceneObject/a2b16ab6-dac8-4b2b-48fc-648f16b4d57f>
+  PrefabRemaps:
+    []
+  Name: Pot2
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 1155.406738}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> cd465c16-f525-4653-42c7-47ebe3b922ba
+- !<RenderMeshVisual/b2f9141d-18bf-421a-59ff-3862c4a45405>
   PrefabRemaps:
     []
   Name: component_2
@@ -66,7 +113,7 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<RenderMeshVisual/377b43dc-4e87-42cb-6aed-cd8f5c9e2e0b>
+- !<RenderMeshVisual/cd465c16-f525-4653-42c7-47ebe3b922ba>
   PrefabRemaps:
     []
   Name: component_1
@@ -86,7 +133,12 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<RenderMeshVisual/444d565b-8f3e-4694-6165-fd47cba4378b>
+- !<ObjectPrefabAssetData/cda0e48b-9e2d-4d4a-a988-e85889bc4806>
+  Prototype: !<ObjectOwner/c308225f-e743-4c32-940b-ad52fcf81822>
+    PackagePath: ""
+    objects:
+      - !<own> 04a58b77-8d1e-46fd-6fe7-218117e298f7
+- !<RenderMeshVisual/e1348840-c7c0-482d-43fe-469aa47c8136>
   PrefabRemaps:
     []
   Name: component_0
@@ -106,7 +158,7 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/74cf6c52-7e32-43dd-7684-344fbd79b120>
+- !<SceneObject/ecc5473d-250a-420c-4e89-8e6638154a77>
   PrefabRemaps:
     []
   Name: Pot1
@@ -120,56 +172,4 @@
   Children:
     []
   Components:
-    - !<own> 444d565b-8f3e-4694-6165-fd47cba4378b
-- !<ObjectPrefabAssetData/cda0e48b-9e2d-4d4a-a988-e85889bc4806>
-  Prototype: !<ObjectOwner/c308225f-e743-4c32-940b-ad52fcf81822>
-    PackagePath: ""
-    objects:
-      - !<own> ce0b9f13-c0c4-43c6-6d33-c3520c3fed21
-- !<SceneObject/ce0b9f13-c0c4-43c6-6d33-c3520c3fed21>
-  PrefabRemaps:
-    []
-  Name: Pots
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> 74cf6c52-7e32-43dd-7684-344fbd79b120
-    - !<own> f8b9abcd-5df0-4d3e-7702-25f863c45e26
-    - !<own> daf4c024-297f-412f-6f80-40b8651467dd
-  Components:
-    []
-- !<SceneObject/daf4c024-297f-412f-6f80-40b8651467dd>
-  PrefabRemaps:
-    []
-  Name: Pot3
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 100.000000, z: 1788.196533}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 2fd6f30f-91e5-4cee-6c49-58b663b49c83
-- !<SceneObject/f8b9abcd-5df0-4d3e-7702-25f863c45e26>
-  PrefabRemaps:
-    []
-  Name: Pot2
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 1155.406738}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 377b43dc-4e87-42cb-6aed-cd8f5c9e2e0b
+    - !<own> e1348840-c7c0-482d-43fe-469aa47c8136
