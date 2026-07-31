@@ -353,11 +353,13 @@ export class FriendGrab extends BaseScriptComponent {
   private speechBubble: ArvisGhostSpeechBubble | null = null;
   private lookAt: LookAtComponent | null = null;
   private lookAtCamera: SceneObject | null = null;
+  private lookAtTargetProxy: SceneObject | null = null;
   private lookAtActive = false;
   private idleBaseLocalPos: vec3 | null = null;
   private lookAtDistanceLogTimer = 0;
   private lookAtLoggedSetup = false;
   private lastLookAtInvalidTargetLogAt = -9999;
+  private nextLookAtRetryAt = 0;
   private onboardingActive = false;
   private onboardingToken = 0;
   private onboardingPracticeDone = false;
@@ -2181,12 +2183,16 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private ensureLookAt(): void {
-    this.lookAtCamera = this.findCameraObject();
-    if (!this.isValidSceneObject(this.lookAtCamera)) {
-      this.lookAtCamera = null;
-      print('[FriendGrab] look-at skipped: Camera Object not found');
+    const now = getTime();
+    if (now < this.nextLookAtRetryAt) {
       return;
     }
+    const targetProxy = this.ensureLookAtTargetProxy();
+    if (isNull(targetProxy)) {
+      this.nextLookAtRetryAt = now + 1.0;
+      return;
+    }
+    this.refreshLookAtTargetProxyPosition();
 
     const anchor = this.getSceneObject();
     let lookAt = anchor.getComponent('Component.LookAtComponent') as LookAtComponent;
@@ -2195,16 +2201,16 @@ export class FriendGrab extends BaseScriptComponent {
     }
 
     try {
-      lookAt.target = this.lookAtCamera as SceneObject;
+      lookAt.target = targetProxy as SceneObject;
     } catch (e) {
-      const now = getTime();
-      if (now - this.lastLookAtInvalidTargetLogAt > 1.5) {
+      if (now - this.lastLookAtInvalidTargetLogAt > 3.0) {
         this.lastLookAtInvalidTargetLogAt = now;
         print('[FriendGrab] look-at skipped: invalid camera target: ' + e);
       }
-      this.lookAtCamera = null;
+      this.nextLookAtRetryAt = now + 1.5;
       return;
     }
+    this.nextLookAtRetryAt = 0;
     lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
     // Confirmed correct for Friend mesh (+Z toward viewer).
     lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
@@ -2220,25 +2226,25 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
 
-    if (isNull(this.lookAt) || isNull(this.lookAtCamera)) {
+    if (isNull(this.lookAt) || isNull(this.lookAtTargetProxy)) {
       this.ensureLookAt();
-      if (isNull(this.lookAt) || isNull(this.lookAtCamera)) {
+      if (isNull(this.lookAt) || isNull(this.lookAtTargetProxy)) {
         return;
       }
     }
-    if (!this.isValidSceneObject(this.lookAtCamera)) {
-      this.lookAtCamera = null;
-      this.lookAt.enabled = false;
-      return;
-    }
+    this.refreshLookAtTargetProxyPosition();
 
     // Always keep component config correct; never leave it enabled by accident.
     try {
-      this.lookAt.target = this.lookAtCamera;
+      this.lookAt.target = this.lookAtTargetProxy as SceneObject;
     } catch (e) {
-      print('[FriendGrab] look-at target refresh failed: ' + e);
-      this.lookAtCamera = null;
+      const now = getTime();
+      if (now - this.lastLookAtInvalidTargetLogAt > 3.0) {
+        this.lastLookAtInvalidTargetLogAt = now;
+        print('[FriendGrab] look-at target refresh failed: ' + e);
+      }
       this.lookAt.enabled = false;
+      this.nextLookAtRetryAt = now + 1.5;
       return;
     }
     this.lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
@@ -2255,7 +2261,7 @@ export class FriendGrab extends BaseScriptComponent {
     }
 
     const friendPos = this.getSceneObject().getTransform().getWorldPosition();
-    const cameraPos = this.lookAtCamera.getTransform().getWorldPosition();
+    const cameraPos = (this.lookAtTargetProxy as SceneObject).getTransform().getWorldPosition();
     const dx = cameraPos.x - friendPos.x;
     const dz = cameraPos.z - friendPos.z;
     const distanceCm = Math.sqrt(dx * dx + dz * dz);
@@ -2266,7 +2272,7 @@ export class FriendGrab extends BaseScriptComponent {
     if (!this.lookAtLoggedSetup) {
       this.lookAtLoggedSetup = true;
       print(
-        `[FriendGrab] look-at setup dist=${distanceCm.toFixed(1)}cm threshold=${enterCm.toFixed(0)}cm camera=${this.lookAtCamera.name}`
+        `[FriendGrab] look-at setup dist=${distanceCm.toFixed(1)}cm threshold=${enterCm.toFixed(0)}cm camera=proxy`
       );
     }
 
@@ -2385,6 +2391,56 @@ export class FriendGrab extends BaseScriptComponent {
     } catch (_e) {
       return false;
     }
+  }
+
+  private ensureLookAtTargetProxy(): SceneObject | null {
+    if (this.isValidSceneObject(this.lookAtTargetProxy)) {
+      return this.lookAtTargetProxy as SceneObject;
+    }
+    try {
+      const proxy = global.scene.createSceneObject('FriendLookAtTarget');
+      proxy.layer = this.getSceneObject().layer;
+      const parent = this.getSceneObject().hasParent()
+        ? this.getSceneObject().getParent()
+        : null;
+      if (!isNull(parent)) {
+        proxy.setParent(parent);
+      }
+      proxy.getTransform().setWorldPosition(this.getSceneObject().getTransform().getWorldPosition());
+      this.lookAtTargetProxy = proxy;
+      return proxy;
+    } catch (_e) {
+      this.lookAtTargetProxy = null;
+      return null;
+    }
+  }
+
+  private refreshLookAtTargetProxyPosition(): void {
+    const proxy = this.ensureLookAtTargetProxy();
+    if (isNull(proxy)) {
+      return;
+    }
+    const preferred = this.findCameraObject();
+    if (this.isValidSceneObject(preferred)) {
+      this.lookAtCamera = preferred as SceneObject;
+    }
+
+    if (this.isValidSceneObject(this.lookAtCamera)) {
+      try {
+        const pos = (this.lookAtCamera as SceneObject).getTransform().getWorldPosition();
+        proxy.getTransform().setWorldPosition(pos);
+        return;
+      } catch (_e) {
+        this.lookAtCamera = null;
+      }
+    }
+
+    // Last-resort fallback: keep a stable point in front of Friend.
+    const selfTransform = this.getSceneObject().getTransform();
+    const selfPos = selfTransform.getWorldPosition();
+    const forward = selfTransform.forward;
+    const fallback = selfPos.add(new vec3(forward.x * 40, 0, forward.z * 40));
+    proxy.getTransform().setWorldPosition(fallback);
   }
 
   private findObjectByNameInScene(name: string): SceneObject | null {

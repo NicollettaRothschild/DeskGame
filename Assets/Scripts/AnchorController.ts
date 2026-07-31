@@ -385,6 +385,7 @@ export class AnchorController extends BaseScriptComponent {
 
     // Onboarding must start from a clean desk — wipe last session before restore.
     if (this.isFriendOnboardingEnabled()) {
+      this.setAIContainerBoardVisible(false);
       this.clearPreviousSessionForOnboarding();
     }
 
@@ -2609,6 +2610,7 @@ export class AnchorController extends BaseScriptComponent {
 
   private applyOnboardingCleanSession(): void {
     print('Onboarding enabled: clearing previous session plants and layout anchors');
+    this.setAIContainerBoardVisible(false);
 
     this.clearPersistedPlantStorageOnly();
 
@@ -2649,6 +2651,17 @@ export class AnchorController extends BaseScriptComponent {
     }
     this.hasRestored = false;
     this.nextPlantSpawnIndex = 0;
+  }
+
+  private setAIContainerBoardVisible(visible: boolean): void {
+    if (isNull(this.menuRoot)) {
+      return;
+    }
+    try {
+      this.menuRoot.enabled = visible;
+    } catch (_e) {
+      // Ignore stale/invalid menu roots during startup resets.
+    }
   }
 
   private destroyLoosePlantAndSeedSceneObjects(): void {

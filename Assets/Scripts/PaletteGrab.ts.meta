@@ -32,15 +32,19 @@
     colorBlobProxyRadiusCm: false
     debugLogging: false
     enableGrabSounds: false
+    enablePaletteMoveHandle: false
     enablePalettePainting: false
     grabSoundTrack: false
     grabSoundVolume: false
+    moveHandleLocalPosition: false
+    moveHandleRadiusCm: false
     paintDotScaleCm: false
     paintMaxDistanceFromPaletteCm: false
     paintRayDistanceCm: false
     paintSampleStepCm: false
     releaseSoundTrack: false
     releaseSoundVolume: false
+    useStablePaintDotMesh: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -65,6 +69,10 @@
       paintMaxDistanceFromPaletteCm: !<float> 120.000000
       colorBlobProxyRadiusCm: 2.600000
       cancelButtonRadiusCm: 3.200000
+      useStablePaintDotMesh: true
+      enablePaletteMoveHandle: true
+      moveHandleLocalPosition: !<Vec3> {x: 0.000000, y: 9.000000, z: 0.000000}
+      moveHandleRadiusCm: 4.200000
   ScriptTypes:
     -
       {}
@@ -84,3 +92,7 @@
     - '// @input float paintMaxDistanceFromPaletteCm = 120 {"hint":"Max paint distance from palette center (cm)"}'
     - // @input float colorBlobProxyRadiusCm = 2.6
     - // @input float cancelButtonRadiusCm = 3.2
+    - '// @input bool useStablePaintDotMesh = true {"hint":"Use a stable mesh for paint dots instead of color-blob meshes"}'
+    - // @input bool enablePaletteMoveHandle = true
+    - "// @input vec3 moveHandleLocalPosition = {0,9,0}"
+    - // @input float moveHandleRadiusCm = 4.2

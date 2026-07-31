@@ -97,9 +97,26 @@ export class PaletteGrab extends BaseScriptComponent {
   @input('float')
   cancelButtonRadiusCm: number = 3.2;
 
+  @input
+  @hint('Use a stable mesh for paint dots instead of color-blob meshes')
+  useStablePaintDotMesh: boolean = true;
+
+  @input
+  enablePaletteMoveHandle: boolean = true;
+
+  @input
+  moveHandleLocalPosition: vec3 = new vec3(0, 9, 0);
+
+  @input('float')
+  moveHandleRadiusCm: number = 4.2;
+
   private grabInteractable: InteractableLike | null = null;
   private grabManipulation: InteractableManipulationLike | null = null;
+  private moveHandleObject: SceneObject | null = null;
+  private moveHandleInteractable: InteractableLike | null = null;
+  private moveHandleManipulation: InteractableManipulationLike | null = null;
   private moveInteractionWired = false;
+  private moveHandleWired = false;
   private moveBindAttempts = 0;
   private moveActive = false;
   private grabAudioPlayer: AudioComponent | null = null;
@@ -108,18 +125,22 @@ export class PaletteGrab extends BaseScriptComponent {
   private paintModeActive = false;
   private selectedPaintMaterial: Material | null = null;
   private selectedPaintMesh: RenderMesh | null = null;
+  private stablePaintMesh: RenderMesh | null = null;
   private activePaintInteractor: InteractorLike | null = null;
   private lastPaintPoint: vec3 | null = null;
   private paintUpdateEvent: UpdateEvent | null = null;
   private cancelButton: SceneObject | null = null;
+  private cancelButtonFollowEvent: UpdateEvent | null = null;
   private strokeRoot: SceneObject | null = null;
   private paletteMoveEnabled = true;
+  private paintStrokeActive = false;
 
   private static readonly ANCHOR_SOURCE_NAME = 'palette';
   private static readonly COLORS_NODE_NAME = 'Colors';
   private static readonly CANCEL_BUTTON_NAME = 'PalettePaintCancel';
   private static readonly CANCEL_BUTTON_TEXT_NAME = 'CancelText';
   private static readonly STROKE_DOT_NAME = 'PalettePaintDot';
+  private static readonly MOVE_HANDLE_NAME = 'PaletteMoveHandle';
 
   private getAnchorHandler(): {
     persistGardenSourceTransform?: (sourceName: string) => void;
@@ -164,6 +185,7 @@ export class PaletteGrab extends BaseScriptComponent {
     if (!this.enablePalettePainting) {
       return;
     }
+    this.resolveStablePaintMesh();
     this.createColorBlobTouchProxies();
     this.ensureCancelPaintButton();
     this.setPaintMode(false);
@@ -236,16 +258,18 @@ export class PaletteGrab extends BaseScriptComponent {
 
   private ensureCancelPaintButton(): void {
     if (!isNull(this.cancelButton)) {
+      this.ensureCancelButtonFollowLoop();
       return;
     }
 
     const root = this.getSceneObject();
     const button = global.scene.createSceneObject(PaletteGrab.CANCEL_BUTTON_NAME);
-    button.setParent(root);
-    button.getTransform().setLocalPosition(vec3.zero());
-    button.getTransform().setLocalRotation(quat.quatIdentity());
+    const parent = root.hasParent() ? root.getParent() : root;
+    button.setParent(parent);
+    button.getTransform().setWorldPosition(root.getTransform().getWorldPosition());
+    button.getTransform().setWorldRotation(quat.quatIdentity());
     const visualRadius = Math.max(2.2, this.cancelButtonRadiusCm * 1.15);
-    button.getTransform().setLocalScale(new vec3(visualRadius, visualRadius, visualRadius));
+    button.getTransform().setWorldScale(new vec3(visualRadius, visualRadius, visualRadius));
     button.layer = root.layer;
 
     const collider = button.createComponent('Component.ColliderComponent') as ColliderComponent;
@@ -296,6 +320,7 @@ export class PaletteGrab extends BaseScriptComponent {
     text.renderOrder = 13;
 
     this.cancelButton = button;
+    this.ensureCancelButtonFollowLoop();
   }
 
   private enterPaintMode(
@@ -311,8 +336,7 @@ export class PaletteGrab extends BaseScriptComponent {
     this.setPaintMode(true);
     this.activePaintInteractor = interactor;
     this.lastPaintPoint = null;
-    this.ensurePaintUpdateLoop(true);
-    this.paintFromInteractor(interactor, true);
+    this.paintStrokeActive = false;
   }
 
   private setPaintMode(active: boolean): void {
@@ -325,7 +349,7 @@ export class PaletteGrab extends BaseScriptComponent {
 
     this.paintModeActive = active;
     this.setPaletteMoveInteractionEnabled(!active);
-    this.ensurePaintUpdateLoop(active);
+    this.ensurePaintUpdateLoop(false);
 
     if (isNull(this.cancelButton)) {
       this.ensureCancelPaintButton();
@@ -338,6 +362,7 @@ export class PaletteGrab extends BaseScriptComponent {
     if (!active) {
       this.activePaintInteractor = null;
       this.lastPaintPoint = null;
+      this.paintStrokeActive = false;
     }
 
     if (this.debugLogging) {
@@ -352,6 +377,9 @@ export class PaletteGrab extends BaseScriptComponent {
     this.paletteMoveEnabled = enabled;
     if (!isNull(this.grabManipulation)) {
       (this.grabManipulation as ScriptComponent).enabled = enabled;
+    }
+    if (!isNull(this.grabInteractable)) {
+      (this.grabInteractable as ScriptComponent).enabled = enabled;
     }
   }
 
@@ -379,6 +407,12 @@ export class PaletteGrab extends BaseScriptComponent {
     if (!this.paintModeActive || isNull(interactor)) {
       return;
     }
+    if (!force && !this.paintStrokeActive) {
+      return;
+    }
+    if (!force && typeof interactor.isActive === 'function' && !interactor.isActive()) {
+      return;
+    }
     const point = this.resolveInteractorPoint(interactor);
     if (isNull(point)) {
       return;
@@ -403,58 +437,44 @@ export class PaletteGrab extends BaseScriptComponent {
     const paletteUp = this.getSceneObject().getTransform().up;
     const clampDistance = Math.max(12, this.paintMaxDistanceFromPaletteCm);
 
+    // Only accept direct hit positions that are near the palette plane.
+    if (!isNull(interactor.targetHitPosition)) {
+      const hit = interactor.targetHitPosition as vec3;
+      if (hit.distance(palettePos) <= clampDistance) {
+        const planeOffset = Math.abs(hit.sub(palettePos).dot(paletteUp));
+        if (planeOffset <= 8) {
+          return hit;
+        }
+      }
+    }
+
     const start = interactor.startPoint || null;
+    if (!isNull(start)) {
+      // Pin hand interactions to palette plane using closest-point projection.
+      const pinchPoint = start as vec3;
+      const toPinch = pinchPoint.sub(palettePos);
+      const projected = pinchPoint.sub(paletteUp.uniformScale(toPinch.dot(paletteUp)));
+      if (projected.distance(palettePos) <= clampDistance) {
+        return projected;
+      }
+    }
+
     const direction = interactor.direction || null;
     if (!isNull(start) && !isNull(direction)) {
       const rayStart = start as vec3;
       const rayDir = direction as vec3;
-
-      // Primary path: place paint on a world-space plane through the palette.
       const denom = rayDir.dot(paletteUp);
       if (Math.abs(denom) > 0.0001) {
         const t = palettePos.sub(rayStart).dot(paletteUp) / denom;
-        if (t > 0) {
+        if (t > 0 && t < Math.max(8, this.paintRayDistanceCm * 2.5)) {
           const planeHit = rayStart.add(rayDir.uniformScale(t));
           if (planeHit.distance(palettePos) <= clampDistance) {
             return planeHit;
           }
         }
       }
-
-      // Fallback path: fixed-distance point along the interactor ray.
-      const distance = !isNull(interactor.distanceToTarget)
-        ? Math.max(0, interactor.distanceToTarget as number)
-        : Math.max(0, this.paintRayDistanceCm);
-      const rayPoint = rayStart.add(rayDir.uniformScale(distance));
-      const fromPalette = rayPoint.sub(palettePos);
-      const mag = Math.sqrt(
-        fromPalette.x * fromPalette.x +
-        fromPalette.y * fromPalette.y +
-        fromPalette.z * fromPalette.z
-      );
-      if (mag > clampDistance && mag > 0.0001) {
-        return palettePos.add(fromPalette.uniformScale(clampDistance / mag));
-      }
-      return rayPoint;
     }
 
-    // Only accept direct hit positions that are near the palette plane.
-    if (!isNull(interactor.targetHitPosition)) {
-      const hit = interactor.targetHitPosition as vec3;
-      if (hit.distance(palettePos) <= clampDistance) {
-        const planeOffset = Math.abs(hit.sub(palettePos).dot(paletteUp));
-        if (planeOffset <= 6) {
-          return hit;
-        }
-      }
-    }
-
-    if (!isNull(start)) {
-      const point = start as vec3;
-      if (point.distance(palettePos) <= clampDistance) {
-        return point;
-      }
-    }
     return null;
   }
 
@@ -463,16 +483,20 @@ export class PaletteGrab extends BaseScriptComponent {
       return;
     }
 
+    const meshToUse =
+      this.useStablePaintDotMesh && !isNull(this.stablePaintMesh)
+        ? (this.stablePaintMesh as RenderMesh)
+        : (this.selectedPaintMesh as RenderMesh);
     const dot = global.scene.createSceneObject(PaletteGrab.STROKE_DOT_NAME);
     dot.setParent(this.ensureStrokeRoot());
     dot.getTransform().setWorldPosition(worldPos);
-    dot.getTransform().setWorldRotation(quat.quatIdentity());
+    dot.getTransform().setWorldRotation(this.getSceneObject().getTransform().getWorldRotation());
     const scale = Math.max(0.1, this.paintDotScaleCm);
     dot.getTransform().setWorldScale(new vec3(scale, scale, scale));
     dot.layer = this.getSceneObject().layer;
 
     const visual = dot.createComponent('Component.RenderMeshVisual') as RenderMeshVisual;
-    visual.mesh = this.selectedPaintMesh as RenderMesh;
+    visual.mesh = meshToUse;
     visual.mainMaterial = this.selectedPaintMaterial as Material;
     visual.renderOrder = 11;
   }
@@ -559,6 +583,32 @@ export class PaletteGrab extends BaseScriptComponent {
     return null;
   }
 
+  private resolveStablePaintMesh(): void {
+    const renderable = this.findFirstRenderable(this.getSceneObject());
+    if (!isNull(renderable) && !isNull(renderable.mesh)) {
+      this.stablePaintMesh = renderable.mesh as RenderMesh;
+      return;
+    }
+    this.stablePaintMesh = null;
+  }
+
+  private ensureCancelButtonFollowLoop(): void {
+    if (isNull(this.cancelButtonFollowEvent)) {
+      this.cancelButtonFollowEvent = this.createEvent('UpdateEvent');
+      this.cancelButtonFollowEvent.bind(() => {
+        if (isNull(this.cancelButton)) {
+          return;
+        }
+        const root = this.getSceneObject();
+        (this.cancelButton as SceneObject)
+          .getTransform()
+          .setWorldPosition(root.getTransform().getWorldPosition());
+        (this.cancelButton as SceneObject).layer = root.layer;
+      });
+    }
+    this.cancelButtonFollowEvent.enabled = true;
+  }
+
   private ensureAnchorGrabComponents(): void {
     const anchor = this.getSceneObject();
     this.refreshGrabCollider();
@@ -619,11 +669,12 @@ export class PaletteGrab extends BaseScriptComponent {
   }
 
   private tryWireMoveInteraction(): void {
-    if (this.moveInteractionWired) {
+    if (this.moveInteractionWired && (!this.enablePaletteMoveHandle || this.moveHandleWired)) {
       return;
     }
 
     this.ensureAnchorGrabComponents();
+    this.ensurePaletteMoveHandleComponents();
     const interactable = this.grabInteractable;
     const manipulation = this.grabManipulation;
     if (isNull(interactable) || isNull(manipulation)) {
@@ -643,7 +694,7 @@ export class PaletteGrab extends BaseScriptComponent {
     this.bindManipulationRoot(manipulation, this.getSceneObject());
 
     const onGrabStart = (event: InteractorEventLike): void => {
-      this.onPaletteGrabStart(event);
+      this.onPaletteGrabStart(event, false);
       this.onPaintDragStart(event);
     };
     const onGrabUpdate = (event: InteractorEventLike): void => {
@@ -656,7 +707,7 @@ export class PaletteGrab extends BaseScriptComponent {
 
     if (manipulation.onManipulationStart) {
       manipulation.onManipulationStart.add(() => {
-        this.onPaletteGrabStart();
+        this.onPaletteGrabStart(undefined, false);
       });
     }
     if (manipulation.onManipulationEnd) {
@@ -700,12 +751,63 @@ export class PaletteGrab extends BaseScriptComponent {
     (interactable as ScriptComponent).enabled = true;
 
     this.moveInteractionWired = true;
+
+    const handleInteractable = this.moveHandleInteractable;
+    const handleManipulation = this.moveHandleManipulation;
+    if (!isNull(handleInteractable) && !isNull(handleManipulation) && !this.moveHandleWired) {
+      const onHandleStart = (event: InteractorEventLike): void => {
+        this.onPaletteGrabStart(event, true);
+      };
+      const onHandleEnd = (): void => {
+        this.onPaletteGrabRelease();
+      };
+      if (handleManipulation.onManipulationStart) {
+        handleManipulation.onManipulationStart.add(() => {
+          this.onPaletteGrabStart(undefined, true);
+        });
+      }
+      if (handleManipulation.onManipulationEnd) {
+        handleManipulation.onManipulationEnd.add(onHandleEnd);
+      }
+      if (handleInteractable.onDragStart) {
+        handleInteractable.onDragStart.add(onHandleStart);
+      }
+      if (handleInteractable.onTriggerStart) {
+        handleInteractable.onTriggerStart.add(onHandleStart);
+      }
+      if (handleInteractable.onInteractorTriggerStart) {
+        handleInteractable.onInteractorTriggerStart.add(onHandleStart);
+      }
+      if (handleInteractable.onDragEnd) {
+        handleInteractable.onDragEnd.add(onHandleEnd);
+      }
+      if (handleInteractable.onTriggerEnd) {
+        handleInteractable.onTriggerEnd.add(onHandleEnd);
+      }
+      if (handleInteractable.onTriggerEndOutside) {
+        handleInteractable.onTriggerEndOutside.add(onHandleEnd);
+      }
+      if (handleInteractable.onInteractorTriggerEnd) {
+        handleInteractable.onInteractorTriggerEnd.add(onHandleEnd);
+      }
+      if (handleInteractable.onInteractorTriggerEndOutside) {
+        handleInteractable.onInteractorTriggerEndOutside.add(onHandleEnd);
+      }
+
+      (handleManipulation as ScriptComponent).enabled = true;
+      (handleInteractable as ScriptComponent).enabled = true;
+      this.moveHandleWired = true;
+    }
+
     print('[PaletteGrab] grab interaction wired');
   }
 
-  private onPaletteGrabStart(_event?: InteractorEventLike): void {
-    if (this.paintModeActive) {
+  private onPaletteGrabStart(_event?: InteractorEventLike, allowWhilePainting: boolean = false): void {
+    if (this.paintModeActive && !allowWhilePainting) {
       return;
+    }
+    if (allowWhilePainting && this.paintModeActive) {
+      this.setPaintMode(false);
     }
     if (this.moveActive) {
       return;
@@ -741,11 +843,89 @@ export class PaletteGrab extends BaseScriptComponent {
     }
   }
 
+  private ensurePaletteMoveHandleComponents(): void {
+    if (!this.enablePaletteMoveHandle) {
+      this.moveHandleObject = null;
+      this.moveHandleInteractable = null;
+      this.moveHandleManipulation = null;
+      return;
+    }
+
+    const root = this.getSceneObject();
+    let handle = this.findNamedChild(root, PaletteGrab.MOVE_HANDLE_NAME);
+    if (isNull(handle)) {
+      handle = global.scene.createSceneObject(PaletteGrab.MOVE_HANDLE_NAME);
+      handle.setParent(root);
+      handle.layer = root.layer;
+    }
+    handle.getTransform().setLocalPosition(this.moveHandleLocalPosition);
+    handle.getTransform().setLocalRotation(quat.quatIdentity());
+    const handleScale = Math.max(0.6, this.moveHandleRadiusCm);
+    handle.getTransform().setLocalScale(new vec3(handleScale, handleScale, handleScale));
+    this.moveHandleObject = handle;
+
+    const existingVisual = handle.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+    if (isNull(existingVisual)) {
+      const template = this.findFirstRenderable(root);
+      if (!isNull(template) && !isNull(template.mesh) && !isNull(template.mainMaterial)) {
+        const visual = handle.createComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+        visual.mesh = template.mesh as RenderMesh;
+        visual.mainMaterial = template.mainMaterial as Material;
+        visual.renderOrder = 12;
+      }
+    }
+
+    let collider = handle.getComponent('Physics.ColliderComponent') as ColliderComponent;
+    if (isNull(collider)) {
+      collider = handle.getComponent('Component.ColliderComponent') as ColliderComponent;
+    }
+    if (isNull(collider)) {
+      collider = handle.createComponent('Physics.ColliderComponent') as ColliderComponent;
+    }
+    if (isNull(collider)) {
+      collider = handle.createComponent('Component.ColliderComponent') as ColliderComponent;
+    }
+    if (!isNull(collider)) {
+      const shape = Shape.createSphereShape();
+      shape.radius = Math.max(1.2, this.moveHandleRadiusCm);
+      const colliderLike = collider as unknown as { shape?: unknown; intangible?: boolean; enabled?: boolean };
+      colliderLike.shape = shape;
+      colliderLike.intangible = false;
+      colliderLike.enabled = true;
+    }
+
+    let interactable = this.findExistingInteractable(handle);
+    if (isNull(interactable)) {
+      interactable = handle.createComponent(Interactable.getTypeName()) as InteractableLike;
+    }
+    interactable.targetingMode = 7;
+    interactable.ignoreInteractionPlane = true;
+    interactable.keepHoverOnTrigger = true;
+    interactable.enableInstantDrag = true;
+
+    let manipulation = this.findExistingManipulation(handle);
+    if (isNull(manipulation)) {
+      manipulation = handle.createComponent(
+        InteractableManipulation.getTypeName()
+      ) as unknown as InteractableManipulationLike;
+    }
+    manipulation.manipulateRootSceneObject = root;
+    manipulation.enableTranslation = true;
+    manipulation.enableRotation = true;
+    manipulation.enableScale = false;
+    manipulation.useFilter = false;
+    this.bindManipulationRoot(manipulation, root);
+
+    this.moveHandleInteractable = interactable;
+    this.moveHandleManipulation = manipulation;
+  }
+
   private onPaintDragStart(event?: InteractorEventLike): void {
     if (!this.paintModeActive) {
       return;
     }
     this.activePaintInteractor = event?.interactor || null;
+    this.paintStrokeActive = true;
     this.lastPaintPoint = null;
     this.paintFromInteractor(this.activePaintInteractor, true);
   }
@@ -764,6 +944,7 @@ export class PaletteGrab extends BaseScriptComponent {
     if (!this.paintModeActive) {
       return;
     }
+    this.paintStrokeActive = false;
     this.activePaintInteractor = null;
     this.lastPaintPoint = null;
   }
