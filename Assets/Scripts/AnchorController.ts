@@ -23,6 +23,7 @@ import { shouldRunFriendOnboardingTour } from './FriendOnboardingStorage';
 const ANCHOR_CONTROLLER_VERSION = 'v44-global-object-scale';
 const GLOBAL_OBJECT_SCALE_MULTIPLIER = 1.5;
 const PALETTE_EXTRA_SCALE_MULTIPLIER = 1.5;
+const TRASH_BIN_SCALE_MULTIPLIER = 2.0;
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
 const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
@@ -380,6 +381,7 @@ export class AnchorController extends BaseScriptComponent {
     print(`AnchorController ${ANCHOR_CONTROLLER_VERSION} starting`);
     this.captureGardenSpawnSourceDefaults();
     this.captureTrashSceneDefault();
+    this.applyTrashScaledWorldSize();
 
     // Onboarding must start from a clean desk — wipe last session before restore.
     if (this.isFriendOnboardingEnabled()) {
@@ -2575,7 +2577,7 @@ export class AnchorController extends BaseScriptComponent {
       }
       trashObject.getTransform().setWorldPosition(defaults.pos);
       trashObject.getTransform().setWorldRotation(defaults.rot);
-      trashObject.getTransform().setWorldScale(defaults.scale);
+      trashObject.getTransform().setWorldScale(this.getTrashScaledWorldScale(defaults.scale));
     }
     this.trashFixedWorldPosition = trashObject.getTransform().getWorldPosition();
     this.lastPersistedTrashWorld = this.trashFixedWorldPosition;
@@ -2961,6 +2963,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     trashObject.getTransform().setWorldPosition(this.trashFixedWorldPosition);
+    this.applyTrashScaledWorldSize();
   }
 
   private maintainTrashAnchorBinding(): void {
@@ -3077,6 +3080,7 @@ export class AnchorController extends BaseScriptComponent {
     if (isNull(trashObject)) {
       return;
     }
+    this.applyTrashScaledWorldSize();
 
     const store = global.persistentStorageSystem.store;
     if (!store.has('trash_bin_has_data') || !store.getBool('trash_bin_has_data')) {
@@ -3102,6 +3106,7 @@ export class AnchorController extends BaseScriptComponent {
         trashObject.setParent(this.findSceneRoot());
       }
       trashObject.getTransform().setWorldPosition(worldPos);
+      this.applyTrashScaledWorldSize();
       this.trashFixedWorldPosition = worldPos;
       this.lastPersistedTrashWorld = worldPos;
       print(`Restored TrashBin (world) at ${worldPos.toString()}`);
@@ -3122,6 +3127,7 @@ export class AnchorController extends BaseScriptComponent {
     );
     trashObject.setParent(this.widgetParent);
     trashObject.getTransform().setLocalPosition(localPos);
+    this.applyTrashScaledWorldSize();
 
     const worldPos = trashObject.getTransform().getWorldPosition();
     this.trashFixedWorldPosition = worldPos;
@@ -3129,27 +3135,55 @@ export class AnchorController extends BaseScriptComponent {
     print(`Restored TrashBin (anchor-local) at world: ${worldPos.toString()}`);
   }
 
+  private getTrashScaledWorldScale(baseScale: vec3): vec3 {
+    return new vec3(
+      baseScale.x * TRASH_BIN_SCALE_MULTIPLIER,
+      baseScale.y * TRASH_BIN_SCALE_MULTIPLIER,
+      baseScale.z * TRASH_BIN_SCALE_MULTIPLIER
+    );
+  }
+
+  private applyTrashScaledWorldSize(): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject) || isNull(this.trashSceneDefault)) {
+      return;
+    }
+    trashObject
+      .getTransform()
+      .setWorldScale(this.getTrashScaledWorldScale(this.trashSceneDefault.scale));
+  }
+
   private wireTrashBinMovement(): void {
     const trash = this.trashBin as TrashBin;
     if (!isNull(trash)) {
       if (typeof trash.setUseExternalMoveHandle === 'function') {
-        trash.setUseExternalMoveHandle(true);
+        trash.setUseExternalMoveHandle(false);
+      }
+      if (typeof trash.wireMoveInteraction === 'function') {
+        trash.wireMoveInteraction();
       }
       if (typeof trash.bindStashRestore === 'function') {
         trash.bindStashRestore(this);
       }
     }
+    this.disableTrashBinMoveHandle();
   }
 
   private scheduleGardenAndTrashHandleWiring(): void {
     this.scheduleDelayed(() => {
       this.wireGardenSourceMoveHandles();
-      this.ensureTrashBinMoveHandle();
     }, 0.3);
-    // TrashBin is much smaller than garden sources — retry once if copySceneObject races a reset.
-    this.scheduleDelayed(() => {
-      this.ensureTrashBinMoveHandle();
-    }, 0.75);
+  }
+
+  private disableTrashBinMoveHandle(): void {
+    const trash = this.getTrashSceneObject();
+    if (isNull(trash)) {
+      return;
+    }
+    const handle = this.findNamedChild(trash, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+    if (!isNull(handle)) {
+      handle.enabled = false;
+    }
   }
 
   private findMoveHandleTemplate(): SceneObject | null {
@@ -4095,6 +4129,7 @@ export class AnchorController extends BaseScriptComponent {
     this.objs.push(obj);
     this.objectKinds.push(objectKind);
     this.objectPrefabIndices.push(prefabIndex);
+    this.enforceTrackedObjectManipulationSettings(obj, wrapper);
     this.wirePlantLifecycle(obj);
     this.wirePotPersistence(obj);
     this.wireTrashReleaseTracking(obj, wrapper);
@@ -4796,6 +4831,7 @@ export class AnchorController extends BaseScriptComponent {
       this.objs.push(obj);
       this.objectKinds.push(objectKind);
       this.objectPrefabIndices.push(prefabIndex);
+      this.enforceTrackedObjectManipulationSettings(obj, wrapper);
 
       this.wirePotPersistence(obj);
       this.restorePlantState(store, i, obj);
@@ -5286,6 +5322,76 @@ export class AnchorController extends BaseScriptComponent {
 
     if (typeof pot.setAnchorPersistence === 'function') {
       pot.setAnchorPersistence(this);
+    }
+  }
+
+  /**
+   * Some prefabs ship with direct-only/default manipulation flags.
+   * Force tracked objects to support distance pinch + rotation consistently.
+   */
+  private enforceTrackedObjectManipulationSettings(
+    contentRoot: SceneObject,
+    wrapperRoot: SceneObject | null
+  ): void {
+    this.applyManipulationSettingsOnHierarchy(contentRoot);
+    if (!isNull(wrapperRoot)) {
+      this.applyManipulationSettingsOnHierarchy(wrapperRoot as SceneObject);
+    }
+  }
+
+  private applyManipulationSettingsOnHierarchy(root: SceneObject): void {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const script = scripts[i] as ScriptComponent & {
+          manipulateRootSceneObject?: SceneObject;
+          enableTranslation?: boolean;
+          enableRotation?: boolean;
+          enableScale?: boolean;
+          targetingMode?: number;
+          onTriggerStart?: unknown;
+          onDragStart?: unknown;
+          onInteractorTriggerStart?: unknown;
+          ignoreInteractionPlane?: boolean;
+        };
+        if (isNull(script)) {
+          continue;
+        }
+
+        if (script.manipulateRootSceneObject !== undefined) {
+          if (script.enableTranslation !== undefined) {
+            script.enableTranslation = true;
+          }
+          if (script.enableRotation !== undefined) {
+            script.enableRotation = true;
+          }
+          if (script.enableScale !== undefined) {
+            script.enableScale = false;
+          }
+        }
+
+        if (
+          script.targetingMode !== undefined &&
+          (script.onTriggerStart !== undefined ||
+            script.onDragStart !== undefined ||
+            script.onInteractorTriggerStart !== undefined)
+        ) {
+          script.targetingMode = 7;
+          if (script.ignoreInteractionPlane !== undefined) {
+            script.ignoreInteractionPlane = true;
+          }
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
     }
   }
 

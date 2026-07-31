@@ -127,6 +127,8 @@ export class PlantLifecycle extends BaseScriptComponent {
   private walkGoalMeters = 0;
   private walkedMeters = 0;
   private walkTrackingActive = false;
+  /** Goal seeds are visually buried until they are watered. */
+  private readonly plantedGoalSeedBurialFraction = 0.9;
   private walkLastCameraPos: vec3 | null = null;
   private walkCamera: SceneObject | null = null;
   private walkProgressLogTimer = 0;
@@ -1625,6 +1627,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       let minX = Infinity;
       let maxX = -Infinity;
       let minY = Infinity;
+      let maxY = -Infinity;
       let minZ = Infinity;
       let maxZ = -Infinity;
 
@@ -1637,6 +1640,7 @@ export class PlantLifecycle extends BaseScriptComponent {
         minX = Math.min(minX, localPoint.x);
         maxX = Math.max(maxX, localPoint.x);
         minY = Math.min(minY, localPoint.y);
+        maxY = Math.max(maxY, localPoint.y);
         minZ = Math.min(minZ, localPoint.z);
         maxZ = Math.max(maxZ, localPoint.z);
       }
@@ -1645,7 +1649,24 @@ export class PlantLifecycle extends BaseScriptComponent {
         return vec3.zero();
       }
 
-      return new vec3(-(minX + maxX) * 0.5, -minY, -(minZ + maxZ) * 0.5);
+      let seedBurialOffset = 0;
+      if (
+        this.currentStage === PlantStage.Seed &&
+        this.isPlanted &&
+        this.requiresGoalCompletion &&
+        !this.goalCompleted &&
+        !this.hasBeenWatered
+      ) {
+        const modelHeight = Math.max(0, maxY - minY);
+        seedBurialOffset =
+          modelHeight * Math.max(0, Math.min(1.2, this.plantedGoalSeedBurialFraction));
+      }
+
+      return new vec3(
+        -(minX + maxX) * 0.5,
+        -minY - seedBurialOffset,
+        -(minZ + maxZ) * 0.5
+      );
     }, true);
   }
 

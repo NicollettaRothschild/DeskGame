@@ -51,9 +51,11 @@
     grabSpeechTrack: false
     idleBobAmplitudeCm: false
     idleBobSpeed: false
+    lookAtAlwaysWhileFollowing: false
     lookAtDistanceMeters: false
     lookAtExitPaddingMeters: false
     lookAtTurnSpeed: false
+    onboardingAutoGoalFallbackOnTimeout: false
     onboardingClock: false
     onboardingClockLine: false
     onboardingClosingLine: false
@@ -130,6 +132,7 @@
       onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
       onboardingGoalFallback: I want to run one kilometer
+      onboardingAutoGoalFallbackOnTimeout: false
       onboardingRequireGoalPotPractice: true
       agentTts: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -144,6 +147,7 @@
       lookAtDistanceMeters: !<float> 2.000000
       lookAtExitPaddingMeters: 0.250000
       lookAtTurnSpeed: !<float> 6.000000
+      lookAtAlwaysWhileFollowing: true
       enableIdleBob: true
       idleBobAmplitudeCm: 1.500000
       idleBobSpeed: 1.800000
@@ -160,7 +164,7 @@
       {}
   InputLines:
     - // @input bool debugLogging
-    - "// @input vec3 colliderSize = {1.5,2.2,1.5}"
+    - "// @input vec3 colliderSize = {2.4,3.2,2.4}"
     - // @input Asset.AudioTrackAsset grabSoundTrack
     - // @input Asset.AudioTrackAsset releaseSoundTrack
     - // @input float grabSoundVolume = 0.85
@@ -194,6 +198,7 @@
     - "// @input string onboardingGoalSeedLine = \"Here's your goal planter — the seed is already planted. Grab it, place it where you like, then water it. Walk goals grow automatically when you finish the distance. Or tell me when you're done!\" {\"label\":\"Goal Planted Pot Line\"}"
     - '// @input float onboardingGoalListenTimeoutSec = 22 {"label":"Goal Listen Timeout (sec)"}'
     - '// @input string onboardingGoalFallback = "I want to walk 20 meters" {"label":"Goal Fallback Example"}'
+    - '// @input bool onboardingAutoGoalFallbackOnTimeout {"label":"Auto Goal Fallback On Timeout", "hint":"When enabled, uses Goal Fallback Example if no goal is heard before timeout."}'
     - '// @input bool onboardingRequireGoalPotPractice = true {"label":"Require Place Goal Pot", "hint":"Wait for grab+release on the planted goal pot before finishing onboarding"}'
     - // @input AssignableType agentTts
     - // @input Asset.AudioTrackAsset grabSpeechTrack
@@ -208,6 +213,7 @@
     - // @input float lookAtDistanceMeters = 0.2
     - // @input float lookAtExitPaddingMeters = 0.05
     - // @input float lookAtTurnSpeed = 6
+    - '// @input bool lookAtAlwaysWhileFollowing = true {"label":"Always Look At User While Following", "hint":"Keeps Buddy facing the user whenever follow mode is active, even outside proximity look-at distance."}'
     - // @input bool enableIdleBob = true
     - // @input float idleBobAmplitudeCm = 1.5
     - // @input float idleBobSpeed = 1.8

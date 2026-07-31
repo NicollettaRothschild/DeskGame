@@ -73,7 +73,7 @@ export class FriendGrab extends BaseScriptComponent {
   debugLogging: boolean = false;
 
   @input
-  colliderSize: vec3 = new vec3(1.5, 2.2, 1.5);
+  colliderSize: vec3 = new vec3(2.4, 3.2, 2.4);
 
   @input
   @allowUndefined
@@ -236,6 +236,11 @@ export class FriendGrab extends BaseScriptComponent {
   onboardingGoalFallback: string = 'I want to walk 20 meters';
 
   @input
+  @label('Auto Goal Fallback On Timeout')
+  @hint('When enabled, uses Goal Fallback Example if no goal is heard before timeout.')
+  onboardingAutoGoalFallbackOnTimeout: boolean = false;
+
+  @input
   @label('Require Place Goal Pot')
   @hint('Wait for grab+release on the planted goal pot before finishing onboarding')
   onboardingRequireGoalPotPractice: boolean = true;
@@ -286,6 +291,11 @@ export class FriendGrab extends BaseScriptComponent {
   /** How quickly Friend turns toward the user (higher = snappier). */
   @input('float')
   lookAtTurnSpeed: number = 6.0;
+
+  @input
+  @label('Always Look At User While Following')
+  @hint('Keeps Buddy facing the user whenever follow mode is active, even outside proximity look-at distance.')
+  lookAtAlwaysWhileFollowing: boolean = true;
 
   @input
   enableIdleBob: boolean = true;
@@ -357,6 +367,7 @@ export class FriendGrab extends BaseScriptComponent {
   private followActive = false;
   private followLoggedStart = false;
   private workspaceResetAt = 0;
+  private static readonly MIN_COLLIDER_SIZE = new vec3(2.1, 2.8, 2.1);
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -927,11 +938,7 @@ export class FriendGrab extends BaseScriptComponent {
       height = height + 2;
     }
 
-    const present = new vec3(
-      friendPos.x + dirX * distance,
-      friendPos.y + height,
-      friendPos.z + dirZ * distance
-    );
+    const present = this.resolveOnboardingSpawnPosition(friendPos, dirX, dirZ, distance, height);
     obj.getTransform().setWorldPosition(present);
 
     if (this.debugLogging) {
@@ -943,7 +950,7 @@ export class FriendGrab extends BaseScriptComponent {
 
   /** Rewire + force-show garden MoveHandle after onboarding re-enables a source. */
   private ensureOnboardingSourceHandle(source: SceneObject, key: string): void {
-    if (key !== 'planter' && key !== 'trash' && key !== 'postit') {
+    if (key !== 'planter' && key !== 'postit') {
       return;
     }
 
@@ -954,8 +961,7 @@ export class FriendGrab extends BaseScriptComponent {
     }
 
     handle.enabled = true;
-    const sourceLabel =
-      key === 'planter' ? 'Planter' : key === 'trash' ? 'TrashBin' : 'PostItNotes';
+    const sourceLabel = key === 'planter' ? 'Planter' : 'PostItNotes';
     const scripts = handle.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
       const script = scripts[i] as ScriptComponent & {
@@ -1145,7 +1151,7 @@ export class FriendGrab extends BaseScriptComponent {
     };
 
     if (needsPractice) {
-      this.waitForOnboardingPractice(step.object as SceneObject, token, () => {
+      this.waitForOnboardingPractice(step.object as SceneObject, token, step.key, () => {
         practiceDone = true;
         tryAdvance();
       });
@@ -1184,7 +1190,12 @@ export class FriendGrab extends BaseScriptComponent {
         if (token !== this.onboardingToken) {
           return;
         }
-        const goal = String(goalText || '').trim() || String(this.onboardingGoalFallback || '').trim();
+        const goal = String(goalText || '').trim();
+        if (!goal) {
+          print('[FriendGrab] onboarding goal not provided — finishing without seeded goal pot');
+          this.delayOnboarding(token, () => this.finishOnboardingTour(token));
+          return;
+        }
         print(`[FriendGrab] onboarding goal heard: ${goal}`);
         this.spawnOnboardingGoalPlantedPot(goal, token, (pot) => {
           if (token !== this.onboardingToken) {
@@ -1202,7 +1213,7 @@ export class FriendGrab extends BaseScriptComponent {
           };
 
           if (!practiceDone && !isNull(pot)) {
-            this.waitForOnboardingPractice(pot as SceneObject, token, () => {
+            this.waitForOnboardingPractice(pot as SceneObject, token, 'goal-pot', () => {
               practiceDone = true;
               tryFinish();
             });
@@ -1231,12 +1242,17 @@ export class FriendGrab extends BaseScriptComponent {
 
   private waitForOnboardingGoalSpeech(
     token: number,
-    onGoal: (goalText: string) => void
+    onGoal: (goalText: string | null) => void
   ): void {
     const speech = getSharedSpeechRecognition();
     if (isNull(speech)) {
-      print('[FriendGrab] onboarding goal: no SpeechRecognition — using fallback');
-      onGoal(String(this.onboardingGoalFallback || 'I want to walk 20 meters'));
+      if (this.onboardingAutoGoalFallbackOnTimeout) {
+        print('[FriendGrab] onboarding goal: no SpeechRecognition — using fallback');
+        onGoal(String(this.onboardingGoalFallback || 'I want to walk 20 meters'));
+      } else {
+        print('[FriendGrab] onboarding goal: no SpeechRecognition — skipping planted goal pot');
+        onGoal(null);
+      }
       return;
     }
 
@@ -1294,8 +1310,13 @@ export class FriendGrab extends BaseScriptComponent {
       }
       poll.enabled = false;
       const fallback = String(this.onboardingGoalFallback || 'I want to walk 20 meters');
-      print(`[FriendGrab] onboarding goal timeout — using fallback: ${fallback}`);
-      finish(fallback);
+      if (this.onboardingAutoGoalFallbackOnTimeout) {
+        print(`[FriendGrab] onboarding goal timeout — using fallback: ${fallback}`);
+        finish(fallback);
+      } else {
+        print('[FriendGrab] onboarding goal timeout — no goal heard; skipping planted goal pot');
+        finish('');
+      }
     });
     timeout.reset(Math.max(6, this.onboardingGoalListenTimeoutSec));
   }
@@ -1375,10 +1396,12 @@ export class FriendGrab extends BaseScriptComponent {
         dirZ = dz / len;
       }
     }
-    const spawnPos = new vec3(
-      friendPos.x + dirX * Math.max(28, this.onboardingPresentDistanceCm),
-      friendPos.y + this.onboardingPresentHeightCm - 2,
-      friendPos.z + dirZ * Math.max(28, this.onboardingPresentDistanceCm)
+    const spawnPos = this.resolveOnboardingSpawnPosition(
+      friendPos,
+      dirX,
+      dirZ,
+      Math.max(28, this.onboardingPresentDistanceCm),
+      this.onboardingPresentHeightCm - 2
     );
 
     let pot: SceneObject | null = null;
@@ -1400,6 +1423,98 @@ export class FriendGrab extends BaseScriptComponent {
     this.ensureGoalCompletionListening();
     print(`[FriendGrab] onboarding goal planted pot spawned for "${goalText}"`);
     onDone(pot);
+  }
+
+  /**
+   * Keep onboarding spawn positions near the user to avoid rare far-away placements
+   * when Friend/camera references jump between anchor states.
+   */
+  private resolveOnboardingSpawnPosition(
+    friendPos: vec3,
+    dirX: number,
+    dirZ: number,
+    distanceCm: number,
+    heightOffsetCm: number
+  ): vec3 {
+    // Keep onboarding props comfortably below Buddy (not face-level).
+    const underBuddyDistance = Math.max(10, Math.min(22, distanceCm * 0.55));
+    const underBuddyDropCm = 18;
+    const spawn = new vec3(
+      friendPos.x + dirX * underBuddyDistance,
+      friendPos.y - underBuddyDropCm + Math.min(0, heightOffsetCm * 0.2),
+      friendPos.z + dirZ * underBuddyDistance
+    );
+
+    if (isNull(this.lookAtCamera)) {
+      return spawn;
+    }
+
+    const camPos = this.lookAtCamera.getTransform().getWorldPosition();
+    // Absolute safety: never let onboarding items creep into head/eye space.
+    const maxHeadClearY = camPos.y - 10;
+    if (spawn.y > maxHeadClearY) {
+      spawn.y = maxHeadClearY;
+    }
+
+    const camDx = spawn.x - camPos.x;
+    const camDz = spawn.z - camPos.z;
+    const camDist = Math.sqrt(camDx * camDx + camDz * camDz);
+    const maxFromCameraCm = 60;
+    if (camDist <= maxFromCameraCm) {
+      return spawn;
+    }
+
+    // Re-center to a reliable slot in front of the user (toward Friend),
+    // then let object-specific grab/release interactions take over.
+    const towardFriendX = friendPos.x - camPos.x;
+    const towardFriendZ = friendPos.z - camPos.z;
+    const towardFriendLen = Math.sqrt(
+      towardFriendX * towardFriendX + towardFriendZ * towardFriendZ
+    );
+    if (towardFriendLen <= 0.001) {
+      return spawn;
+    }
+
+    const nX = towardFriendX / towardFriendLen;
+    const nZ = towardFriendZ / towardFriendLen;
+    const fallbackDist = Math.max(18, Math.min(30, underBuddyDistance));
+    const clamped = new vec3(
+      camPos.x + nX * fallbackDist,
+      spawn.y,
+      camPos.z + nZ * fallbackDist
+    );
+    if (this.debugLogging) {
+      print(
+        `[FriendGrab] onboarding spawn clamped to camera envelope (was ${camDist.toFixed(1)}cm)`
+      );
+    }
+    return clamped;
+  }
+
+  private recoverOnboardingObjectIfOutOfView(target: SceneObject, key: string): void {
+    if (isNull(target) || isNull(this.lookAtCamera)) {
+      return;
+    }
+
+    const camPos = this.lookAtCamera.getTransform().getWorldPosition();
+    const worldPos = target.getTransform().getWorldPosition();
+    const dx = worldPos.x - camPos.x;
+    const dz = worldPos.z - camPos.z;
+    const horizontalCm = Math.sqrt(dx * dx + dz * dz);
+    const yDelta = worldPos.y - camPos.y;
+
+    // Only intervene when the object likely "vanished" from user view.
+    const tooFar = horizontalCm > 120;
+    const tooLow = yDelta < -120;
+    const tooHigh = yDelta > 20;
+    if (!tooFar && !tooLow && !tooHigh) {
+      return;
+    }
+
+    this.placeObjectInFrontOfFriend(target, key);
+    print(
+      `[FriendGrab] onboarding ${key} recovered (dist=${horizontalCm.toFixed(1)}cm yDelta=${yDelta.toFixed(1)}cm)`
+    );
   }
 
   private finishOnboardingTour(token: number): void {
@@ -1711,6 +1826,7 @@ export class FriendGrab extends BaseScriptComponent {
   private waitForOnboardingPractice(
     target: SceneObject,
     token: number,
+    key: string,
     onDone: () => void
   ): void {
     this.onboardingPracticeDone = false;
@@ -1745,6 +1861,7 @@ export class FriendGrab extends BaseScriptComponent {
       }
       // Count release even if we armed mid-grab (missed the start event).
       if (grabbed || hasMovedFromPresent()) {
+        this.recoverOnboardingObjectIfOutOfView(target, key);
         finish('grab-release');
       }
     };
@@ -1811,7 +1928,14 @@ export class FriendGrab extends BaseScriptComponent {
 
     const timeoutSec = Math.max(3, this.onboardingPracticeTimeoutSec);
     const timeout = this.createEvent('DelayedCallbackEvent');
-    timeout.bind(() => finish('timeout'));
+    timeout.bind(() => {
+      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
+        return;
+      }
+      print('[FriendGrab] onboarding practice waiting for grab-release');
+      this.showSpeech('Try grabbing it, then release.', true, null);
+      timeout.reset(timeoutSec);
+    });
     timeout.reset(timeoutSec);
 
     // Nudge only if they still haven't practiced (don't nag after a mid-speech grab).
@@ -2103,6 +2227,17 @@ export class FriendGrab extends BaseScriptComponent {
     }
     this.lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
 
+    const forceFollowLookAt =
+      this.lookAtAlwaysWhileFollowing &&
+      this.followActive &&
+      this.enableFollowAfterOnboarding &&
+      !this.moveActive;
+    if (forceFollowLookAt) {
+      this.setLookAtActive(true);
+      this.lookAt.enabled = true;
+      return;
+    }
+
     const friendPos = this.getSceneObject().getTransform().getWorldPosition();
     const cameraPos = this.lookAtCamera.getTransform().getWorldPosition();
     const dx = cameraPos.x - friendPos.x;
@@ -2316,10 +2451,20 @@ export class FriendGrab extends BaseScriptComponent {
     colliderLike.debugDrawEnabled = false;
 
     const shape = Shape.createBoxShape();
-    shape.size = this.colliderSize;
+    shape.size = this.getEffectiveColliderSize();
     colliderLike.shape = shape;
 
     return collider;
+  }
+
+  private getEffectiveColliderSize(): vec3 {
+    const configured = this.colliderSize || new vec3(0, 0, 0);
+    const min = FriendGrab.MIN_COLLIDER_SIZE;
+    return new vec3(
+      Math.max(min.x, configured.x),
+      Math.max(min.y, configured.y),
+      Math.max(min.z, configured.z)
+    );
   }
 
   private bindManipulationRoot(

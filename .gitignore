@@ -31,3 +31,6 @@ BackUp/**
 *.lock
 
 Workspaces/** 
+
+# Local Memtrace database/cache (not part of project source)
+.memdb/**

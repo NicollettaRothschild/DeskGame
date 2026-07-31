@@ -94,6 +94,10 @@ export class MainPostItSource extends BaseScriptComponent {
   @input
   debugLogging: boolean = false;
 
+  @input('float')
+  @hint('Keep transcript capture active briefly after release')
+  postReleaseCaptureSec: number = 6;
+
   private activePull: PullState | null = null;
   private updateEvent: UpdateEvent | null = null;
   private bindAttempts = 0;
@@ -480,7 +484,7 @@ export class MainPostItSource extends BaseScriptComponent {
   }
 
   private finalizeReleasedPull(releasedNote: SceneObject): void {
-    this.endNoteTranscriptCapture(releasedNote);
+    this.deferEndNoteTranscriptCapture(releasedNote);
     this.abandonActivePull();
 
     const anchorSpawner = this.getAnchorNoteSpawner();
@@ -519,6 +523,18 @@ export class MainPostItSource extends BaseScriptComponent {
       return;
     }
     transcript.endCapture();
+  }
+
+  private deferEndNoteTranscriptCapture(noteObject: SceneObject): void {
+    const delaySec = Math.max(0, this.postReleaseCaptureSec);
+    if (delaySec <= 0.001) {
+      this.endNoteTranscriptCapture(noteObject);
+      return;
+    }
+    const noteRef = noteObject;
+    const done = this.createEvent('DelayedCallbackEvent');
+    done.bind(() => this.endNoteTranscriptCapture(noteRef));
+    done.reset(delaySec);
   }
 
   private findNoteTranscript(noteObject: SceneObject): NoteTranscriptLike | null {
