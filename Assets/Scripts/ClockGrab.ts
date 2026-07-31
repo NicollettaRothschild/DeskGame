@@ -32,9 +32,9 @@ export class ClockGrab extends BaseScriptComponent {
   @input
   debugLogging: boolean = false;
 
-  /** Local-space box size. Clock root is scaled ~0.1 with mesh children at ~100. */
+  /** Local-space box size. Clock root is scaled ~0.06 with mesh children at ~100. */
   @input
-  colliderSize: vec3 = new vec3(80, 80, 30);
+  colliderSize: vec3 = new vec3(140, 140, 55);
 
   @input
   @allowUndefined
