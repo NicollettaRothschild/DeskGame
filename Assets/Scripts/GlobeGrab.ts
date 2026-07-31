@@ -54,6 +54,14 @@ export class GlobeGrab extends BaseScriptComponent {
   enableGrabSounds: boolean = true;
 
   @input
+  @hint('Slowly rotate globe when not grabbed')
+  enableIdleRotation: boolean = true;
+
+  @input('float')
+  @hint('Idle rotation speed in degrees/second')
+  idleRotationDegreesPerSecond: number = 8;
+
+  @input
   @allowUndefined
   anchorController!: ScriptComponent;
 
@@ -90,8 +98,32 @@ export class GlobeGrab extends BaseScriptComponent {
       }
     });
 
+    this.createEvent('UpdateEvent').bind(() => this.updateIdleRotation());
+
     this.scheduleGrabWireRetry(0.25);
     this.scheduleGrabWireRetry(0.75);
+  }
+
+  private updateIdleRotation(): void {
+    if (!this.enableIdleRotation || this.moveActive) {
+      return;
+    }
+
+    const speed = Math.max(0, this.idleRotationDegreesPerSecond);
+    if (speed <= 0.0001) {
+      return;
+    }
+
+    const dt = Math.max(0, getDeltaTime());
+    if (dt <= 0.000001) {
+      return;
+    }
+
+    const radians = (speed * Math.PI * dt) / 180.0;
+    const transform = this.getSceneObject().getTransform();
+    const current = transform.getLocalRotation();
+    const delta = quat.angleAxis(radians, vec3.up());
+    transform.setLocalRotation(current.multiply(delta));
   }
 
   private scheduleGrabWireRetry(delaySec: number): void {
@@ -129,7 +161,7 @@ export class GlobeGrab extends BaseScriptComponent {
 
     manipulation.manipulateRootSceneObject = anchor;
     manipulation.enableTranslation = true;
-    manipulation.enableRotation = false;
+    manipulation.enableRotation = true;
     manipulation.enableScale = false;
     manipulation.useFilter = false;
 

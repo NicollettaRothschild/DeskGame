@@ -484,7 +484,7 @@ export class TrashBin extends BaseScriptComponent {
 
     manipulation.manipulateRootSceneObject = root;
     manipulation.enableTranslation = true;
-    manipulation.enableRotation = false;
+    manipulation.enableRotation = true;
     manipulation.enableScale = false;
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;

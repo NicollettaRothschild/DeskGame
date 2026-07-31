@@ -111,6 +111,10 @@ export class PlantLifecycle extends BaseScriptComponent {
   private static readonly GROWTH_SIZE_DIVISOR = 3;
   /** Goal plants pause ~60% grown until the player finishes the goal. */
   private static readonly GOAL_GROWTH_CAP_RATIO = 0.6;
+  private static readonly GOAL_LABEL_OFFSET = new vec3(18, 18, 0);
+  private static readonly GOAL_LABEL_HALF_WIDTH = 65;
+  private static readonly GOAL_LABEL_HALF_HEIGHT = 14;
+  private static readonly GOAL_LABEL_TEXT_SIZE = 20;
   /** Ignore sub-cm camera jitter when accumulating walk distance (world units = cm). */
   private static readonly WALK_SAMPLE_MIN_CM = 2;
   private static goalPlantRegistry: PlantLifecycle[] = [];
@@ -126,6 +130,10 @@ export class PlantLifecycle extends BaseScriptComponent {
   private walkLastCameraPos: vec3 | null = null;
   private walkCamera: SceneObject | null = null;
   private walkProgressLogTimer = 0;
+  private goalLabelRoot: SceneObject | null = null;
+  private goalLabelText3D: Text3D | null = null;
+  private goalLabelLookAt: LookAtComponent | null = null;
+  private goalLabelCamera: SceneObject | null = null;
 
   onAwake(): void {
     this.debugLog(`awake plantType=${this.plantTypeId}`);
@@ -299,6 +307,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       );
     }
     PlantLifecycle.registerGoalPlant(this);
+    this.refreshGoalLabel();
     this.notifyAnchorStateChanged();
     print(`[PlantLifecycle] ${this.getSceneObject().name}: bound goal "${text}"`);
   }
@@ -462,6 +471,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       return false;
     }
     this.goalCompleted = true;
+    this.refreshGoalLabel();
     this.walkTrackingActive = false;
     print(`[PlantLifecycle] ${this.getSceneObject().name}: goal completed "${this.goalText}"`);
 
@@ -493,30 +503,17 @@ export class PlantLifecycle extends BaseScriptComponent {
       return null;
     }
 
-    const wantsComplete =
-      /\b(finished|finish|completed|complete|done|did it|i did|achieved|accomplished)\b/.test(
-        query
-      ) || /\b(my )?goal\b/.test(query);
-    if (!wantsComplete) {
-      // Still allow matching the goal wording itself ("i ran one kilometer").
-      let matched: PlantLifecycle | null = null;
-      for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
-        const plant = PlantLifecycle.goalPlantRegistry[i];
-        if (isNull(plant) || !plant.requiresGoal()) {
-          continue;
-        }
-        const goal = plant.getGoalText().toLowerCase();
-        if (goal && (query.indexOf(goal) >= 0 || goal.indexOf(query) >= 0 || this.sharesGoalTokens(query, goal))) {
-          matched = plant;
-          break;
-        }
-      }
-      if (isNull(matched)) {
-        return null;
-      }
-      if (matched.completeGoal()) {
-        return matched;
-      }
+    // Require explicit completion intent to avoid accidental completes from ambient speech/TTS.
+    const hasDoneWord = /\b(finished|finish|completed|complete|done|did it|i did|achieved|accomplished)\b/.test(
+      query
+    );
+    const mentionsGoal = /\b(my )?goal\b/.test(query);
+    const completionIntent =
+      hasDoneWord ||
+      /\b(i am|i'm|im)\s+done\b/.test(query) ||
+      /\b(all set|that'?s it|thats it)\b/.test(query) ||
+      (mentionsGoal && /\b(finish|finished|complete|completed|done)\b/.test(query));
+    if (!completionIntent) {
       return null;
     }
 
@@ -533,13 +530,20 @@ export class PlantLifecycle extends BaseScriptComponent {
       }
     }
     if (isNull(target)) {
+      // Fallback to a single active goal only when intent is explicit.
+      let onlyActive: PlantLifecycle | null = null;
       for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
         const plant = PlantLifecycle.goalPlantRegistry[i];
-        if (!isNull(plant) && plant.requiresGoal()) {
-          target = plant;
+        if (isNull(plant) || !plant.requiresGoal()) {
+          continue;
+        }
+        if (!isNull(onlyActive)) {
+          onlyActive = null;
           break;
         }
+        onlyActive = plant;
       }
+      target = onlyActive;
     }
     if (isNull(target) || !target.completeGoal()) {
       return null;
@@ -838,6 +842,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     } else if (this.requiresGoalCompletion && !this.goalCompleted) {
       PlantLifecycle.registerGoalPlant(this);
     }
+    this.refreshGoalLabel();
 
     if (this.currentStage === PlantStage.Seed) {
       this.showSeed();
@@ -869,6 +874,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   }
 
   private onUpdate(): void {
+    this.updateGoalLabelTransform();
     if (this.isPlanted && !this.allowTrashManipulation) {
       this.enforcePlantedAnchor();
     }
@@ -2068,6 +2074,124 @@ export class PlantLifecycle extends BaseScriptComponent {
       offsetEnd.y - origin.y,
       offsetEnd.z - origin.z
     );
+  }
+
+  private refreshGoalLabel(): void {
+    const hasGoal = this.requiresGoalCompletion && !!String(this.goalText || '').trim();
+    if (!hasGoal) {
+      if (!isNull(this.goalLabelRoot)) {
+        this.goalLabelRoot.enabled = false;
+      }
+      return;
+    }
+
+    this.ensureGoalLabelVisual();
+    if (isNull(this.goalLabelRoot) || isNull(this.goalLabelText3D)) {
+      return;
+    }
+
+    const prefix = this.goalCompleted ? 'Goal complete:' : 'Goal:';
+    this.goalLabelText3D.text = `${prefix} ${this.goalText}`;
+    this.goalLabelRoot.enabled = true;
+    this.updateGoalLabelTransform();
+  }
+
+  private ensureGoalLabelVisual(): void {
+    if (!isNull(this.goalLabelRoot) && !isNull(this.goalLabelText3D)) {
+      return;
+    }
+
+    const host = this.getSceneObject();
+    const root = global.scene.createSceneObject('GoalLabel');
+    root.setParent(host);
+    root.layer = host.layer;
+    root.enabled = false;
+    root.getTransform().setLocalPosition(PlantLifecycle.GOAL_LABEL_OFFSET);
+
+    const text3d = root.createComponent('Component.Text3D') as Text3D;
+    text3d.enabled = true;
+    text3d.text = '';
+    text3d.size = PlantLifecycle.GOAL_LABEL_TEXT_SIZE;
+    text3d.extrusionDepth = 0.06;
+    text3d.lineSpacing = 1.05;
+    text3d.horizontalAlignment = HorizontalAlignment.Left;
+    text3d.verticalAlignment = VerticalAlignment.Center;
+    text3d.horizontalOverflow = HorizontalOverflow.Wrap;
+    text3d.verticalOverflow = VerticalOverflow.Overflow;
+    text3d.worldSpaceRect = Rect.create(
+      -PlantLifecycle.GOAL_LABEL_HALF_WIDTH,
+      PlantLifecycle.GOAL_LABEL_HALF_WIDTH,
+      -PlantLifecycle.GOAL_LABEL_HALF_HEIGHT,
+      PlantLifecycle.GOAL_LABEL_HALF_HEIGHT
+    );
+    text3d.renderOrder = 13;
+
+    this.goalLabelRoot = root;
+    this.goalLabelText3D = text3d;
+    this.goalLabelLookAt = root.createComponent('Component.LookAtComponent') as LookAtComponent;
+    if (!isNull(this.goalLabelLookAt)) {
+      this.goalLabelLookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
+      this.goalLabelLookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
+      this.goalLabelLookAt.worldUpVector = LookAtComponent.WorldUpVector.SceneY;
+      this.goalLabelLookAt.enabled = false;
+    }
+  }
+
+  private updateGoalLabelTransform(): void {
+    if (isNull(this.goalLabelRoot) || !this.goalLabelRoot.enabled) {
+      return;
+    }
+
+    const hostScale = this.getSceneObject().getTransform().getLocalScale();
+    const invX = 1 / Math.max(0.001, Math.abs(hostScale.x));
+    const invY = 1 / Math.max(0.001, Math.abs(hostScale.y));
+    const invZ = 1 / Math.max(0.001, Math.abs(hostScale.z));
+    this.goalLabelRoot.getTransform().setLocalScale(new vec3(invX, invY, invZ));
+    this.goalLabelRoot.getTransform().setLocalPosition(PlantLifecycle.GOAL_LABEL_OFFSET);
+
+    if (isNull(this.goalLabelLookAt)) {
+      return;
+    }
+    if (isNull(this.goalLabelCamera)) {
+      this.goalLabelCamera = this.findCameraObject();
+    }
+    if (isNull(this.goalLabelCamera)) {
+      this.goalLabelLookAt.enabled = false;
+      return;
+    }
+
+    this.goalLabelLookAt.target = this.goalLabelCamera;
+    this.goalLabelLookAt.enabled = true;
+  }
+
+  private findCameraObject(): SceneObject | null {
+    const preferredNames = ['Camera Object', 'Camera', 'Device Camera'];
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < preferredNames.length; i++) {
+      for (let r = 0; r < rootCount; r++) {
+        const found = this.findObjectByName(global.scene.getRootObject(r), preferredNames[i]);
+        if (!isNull(found)) {
+          return found;
+        }
+      }
+    }
+    return null;
+  }
+
+  private findObjectByName(node: SceneObject, name: string): SceneObject | null {
+    if (isNull(node)) {
+      return null;
+    }
+    if (String(node.name || '') === name) {
+      return node;
+    }
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      const found = this.findObjectByName(node.getChild(i), name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
   }
 
   private debugLog(message: string): void {

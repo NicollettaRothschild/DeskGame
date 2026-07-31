@@ -20,7 +20,9 @@ import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
 import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
 import { shouldRunFriendOnboardingTour } from './FriendOnboardingStorage';
 
-const ANCHOR_CONTROLLER_VERSION = 'v41-treat-as-new-user';
+const ANCHOR_CONTROLLER_VERSION = 'v44-global-object-scale';
+const GLOBAL_OBJECT_SCALE_MULTIPLIER = 1.5;
+const PALETTE_EXTRA_SCALE_MULTIPLIER = 1.5;
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
 const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
@@ -32,7 +34,12 @@ const TRASH_MOVE_HANDLE_REFERENCE_SOURCE = 'Planter';
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_OFFSETS: { [sourceName: string]: vec3 } = {
   'Water Source': new vec3(1.35, 0.08, 1.35),
   Seeds: new vec3(1.25, 0.08, 1.25),
-  PostItNotes: new vec3(0.55, 0.08, 0.55),
+  // Post-it stack is wider after scaling; push handle to the front-right corner.
+  PostItNotes: new vec3(1.2, 0.2, 1.2),
+};
+const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_SCALES: { [sourceName: string]: vec3 } = {
+  // Post-it pad is smaller than other sources; use a bigger handle for parity.
+  PostItNotes: new vec3(0.52, 0.52, 0.52),
 };
 const SEEDS_STATIC_CHILD_NAMES = new Set([
   'Pot1',
@@ -68,22 +75,23 @@ const GARDEN_SOURCE_SCENE_DEFAULTS: Record<
   'Water Source': {
     pos: new vec3(14.318802, -20.641001, -79.9077),
     rot: quat.quatIdentity(),
-    scale: new vec3(10, 10, 10),
+    scale: new vec3(15, 15, 15),
   },
   Planter: {
     pos: new vec3(34.397942, -20.640976, -79.907722),
     rot: quat.quatIdentity(),
-    scale: new vec3(8, 8, 8),
+    scale: new vec3(12, 12, 12),
   },
   Seeds: {
     pos: new vec3(55.521027, -20.640976, -79.907722),
     rot: quat.quatIdentity(),
-    scale: new vec3(8, 8, 8),
+    scale: new vec3(12, 12, 12),
   },
   PostItNotes: {
     pos: new vec3(-10.0, -20.64, -79.9),
     rot: quat.quatIdentity(),
-    scale: new vec3(6, 6, 6),
+    // Keep post-it pad readable next to planter while avoiding giant flattening.
+    scale: new vec3(4.5, 4.5, 4.5),
   },
 };
 const STARTUP_REBIND_DELAY_SEC = 0.35;
@@ -1435,7 +1443,15 @@ export class AnchorController extends BaseScriptComponent {
     entry.wrapper.setParent(this.getSpawnParent());
     entry.wrapper.getTransform().setWorldPosition(worldPos);
     entry.wrapper.getTransform().setWorldRotation(worldRot);
-    entry.wrapper.getTransform().setLocalScale(new vec3(1, 1, 1));
+    entry.wrapper
+      .getTransform()
+      .setLocalScale(
+        new vec3(
+          GLOBAL_OBJECT_SCALE_MULTIPLIER,
+          GLOBAL_OBJECT_SCALE_MULTIPLIER,
+          GLOBAL_OBJECT_SCALE_MULTIPLIER
+        )
+      );
     entry.wrapper.enabled = true;
     entry.content.enabled = true;
 
@@ -2605,6 +2621,7 @@ export class AnchorController extends BaseScriptComponent {
         wrapper.destroy();
       }
     }
+    this.destroyLoosePlantAndSeedSceneObjects();
 
     const layoutNames = this.getAnchorLayoutSourceNames();
     for (let i = 0; i < layoutNames.length; i++) {
@@ -2616,8 +2633,8 @@ export class AnchorController extends BaseScriptComponent {
     this.clearTrashStorage();
     this.restoreGardenSpawnSourcesLayout('reset');
     this.resetTrashToSceneDefault();
-    // Hide Friend tour props; leave Water Source / Seeds at scene-enabled state.
-    const onboardingHideNames = DESK_PROP_NAMES.concat(['Planter', 'PostItNotes']);
+    // Hide all desk/source props so onboarding starts clean with Friend only.
+    const onboardingHideNames = GARDEN_SPAWN_SOURCE_NAMES.concat(DESK_PROP_NAMES);
     for (let i = 0; i < onboardingHideNames.length; i++) {
       const source = this.findGardenSpawnSource(onboardingHideNames[i]);
       if (!isNull(source)) {
@@ -2630,6 +2647,44 @@ export class AnchorController extends BaseScriptComponent {
     }
     this.hasRestored = false;
     this.nextPlantSpawnIndex = 0;
+  }
+
+  private destroyLoosePlantAndSeedSceneObjects(): void {
+    const startsWith = ['PlantContent_', 'SeedPlantModel', 'PotContent_'];
+    const destroyList: SceneObject[] = [];
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      this.collectLoosePlantAndSeedObjects(global.scene.getRootObject(i), startsWith, destroyList);
+    }
+    for (let i = 0; i < destroyList.length; i++) {
+      const node = destroyList[i];
+      if (!isNull(node)) {
+        node.destroy();
+      }
+    }
+    if (destroyList.length > 0) {
+      print(`Onboarding cleanup: destroyed ${destroyList.length} loose seed/plant object(s)`);
+    }
+  }
+
+  private collectLoosePlantAndSeedObjects(
+    node: SceneObject,
+    startsWith: string[],
+    out: SceneObject[]
+  ): void {
+    if (isNull(node)) {
+      return;
+    }
+    const name = String(node.name || '');
+    for (let i = 0; i < startsWith.length; i++) {
+      if (name.indexOf(startsWith[i]) === 0) {
+        out.push(node);
+        return;
+      }
+    }
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      this.collectLoosePlantAndSeedObjects(node.getChild(i), startsWith, out);
+    }
   }
 
   private async resetSpatialAnchorsForWorkspaceMove(): Promise<void> {
@@ -2816,7 +2871,9 @@ export class AnchorController extends BaseScriptComponent {
         if (defaults) {
           source.getTransform().setWorldPosition(defaults.pos);
           source.getTransform().setWorldRotation(defaults.rot);
-          source.getTransform().setWorldScale(defaults.scale);
+          source
+            .getTransform()
+            .setWorldScale(this.getLayoutScaleForSource(name, defaults.scale));
         }
 
         this.gardenSourceFixedWorldPositions.delete(name);
@@ -2846,7 +2903,9 @@ export class AnchorController extends BaseScriptComponent {
         if (defaults) {
           source.getTransform().setWorldPosition(defaults.pos);
           source.getTransform().setWorldRotation(defaults.rot);
-          source.getTransform().setWorldScale(defaults.scale);
+          source
+            .getTransform()
+            .setWorldScale(this.getLayoutScaleForSource(name, defaults.scale));
         }
       }
 
@@ -2859,6 +2918,18 @@ export class AnchorController extends BaseScriptComponent {
 
   private restoreGardenSpawnSourcesAfterReset(): void {
     this.restoreGardenSpawnSourcesLayout('reset');
+  }
+
+  private getLayoutScaleForSource(sourceName: string, baseScale: vec3): vec3 {
+    if (sourceName !== 'palette') {
+      return baseScale;
+    }
+
+    return new vec3(
+      baseScale.x * PALETTE_EXTRA_SCALE_MULTIPLIER,
+      baseScale.y * PALETTE_EXTRA_SCALE_MULTIPLIER,
+      baseScale.z * PALETTE_EXTRA_SCALE_MULTIPLIER
+    );
   }
 
   private captureTrashInitialTransform(): void {
@@ -3304,7 +3375,7 @@ export class AnchorController extends BaseScriptComponent {
 
       manipulation.manipulateRootSceneObject = trash;
       manipulation.enableTranslation = true;
-      manipulation.enableRotation = false;
+      manipulation.enableRotation = true;
       manipulation.enableScale = false;
       if (typeof manipulation.setManipulateRoot === 'function') {
         manipulation.setManipulateRoot(trash.getTransform());
@@ -3546,6 +3617,10 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     handle.getTransform().setLocalPosition(offset);
+    const scale = GARDEN_SOURCE_MOVE_HANDLE_LOCAL_SCALES[sourceName];
+    if (scale) {
+      handle.getTransform().setLocalScale(scale);
+    }
   }
 
   private applyGardenSourceMoveHandleVisual(handle: SceneObject): void {
@@ -3991,6 +4066,15 @@ export class AnchorController extends BaseScriptComponent {
       objectKind === OBJECT_KIND_POT ? `Pot_${index}` : `Plant_${index}`
     );
     wrapper.setParent(this.getSpawnParent());
+    wrapper
+      .getTransform()
+      .setLocalScale(
+        new vec3(
+          GLOBAL_OBJECT_SCALE_MULTIPLIER,
+          GLOBAL_OBJECT_SCALE_MULTIPLIER,
+          GLOBAL_OBJECT_SCALE_MULTIPLIER
+        )
+      );
 
     let obj: SceneObject;
     try {
@@ -4653,6 +4737,15 @@ export class AnchorController extends BaseScriptComponent {
         objectKind === OBJECT_KIND_POT ? `Pot_${i}` : `Plant_${i}`
       );
       wrapper.setParent(this.getSpawnParent());
+      wrapper
+        .getTransform()
+        .setLocalScale(
+          new vec3(
+            GLOBAL_OBJECT_SCALE_MULTIPLIER,
+            GLOBAL_OBJECT_SCALE_MULTIPLIER,
+            GLOBAL_OBJECT_SCALE_MULTIPLIER
+          )
+        );
 
       let obj: SceneObject;
       try {

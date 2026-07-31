@@ -304,20 +304,20 @@ export class FriendGrab extends BaseScriptComponent {
     "Woohoo! You did it! I'm so proud of you — your plant is fully grown!";
 
   @input
-  @hint('After onboarding, Buddy smoothly follows the camera')
+  @hint('Buddy follows the camera in all sessions (paused only while grabbed)')
   enableFollowAfterOnboarding: boolean = true;
 
   /** How far ahead of the user Buddy stays (cm, along look direction). */
   @input('float')
-  followDistanceCm: number = 55;
+  followDistanceCm: number = 26;
 
   /** Side offset from camera forward (cm). Positive = right. */
   @input('float')
-  followSideOffsetCm: number = 18;
+  followSideOffsetCm: number = 4;
 
   /** Height relative to camera (cm). Negative = a bit below eye level. */
   @input('float')
-  followHeightOffsetCm: number = -25;
+  followHeightOffsetCm: number = -18;
 
   /** How quickly Buddy catches up (higher = snappier). */
   @input('float')
@@ -365,15 +365,10 @@ export class FriendGrab extends BaseScriptComponent {
       this.ensureFriendSounds();
       this.ensureSpeechBubble();
       this.resolveTts();
-      this.ensureLookAt();
       this.tryWireMoveInteraction();
       this.ensureGoalCompletionListening();
+      this.startFollowingUser('always-on');
       this.scheduleOnboarding();
-      if (!this.shouldRunOnboardingThisSession() && this.enableFollowAfterOnboarding) {
-        this.startFollowingUser(
-          isFriendOnboardingCompletedInStorage() ? 'returning-user' : 'no-onboarding'
-        );
-      }
       if (this.debugLogging) {
         print(
           `[FriendGrab] ready tts=${!isNull(this.resolveTts())} bubble=${this.enableSpeechBubble} lookAt=${this.enableLookAt} bob=${this.enableIdleBob} onboarding=${this.enableOnboarding} completed=${isFriendOnboardingCompletedInStorage()}`
@@ -1498,8 +1493,6 @@ export class FriendGrab extends BaseScriptComponent {
 
     this.workspaceResetAt = now;
     print(`[FriendGrab] restarting onboarding (${reason})`);
-    this.followActive = false;
-    this.followLoggedStart = false;
     this.onboardingGoalListening = false;
     this.enableOnboarding = true;
     clearFriendOnboardingCompletedInStorage();
@@ -1894,26 +1887,33 @@ export class FriendGrab extends BaseScriptComponent {
     if (!this.followActive || !this.enableFollowAfterOnboarding) {
       return;
     }
-    if (this.moveActive || this.onboardingActive) {
+    if (this.moveActive) {
+      return;
+    }
+    const self = this.getSceneObject();
+    if (!isNull(self) && !self.enabled) {
+      self.enabled = true;
+    }
+
+    const preferredCamera = this.findCameraObject();
+    if (!isNull(preferredCamera)) {
+      this.lookAtCamera = preferredCamera;
+    }
+    if (!this.isValidSceneObject(this.lookAtCamera)) {
+      this.lookAtCamera = null;
       return;
     }
 
-    if (isNull(this.lookAtCamera)) {
-      this.lookAtCamera = this.findCameraObject();
-    }
-    if (isNull(this.lookAtCamera)) {
-      return;
-    }
-
-    const camTransform = this.lookAtCamera.getTransform();
+    const camTransform = (this.lookAtCamera as SceneObject).getTransform();
     const camPos = camTransform.getWorldPosition();
 
     let forward = camTransform.forward;
     if (isNull(forward)) {
       forward = new vec3(0, 0, -1);
     }
-    let fx = forward.x;
-    let fz = forward.z;
+    // Lens world forward is -Z; invert camera forward so Buddy stays in front of the user.
+    let fx = -forward.x;
+    let fz = -forward.z;
     let flatLen = Math.sqrt(fx * fx + fz * fz);
     if (flatLen < 0.001) {
       fx = 0;
@@ -1927,8 +1927,10 @@ export class FriendGrab extends BaseScriptComponent {
     const rx = -fz;
     const rz = fx;
 
-    const dist = Math.max(20, this.followDistanceCm);
-    const side = this.followSideOffsetCm;
+    // Spectacles comfort bounds: keep Buddy centered and inside forward FOV
+    // even if inspector values were previously tuned too far to the right/far.
+    const dist = Math.max(18, Math.min(30, this.followDistanceCm));
+    const side = Math.max(-2, Math.min(2, this.followSideOffsetCm));
     const height = this.followHeightOffsetCm;
     const target = new vec3(
       camPos.x + fx * dist + rx * side,
@@ -1939,19 +1941,39 @@ export class FriendGrab extends BaseScriptComponent {
     const transform = this.getSceneObject().getTransform();
     const current = transform.getWorldPosition();
     const dx = target.x - current.x;
-    const dy = target.y - current.y;
+    const dyRaw = target.y - current.y;
     const dz = target.z - current.z;
-    const gap = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (gap < Math.max(0.5, this.followMinMoveCm)) {
+    const horizontalGap = Math.sqrt(dx * dx + dz * dz);
+    const gap = Math.sqrt(dx * dx + dyRaw * dyRaw + dz * dz);
+    const snapThresholdCm = Math.max(100, dist * 3);
+    if (gap > snapThresholdCm) {
+      transform.setWorldPosition(target);
+      this.captureIdleBasePosition();
+      if (this.debugLogging) {
+        print(`[FriendGrab] follow snap (gap=${gap.toFixed(1)}cm)`);
+      }
+      return;
+    }
+    const verticalDeadzoneCm = 1.25;
+    if (
+      horizontalGap < Math.max(0.5, this.followMinMoveCm) &&
+      Math.abs(dyRaw) < verticalDeadzoneCm
+    ) {
       return;
     }
 
     const dt = Math.max(0.001, getDeltaTime());
     const speed = Math.max(0.5, this.followLerpSpeed);
     const t = 1 - Math.exp(-speed * dt);
+    const maxVerticalStepCm = Math.max(0.2, 10 * dt);
+    let dy = 0;
+    if (Math.abs(dyRaw) >= verticalDeadzoneCm) {
+      dy = Math.max(-maxVerticalStepCm, Math.min(maxVerticalStepCm, dyRaw));
+    }
+    const verticalT = Math.min(1, t * 0.45);
     const next = new vec3(
       current.x + dx * t,
-      current.y + dy * t,
+      current.y + dy * verticalT,
       current.z + dz * t
     );
     transform.setWorldPosition(next);
@@ -1972,6 +1994,12 @@ export class FriendGrab extends BaseScriptComponent {
 
   private updateIdleBob(): void {
     if (!this.enableIdleBob || this.moveActive) {
+      return;
+    }
+
+    // Follow motion already has enough life; bobbing while following looks jumpy on Specs.
+    if (this.followActive) {
+      this.resetIdleBobOffset();
       return;
     }
 
@@ -2017,10 +2045,9 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private ensureLookAt(): void {
-    if (isNull(this.lookAtCamera)) {
-      this.lookAtCamera = this.findCameraObject();
-    }
-    if (isNull(this.lookAtCamera)) {
+    this.lookAtCamera = this.findCameraObject();
+    if (!this.isValidSceneObject(this.lookAtCamera)) {
+      this.lookAtCamera = null;
       print('[FriendGrab] look-at skipped: Camera Object not found');
       return;
     }
@@ -2031,7 +2058,13 @@ export class FriendGrab extends BaseScriptComponent {
       lookAt = anchor.createComponent('Component.LookAtComponent') as LookAtComponent;
     }
 
-    lookAt.target = this.lookAtCamera;
+    try {
+      lookAt.target = this.lookAtCamera as SceneObject;
+    } catch (e) {
+      print('[FriendGrab] look-at skipped: invalid camera target: ' + e);
+      this.lookAtCamera = null;
+      return;
+    }
     lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
     // Confirmed correct for Friend mesh (+Z toward viewer).
     lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
@@ -2053,9 +2086,21 @@ export class FriendGrab extends BaseScriptComponent {
         return;
       }
     }
+    if (!this.isValidSceneObject(this.lookAtCamera)) {
+      this.lookAtCamera = null;
+      this.lookAt.enabled = false;
+      return;
+    }
 
     // Always keep component config correct; never leave it enabled by accident.
-    this.lookAt.target = this.lookAtCamera;
+    try {
+      this.lookAt.target = this.lookAtCamera;
+    } catch (e) {
+      print('[FriendGrab] look-at target refresh failed: ' + e);
+      this.lookAtCamera = null;
+      this.lookAt.enabled = false;
+      return;
+    }
     this.lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
 
     const friendPos = this.getSceneObject().getTransform().getWorldPosition();
@@ -2122,14 +2167,50 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private findCameraObject(): SceneObject | null {
-    const preferredNames = ['Camera Object', 'Camera', 'Device Camera'];
+    // Prefer tracked "Camera" (Specs rigs often use this), then fall back.
+    const preferredNames = ['Camera', 'Camera Object', 'Device Camera'];
     for (let i = 0; i < preferredNames.length; i++) {
       const found = this.findObjectByNameInScene(preferredNames[i]);
+      if (this.isValidSceneObject(found)) {
+        return found;
+      }
+    }
+    const fallback = this.findObjectWithCameraComponent();
+    return this.isValidSceneObject(fallback) ? fallback : null;
+  }
+
+  private findAnchorControllerCamera(): SceneObject | null {
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const found = this.findAnchorControllerCameraRecursive(global.scene.getRootObject(i));
       if (!isNull(found)) {
         return found;
       }
     }
-    return this.findObjectWithCameraComponent();
+    return null;
+  }
+
+  private findAnchorControllerCameraRecursive(node: SceneObject): SceneObject | null {
+    if (isNull(node)) {
+      return null;
+    }
+    const scripts = node.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as ScriptComponent & { camera?: SceneObject };
+      if (!isNull(candidate) && !isNull(candidate.camera)) {
+        const camObj = candidate.camera as SceneObject;
+        if (!isNull(camObj) && !isNull(camObj.getComponent('Component.Camera') as Camera)) {
+          return camObj;
+        }
+      }
+    }
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      const found = this.findAnchorControllerCameraRecursive(node.getChild(i));
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
   }
 
   private findObjectByNameInScene(name: string): SceneObject | null {
@@ -2189,6 +2270,18 @@ export class FriendGrab extends BaseScriptComponent {
       }
     }
     return null;
+  }
+
+  private isValidSceneObject(node: SceneObject | null): boolean {
+    if (isNull(node)) {
+      return false;
+    }
+    try {
+      const t = node.getTransform();
+      return !isNull(t);
+    } catch (_e) {
+      return false;
+    }
   }
 
   private refreshGrabCollider(): void {

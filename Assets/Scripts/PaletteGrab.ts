@@ -129,7 +129,7 @@ export class PaletteGrab extends BaseScriptComponent {
 
     manipulation.manipulateRootSceneObject = anchor;
     manipulation.enableTranslation = true;
-    manipulation.enableRotation = false;
+    manipulation.enableRotation = true;
     manipulation.enableScale = false;
     manipulation.useFilter = false;
 

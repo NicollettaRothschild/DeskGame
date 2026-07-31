@@ -200,7 +200,7 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
 
     this.bindManipulationRoot(manipulation, sourceRoot);
     manipulation.enableTranslation = true;
-    manipulation.enableRotation = false;
+    manipulation.enableRotation = true;
     manipulation.enableScale = false;
     const manipulationLike = manipulation as ScriptComponent & {
       useFilter?: boolean;

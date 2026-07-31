@@ -67,6 +67,7 @@ export class ClockGrab extends BaseScriptComponent {
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
 
   private static readonly ANCHOR_SOURCE_NAME = 'Clock';
+  private static readonly MIN_COLLIDER_SIZE = new vec3(140, 140, 55);
 
   private getAnchorHandler(): {
     persistGardenSourceTransform?: (sourceName: string) => void;
@@ -129,7 +130,7 @@ export class ClockGrab extends BaseScriptComponent {
 
     manipulation.manipulateRootSceneObject = anchor;
     manipulation.enableTranslation = true;
-    manipulation.enableRotation = false;
+    manipulation.enableRotation = true;
     manipulation.enableScale = false;
     manipulation.useFilter = false;
 
@@ -418,10 +419,20 @@ export class ClockGrab extends BaseScriptComponent {
     colliderLike.debugDrawEnabled = false;
 
     const shape = Shape.createBoxShape();
-    shape.size = this.colliderSize;
+    shape.size = this.getEffectiveColliderSize();
     colliderLike.shape = shape;
 
     return collider;
+  }
+
+  private getEffectiveColliderSize(): vec3 {
+    const configured = this.colliderSize || new vec3(0, 0, 0);
+    const min = ClockGrab.MIN_COLLIDER_SIZE;
+    return new vec3(
+      Math.max(min.x, configured.x),
+      Math.max(min.y, configured.y),
+      Math.max(min.z, configured.z)
+    );
   }
 
   private bindManipulationRoot(

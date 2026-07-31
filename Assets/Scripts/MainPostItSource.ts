@@ -28,6 +28,7 @@ type InteractableLike = ScriptComponent & {
   onTriggerUpdate?: PublicEventLike<InteractorEventLike>;
   onDragStart?: PublicEventLike<InteractorEventLike>;
   onDragUpdate?: PublicEventLike<InteractorEventLike>;
+  onInteractorTriggerUpdate?: PublicEventLike<InteractorEventLike>;
   onDragEnd?: PublicEventLike<InteractorEventLike>;
   onInteractorTriggerEnd?: PublicEventLike<InteractorEventLike>;
   onInteractorTriggerEndOutside?: PublicEventLike<InteractorEventLike>;
@@ -140,7 +141,10 @@ export class MainPostItSource extends BaseScriptComponent {
     }
 
     const triggerStart = interactable.onInteractorTriggerStart || interactable.onTriggerStart;
-    const triggerUpdate = interactable.onTriggerUpdate || interactable.onDragUpdate;
+    const triggerUpdate =
+      interactable.onTriggerUpdate ||
+      interactable.onDragUpdate ||
+      interactable.onInteractorTriggerUpdate;
     if (!triggerStart && !interactable.onDragStart) {
       this.debugLog('sourceInteractable found, but trigger/drag events are not initialized yet.');
       return;
@@ -406,7 +410,10 @@ export class MainPostItSource extends BaseScriptComponent {
       if (
         !isNull(candidate) &&
         (candidate.onInteractorTriggerStart !== undefined || candidate.onTriggerStart !== undefined) &&
-        candidate.onTriggerUpdate !== undefined
+        (candidate.onTriggerUpdate !== undefined ||
+          candidate.onDragUpdate !== undefined ||
+          candidate.onInteractorTriggerUpdate !== undefined ||
+          candidate.onDragStart !== undefined)
       ) {
         return candidate;
       }
@@ -498,7 +505,9 @@ export class MainPostItSource extends BaseScriptComponent {
   private beginNoteTranscriptCapture(noteObject: SceneObject): void {
     const transcript = this.findNoteTranscript(noteObject);
     if (isNull(transcript) || typeof transcript.beginCapture !== 'function') {
-      this.debugLog('spawned note has no PostItNoteTranscript component.');
+      print(
+        `[MainPostItSource] ${noteObject.name} missing PostItNoteTranscript (capture unavailable)`
+      );
       return;
     }
     transcript.beginCapture();
@@ -517,17 +526,30 @@ export class MainPostItSource extends BaseScriptComponent {
       return null;
     }
 
-    const scripts = noteObject.getComponents('Component.ScriptComponent');
-    for (let i = 0; i < scripts.length; i++) {
-      const candidate = scripts[i] as NoteTranscriptLike;
-      if (
-        !isNull(candidate) &&
-        typeof candidate.beginCapture === 'function' &&
-        typeof candidate.endCapture === 'function'
-      ) {
-        return candidate;
+    const stack: SceneObject[] = [noteObject];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as NoteTranscriptLike;
+        if (
+          !isNull(candidate) &&
+          typeof candidate.beginCapture === 'function' &&
+          typeof candidate.endCapture === 'function'
+        ) {
+          return candidate;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
       }
     }
+
     return null;
   }
 
