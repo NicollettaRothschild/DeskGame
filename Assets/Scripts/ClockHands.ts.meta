@@ -1,0 +1,56 @@
+- !<AssetImportMetadata/bfbe0d1a-daa8-4052-844e-91a4aa81d2c9>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> cb960e17-5dcc-416f-b1f7-198e8e1639c8
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> cb960e17-5dcc-416f-b1f7-198e8e1639c8
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 3ea48f66-7785-477c-9bd5-155e12321ae8
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/3ea48f66-7785-477c-9bd5-155e12321ae8>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: b7e2822c-3245-44a1-a508-7fb587dc568b
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    debugLogging: false
+    hourHand: false
+    invertDirection: false
+    minuteHand: false
+    zeroOffsetDegrees: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - hourHand: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      minuteHand: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      zeroOffsetDegrees: !<float> 180.000000
+      invertDirection: false
+      debugLogging: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input SceneObject hourHand
+    - // @input SceneObject minuteHand
+    - // @input float zeroOffsetDegrees = 180
+    - // @input bool invertDirection
+    - // @input bool debugLogging
