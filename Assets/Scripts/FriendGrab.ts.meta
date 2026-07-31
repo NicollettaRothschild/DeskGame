@@ -35,6 +35,7 @@
     enableGrabSounds: false
     enableIdleBob: false
     enableLookAt: false
+    enableOnboarding: false
     enableSpeechBubble: false
     enableTts: false
     grabBubbleText: false
@@ -46,6 +47,14 @@
     lookAtDistanceMeters: false
     lookAtExitPaddingMeters: false
     lookAtTurnSpeed: false
+    onboardingGapSec: false
+    onboardingLine1: false
+    onboardingLine2: false
+    onboardingLine3: false
+    onboardingLine4: false
+    onboardingLine5: false
+    onboardingLine6: false
+    onboardingStartDelaySec: false
     releaseBubbleText: false
     releaseSoundTrack: false
     releaseSoundVolume: false
@@ -69,6 +78,15 @@
       enableGrabSounds: true
       enableSpeechBubble: true
       enableTts: true
+      enableOnboarding: false
+      onboardingStartDelaySec: 2.500000
+      onboardingGapSec: 0.500000
+      onboardingLine1: "Hi! I'm your desk buddy. Here's a quick tour!"
+      onboardingLine2: "Pinch and drag me, the clock, globe, or palette to move them."
+      onboardingLine3: "Grab a planter, then add seeds and water to grow plants."
+      onboardingLine4: Pull a sticky note and speak — your words appear on it.
+      onboardingLine5: Drop things in the trash to clean up.
+      onboardingLine6: Say hey Arvis if you need help. Have fun!
       agentTts: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       releaseSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -98,6 +116,15 @@
     - // @input bool enableGrabSounds = true
     - // @input bool enableSpeechBubble = true
     - // @input bool enableTts = true
+    - '// @input bool enableOnboarding {"label":"Enable Onboarding", "hint":"Friend explains the desk garden to new players on start"}'
+    - '// @input float onboardingStartDelaySec = 2.5 {"label":"Onboarding Start Delay (sec)"}'
+    - '// @input float onboardingGapSec = 0.5 {"label":"Onboarding Gap (sec)"}'
+    - "// @input string onboardingLine1 = \"Hi! I'm your desk buddy. Here's a quick tour!\" {\"label\":\"Onboarding Line 1\"}"
+    - '// @input string onboardingLine2 = "Pinch and drag me, the clock, globe, or palette to move them." {"label":"Onboarding Line 2"}'
+    - '// @input string onboardingLine3 = "Grab a planter, then add seeds and water to grow plants." {"label":"Onboarding Line 3"}'
+    - '// @input string onboardingLine4 = "Pull a sticky note and speak — your words appear on it." {"label":"Onboarding Line 4"}'
+    - '// @input string onboardingLine5 = "Drop things in the trash to clean up." {"label":"Onboarding Line 5"}'
+    - '// @input string onboardingLine6 = "Say hey Arvis if you need help. Have fun!" {"label":"Onboarding Line 6"}'
     - // @input AssignableType agentTts
     - // @input Asset.AudioTrackAsset grabSpeechTrack
     - // @input Asset.AudioTrackAsset releaseSpeechTrack

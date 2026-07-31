@@ -1,7 +1,7 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable';
 import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
 import { ArvisGhostSpeechBubble } from './ArvisGhostSpeechBubble';
-import { FlowGardenTTS } from './FlowGardenTTS';
+import { estimateSpeechDurationSec, FlowGardenTTS } from './FlowGardenTTS';
 import { getSharedFlowGardenTts } from './FlowGardenServiceRegistry';
 
 type InteractableLike = ScriptComponent & {
@@ -63,6 +63,103 @@ export class FriendGrab extends BaseScriptComponent {
 
   @input
   enableTts: boolean = true;
+
+  /**
+   * When on, Friend hides desk props and reveals them one-by-one with a short lesson.
+   * Toggle off in the Inspector once players know the ropes.
+   */
+  @input
+  @label('Enable Onboarding')
+  @hint('Friend reveals desk objects one at a time and explains grab / release')
+  enableOnboarding: boolean = false;
+
+  @input('float')
+  @label('Onboarding Start Delay (sec)')
+  onboardingStartDelaySec: number = 2.5;
+
+  @input('float')
+  @label('Onboarding Gap (sec)')
+  onboardingGapSec: number = 0.6;
+
+  @input('float')
+  @label('Practice Timeout (sec)')
+  @hint('Auto-advance if the player does not grab/release in time')
+  onboardingPracticeTimeoutSec: number = 14;
+
+  @input
+  @label('Require Grab Practice')
+  @hint('Wait for grab+release on movable desk props before revealing the next')
+  onboardingRequirePractice: boolean = true;
+
+  @input
+  @label('Welcome Line')
+  onboardingWelcomeLine: string =
+    "Hi! I'm your desk buddy. I'll show you the desk one piece at a time.";
+
+  @input
+  @label('Closing Line')
+  onboardingClosingLine: string =
+    "You're all set! Say hey Arvis if you need help. Have fun!";
+
+  @input
+  @allowUndefined
+  @label('Tour Globe')
+  onboardingGlobe!: SceneObject;
+
+  @input
+  @label('Globe Line')
+  onboardingGlobeLine: string =
+    "Here's the globe. Pinch to grab it, move it, then release.";
+
+  @input
+  @allowUndefined
+  @label('Tour Clock')
+  onboardingClock!: SceneObject;
+
+  @input
+  @label('Clock Line')
+  onboardingClockLine: string =
+    "Here's the clock. Grab it, move it, then let go.";
+
+  @input
+  @allowUndefined
+  @label('Tour Palette')
+  onboardingPalette!: SceneObject;
+
+  @input
+  @label('Palette Line')
+  onboardingPaletteLine: string =
+    "Here's the palette. Grab and release to place it where you like.";
+
+  @input
+  @allowUndefined
+  @label('Tour Planter')
+  onboardingPlanter!: SceneObject;
+
+  @input
+  @label('Planter Line')
+  onboardingPlanterLine: string =
+    "Here's the planter stack. Pinch it to grab a pot for your garden.";
+
+  @input
+  @allowUndefined
+  @label('Tour Post-its')
+  onboardingPostIt!: SceneObject;
+
+  @input
+  @label('Post-it Line')
+  onboardingPostItLine: string =
+    "Here's the sticky notes. Pull one and speak — your words appear on it.";
+
+  @input
+  @allowUndefined
+  @label('Tour Trash')
+  onboardingTrash!: SceneObject;
+
+  @input
+  @label('Trash Line')
+  onboardingTrashLine: string =
+    "Here's the trash. Drop things into it to clean up.";
 
   @input
   @allowUndefined
@@ -137,6 +234,9 @@ export class FriendGrab extends BaseScriptComponent {
   private idleBaseLocalPos: vec3 | null = null;
   private lookAtDistanceLogTimer = 0;
   private lookAtLoggedSetup = false;
+  private onboardingActive = false;
+  private onboardingToken = 0;
+  private onboardingPracticeDone = false;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -146,9 +246,10 @@ export class FriendGrab extends BaseScriptComponent {
       this.resolveTts();
       this.ensureLookAt();
       this.tryWireMoveInteraction();
+      this.scheduleOnboarding();
       if (this.debugLogging) {
         print(
-          `[FriendGrab] ready tts=${!isNull(this.resolveTts())} bubble=${this.enableSpeechBubble} lookAt=${this.enableLookAt} bob=${this.enableIdleBob}`
+          `[FriendGrab] ready tts=${!isNull(this.resolveTts())} bubble=${this.enableSpeechBubble} lookAt=${this.enableLookAt} bob=${this.enableIdleBob} onboarding=${this.enableOnboarding}`
         );
       }
     });
@@ -386,7 +487,8 @@ export class FriendGrab extends BaseScriptComponent {
     this.moveActive = true;
     this.resetIdleBobOffset();
     this.playFriendSound(this.resolvedGrabTrack, this.grabSoundVolume, 'grab');
-    if (this.grabBubbleText) {
+    // Don't interrupt the onboarding tour with grab quips.
+    if (!this.onboardingActive && this.grabBubbleText) {
       this.showSpeech(this.grabBubbleText, true, this.grabSpeechTrack);
     }
     if (this.debugLogging) {
@@ -401,7 +503,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.moveActive = false;
     this.captureIdleBasePosition();
     this.playFriendSound(this.resolvedReleaseTrack, this.releaseSoundVolume, 'release');
-    if (this.releaseBubbleText) {
+    if (!this.onboardingActive && this.releaseBubbleText) {
       this.showSpeech(this.releaseBubbleText, true, this.releaseSpeechTrack);
     }
     if (this.debugLogging) {
@@ -547,12 +649,333 @@ export class FriendGrab extends BaseScriptComponent {
     const followRoot = this.getSceneObject();
     this.speechBubble = new ArvisGhostSpeechBubble(followRoot, this, {
       scaleCompensation: Math.max(0.1, this.bubbleScaleCompensation),
-      maxCharacters: 88,
-      hideDelaySec: this.speechBubbleHideDelaySec,
+      maxCharacters: 120,
+      hideDelaySec: Math.max(
+        this.speechBubbleHideDelaySec,
+        this.enableOnboarding ? 10 : this.speechBubbleHideDelaySec
+      ),
       debugLogging: this.debugLogging,
       bubbleBaseY: this.bubbleHeightOffset,
       bubbleBaseZ: this.bubbleForwardOffset,
     });
+  }
+
+  private getOnboardingTourSteps(): Array<{
+    key: string;
+    object: SceneObject | null;
+    line: string;
+    requirePractice: boolean;
+  }> {
+    const resolve = (
+      assigned: SceneObject | null | undefined,
+      fallbackName: string
+    ): SceneObject | null => {
+      if (!isNull(assigned)) {
+        return assigned;
+      }
+      return this.findObjectByNameInScene(fallbackName);
+    };
+
+    return [
+      {
+        key: 'globe',
+        object: resolve(this.onboardingGlobe, 'Globe'),
+        line: this.onboardingGlobeLine,
+        requirePractice: true,
+      },
+      {
+        key: 'clock',
+        object: resolve(this.onboardingClock, 'Clock'),
+        line: this.onboardingClockLine,
+        requirePractice: true,
+      },
+      {
+        key: 'palette',
+        object: resolve(this.onboardingPalette, 'palette'),
+        line: this.onboardingPaletteLine,
+        requirePractice: true,
+      },
+      {
+        key: 'planter',
+        object: resolve(this.onboardingPlanter, 'Planter'),
+        line: this.onboardingPlanterLine,
+        requirePractice: false,
+      },
+      {
+        key: 'postit',
+        object: resolve(this.onboardingPostIt, 'PostItNotes'),
+        line: this.onboardingPostItLine,
+        requirePractice: false,
+      },
+      {
+        key: 'trash',
+        object: resolve(this.onboardingTrash, 'TrashBin'),
+        line: this.onboardingTrashLine,
+        requirePractice: false,
+      },
+    ];
+  }
+
+  private hideOnboardingTourObjects(): void {
+    const steps = this.getOnboardingTourSteps();
+    for (let i = 0; i < steps.length; i++) {
+      const obj = steps[i].object;
+      if (!isNull(obj)) {
+        obj.enabled = false;
+      }
+    }
+  }
+
+  private revealAllOnboardingTourObjects(): void {
+    const steps = this.getOnboardingTourSteps();
+    for (let i = 0; i < steps.length; i++) {
+      const obj = steps[i].object;
+      if (!isNull(obj)) {
+        obj.enabled = true;
+      }
+    }
+  }
+
+  private scheduleOnboarding(): void {
+    if (!this.enableOnboarding) {
+      return;
+    }
+
+    // Hide tour props immediately so the desk starts empty aside from Friend.
+    this.hideOnboardingTourObjects();
+
+    this.onboardingToken += 1;
+    const token = this.onboardingToken;
+    const delaySec = Math.max(0.1, this.onboardingStartDelaySec);
+    const delay = this.createEvent('DelayedCallbackEvent');
+    delay.bind(() => {
+      if (token !== this.onboardingToken || !this.enableOnboarding) {
+        return;
+      }
+      // Re-hide in case AnchorController layout re-enabled props during boot.
+      this.hideOnboardingTourObjects();
+      print('[FriendGrab] onboarding tour start');
+      this.runOnboardingWelcome(token);
+    });
+    delay.reset(delaySec);
+  }
+
+  private runOnboardingWelcome(token: number): void {
+    if (token !== this.onboardingToken || !this.enableOnboarding) {
+      return;
+    }
+    this.onboardingActive = true;
+    const welcome = String(this.onboardingWelcomeLine || '').trim();
+    if (!welcome) {
+      this.runOnboardingStep(0, token);
+      return;
+    }
+    this.speakOnboardingText(welcome, token, () => {
+      this.delayOnboarding(token, () => this.runOnboardingStep(0, token));
+    });
+  }
+
+  private runOnboardingStep(index: number, token: number): void {
+    if (token !== this.onboardingToken || !this.enableOnboarding) {
+      this.onboardingActive = false;
+      return;
+    }
+
+    const steps = this.getOnboardingTourSteps();
+    if (index < 0 || index >= steps.length) {
+      this.finishOnboardingTour(token);
+      return;
+    }
+
+    const step = steps[index];
+    if (isNull(step.object)) {
+      print(`[FriendGrab] onboarding skip missing object: ${step.key}`);
+      this.runOnboardingStep(index + 1, token);
+      return;
+    }
+
+    this.onboardingActive = true;
+    step.object.enabled = true;
+    print(`[FriendGrab] onboarding reveal ${step.key}`);
+
+    const line = String(step.line || '').trim();
+    const afterSpeech = (): void => {
+      if (token !== this.onboardingToken) {
+        return;
+      }
+      const needsPractice =
+        this.onboardingRequirePractice && step.requirePractice && !isNull(step.object);
+      if (!needsPractice) {
+        this.delayOnboarding(token, () => this.runOnboardingStep(index + 1, token));
+        return;
+      }
+      this.waitForOnboardingPractice(step.object as SceneObject, token, () => {
+        this.delayOnboarding(token, () => this.runOnboardingStep(index + 1, token));
+      });
+    };
+
+    if (!line) {
+      afterSpeech();
+      return;
+    }
+    this.speakOnboardingText(line, token, afterSpeech);
+  }
+
+  private finishOnboardingTour(token: number): void {
+    if (token !== this.onboardingToken) {
+      return;
+    }
+    this.revealAllOnboardingTourObjects();
+    const closing = String(this.onboardingClosingLine || '').trim();
+    if (!closing) {
+      this.onboardingActive = false;
+      print('[FriendGrab] onboarding complete');
+      return;
+    }
+    this.speakOnboardingText(closing, token, () => {
+      if (token !== this.onboardingToken) {
+        return;
+      }
+      this.onboardingActive = false;
+      print('[FriendGrab] onboarding complete');
+    });
+  }
+
+  private delayOnboarding(token: number, next: () => void): void {
+    const gap = Math.max(0.05, this.onboardingGapSec);
+    const delay = this.createEvent('DelayedCallbackEvent');
+    delay.bind(() => {
+      if (token !== this.onboardingToken) {
+        return;
+      }
+      next();
+    });
+    delay.reset(gap);
+  }
+
+  private speakOnboardingText(
+    text: string,
+    token: number,
+    onDone: () => void
+  ): void {
+    if (token !== this.onboardingToken) {
+      return;
+    }
+
+    if (this.enableSpeechBubble) {
+      this.ensureSpeechBubble();
+      if (!isNull(this.speechBubble)) {
+        this.speechBubble.showAgentChat('reply', '', text, 'Friend');
+      }
+    }
+
+    const finish = (): void => {
+      if (token !== this.onboardingToken) {
+        return;
+      }
+      onDone();
+    };
+
+    if (!this.enableTts) {
+      const wait = this.createEvent('DelayedCallbackEvent');
+      wait.bind(finish);
+      wait.reset(estimateSpeechDurationSec(text));
+      return;
+    }
+
+    const tts = this.resolveTts();
+    if (isNull(tts)) {
+      const wait = this.createEvent('DelayedCallbackEvent');
+      wait.bind(finish);
+      wait.reset(estimateSpeechDurationSec(text));
+      return;
+    }
+
+    tts.speak(text, (ok) => {
+      if (token !== this.onboardingToken) {
+        return;
+      }
+      if (!ok) {
+        const wait = this.createEvent('DelayedCallbackEvent');
+        wait.bind(finish);
+        wait.reset(Math.max(1.2, estimateSpeechDurationSec(text) * 0.35));
+        return;
+      }
+      finish();
+    });
+  }
+
+  private waitForOnboardingPractice(
+    target: SceneObject,
+    token: number,
+    onDone: () => void
+  ): void {
+    this.onboardingPracticeDone = false;
+    let grabbed = false;
+
+    const finish = (reason: string): void => {
+      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
+        return;
+      }
+      this.onboardingPracticeDone = true;
+      print(`[FriendGrab] onboarding practice ${reason}`);
+      onDone();
+    };
+
+    const manip = this.findManipulationInTree(target);
+    if (!isNull(manip)) {
+      if (manip.onManipulationStart) {
+        manip.onManipulationStart.add(() => {
+          if (token !== this.onboardingToken) {
+            return;
+          }
+          grabbed = true;
+        });
+      }
+      if (manip.onManipulationEnd) {
+        manip.onManipulationEnd.add(() => {
+          if (token !== this.onboardingToken || !grabbed) {
+            return;
+          }
+          finish('grab-release');
+        });
+      }
+    } else {
+      print(
+        `[FriendGrab] onboarding no grab handler on ${target.name} — using timeout`
+      );
+    }
+
+    const timeoutSec = Math.max(3, this.onboardingPracticeTimeoutSec);
+    const timeout = this.createEvent('DelayedCallbackEvent');
+    timeout.bind(() => finish('timeout'));
+    timeout.reset(timeoutSec);
+
+    // Nudge player if they're still waiting.
+    const tip = this.createEvent('DelayedCallbackEvent');
+    tip.bind(() => {
+      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
+        return;
+      }
+      this.showSpeech('Try grabbing it, then release.', true, null);
+    });
+    tip.reset(Math.min(5, timeoutSec * 0.45));
+  }
+
+  private findManipulationInTree(root: SceneObject): InteractableManipulationLike | null {
+    const direct = this.findExistingManipulation(root);
+    if (!isNull(direct)) {
+      return direct;
+    }
+    const childCount = root.getChildrenCount();
+    for (let i = 0; i < childCount; i++) {
+      const child = root.getChild(i);
+      const nested = this.findManipulationInTree(child);
+      if (!isNull(nested)) {
+        return nested;
+      }
+    }
+    return null;
   }
 
   private captureIdleBasePosition(): void {
