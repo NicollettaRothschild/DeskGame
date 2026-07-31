@@ -357,6 +357,7 @@ export class FriendGrab extends BaseScriptComponent {
   private idleBaseLocalPos: vec3 | null = null;
   private lookAtDistanceLogTimer = 0;
   private lookAtLoggedSetup = false;
+  private lastLookAtInvalidTargetLogAt = -9999;
   private onboardingActive = false;
   private onboardingToken = 0;
   private onboardingPracticeDone = false;
@@ -1449,7 +1450,28 @@ export class FriendGrab extends BaseScriptComponent {
       return spawn;
     }
 
-    const camPos = this.lookAtCamera.getTransform().getWorldPosition();
+    const camTransform = this.lookAtCamera.getTransform();
+    const camPos = camTransform.getWorldPosition();
+    let camForward = camTransform.forward;
+    if (isNull(camForward)) {
+      camForward = new vec3(0, 0, -1);
+    }
+    let fX = -camForward.x;
+    let fZ = -camForward.z;
+    let fLen = Math.sqrt(fX * fX + fZ * fZ);
+    if (fLen < 0.001) {
+      fX = dirX;
+      fZ = dirZ;
+      fLen = Math.sqrt(fX * fX + fZ * fZ);
+    }
+    if (fLen < 0.001) {
+      fX = 0;
+      fZ = -1;
+      fLen = 1;
+    }
+    fX /= fLen;
+    fZ /= fLen;
+
     // Absolute safety: never let onboarding items creep into head/eye space.
     const maxHeadClearY = camPos.y - 10;
     if (spawn.y > maxHeadClearY) {
@@ -1460,32 +1482,22 @@ export class FriendGrab extends BaseScriptComponent {
     const camDz = spawn.z - camPos.z;
     const camDist = Math.sqrt(camDx * camDx + camDz * camDz);
     const maxFromCameraCm = 60;
-    if (camDist <= maxFromCameraCm) {
+    const dotForward = camDx * fX + camDz * fZ;
+    const isBehindCamera = dotForward < 6;
+    if (camDist <= maxFromCameraCm && !isBehindCamera) {
       return spawn;
     }
 
-    // Re-center to a reliable slot in front of the user (toward Friend),
-    // then let object-specific grab/release interactions take over.
-    const towardFriendX = friendPos.x - camPos.x;
-    const towardFriendZ = friendPos.z - camPos.z;
-    const towardFriendLen = Math.sqrt(
-      towardFriendX * towardFriendX + towardFriendZ * towardFriendZ
-    );
-    if (towardFriendLen <= 0.001) {
-      return spawn;
-    }
-
-    const nX = towardFriendX / towardFriendLen;
-    const nZ = towardFriendZ / towardFriendLen;
+    // Re-center to a reliable slot in front of the user in camera forward.
     const fallbackDist = Math.max(18, Math.min(30, underBuddyDistance));
     const clamped = new vec3(
-      camPos.x + nX * fallbackDist,
+      camPos.x + fX * fallbackDist,
       spawn.y,
-      camPos.z + nZ * fallbackDist
+      camPos.z + fZ * fallbackDist
     );
     if (this.debugLogging) {
       print(
-        `[FriendGrab] onboarding spawn clamped to camera envelope (was ${camDist.toFixed(1)}cm)`
+        `[FriendGrab] onboarding spawn clamped to camera-forward slot (dist=${camDist.toFixed(1)}cm behind=${isBehindCamera})`
       );
     }
     return clamped;
@@ -2185,7 +2197,11 @@ export class FriendGrab extends BaseScriptComponent {
     try {
       lookAt.target = this.lookAtCamera as SceneObject;
     } catch (e) {
-      print('[FriendGrab] look-at skipped: invalid camera target: ' + e);
+      const now = getTime();
+      if (now - this.lastLookAtInvalidTargetLogAt > 1.5) {
+        this.lastLookAtInvalidTargetLogAt = now;
+        print('[FriendGrab] look-at skipped: invalid camera target: ' + e);
+      }
       this.lookAtCamera = null;
       return;
     }
@@ -2302,16 +2318,22 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private findCameraObject(): SceneObject | null {
-    // Prefer tracked "Camera" (Specs rigs often use this), then fall back.
-    const preferredNames = ['Camera', 'Camera Object', 'Device Camera'];
+    // Prefer AnchorController camera input first (usually the tracked device camera).
+    const anchorCamera = this.findAnchorControllerCamera();
+    if (this.isUsableCameraObject(anchorCamera)) {
+      return anchorCamera;
+    }
+
+    // Then prefer explicit scene camera objects.
+    const preferredNames = ['Camera Object', 'Device Camera', 'Camera'];
     for (let i = 0; i < preferredNames.length; i++) {
       const found = this.findObjectByNameInScene(preferredNames[i]);
-      if (this.isValidSceneObject(found)) {
+      if (this.isUsableCameraObject(found)) {
         return found;
       }
     }
     const fallback = this.findObjectWithCameraComponent();
-    return this.isValidSceneObject(fallback) ? fallback : null;
+    return this.isUsableCameraObject(fallback) ? fallback : null;
   }
 
   private findAnchorControllerCamera(): SceneObject | null {
@@ -2331,12 +2353,17 @@ export class FriendGrab extends BaseScriptComponent {
     }
     const scripts = node.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
-      const candidate = scripts[i] as ScriptComponent & { camera?: SceneObject };
-      if (!isNull(candidate) && !isNull(candidate.camera)) {
+      try {
+        const candidate = scripts[i] as ScriptComponent & { camera?: SceneObject };
+        if (isNull(candidate) || isNull(candidate.camera)) {
+          continue;
+        }
         const camObj = candidate.camera as SceneObject;
-        if (!isNull(camObj) && !isNull(camObj.getComponent('Component.Camera') as Camera)) {
+        if (this.isUsableCameraObject(camObj)) {
           return camObj;
         }
+      } catch (_e) {
+        // Ignore stale script/camera bindings and continue searching.
       }
     }
     for (let i = 0; i < node.getChildrenCount(); i++) {
@@ -2346,6 +2373,18 @@ export class FriendGrab extends BaseScriptComponent {
       }
     }
     return null;
+  }
+
+  private isUsableCameraObject(node: SceneObject | null): boolean {
+    if (!this.isValidSceneObject(node)) {
+      return false;
+    }
+    try {
+      const camera = (node as SceneObject).getComponent('Component.Camera') as Camera;
+      return !isNull(camera);
+    } catch (_e) {
+      return false;
+    }
   }
 
   private findObjectByNameInScene(name: string): SceneObject | null {

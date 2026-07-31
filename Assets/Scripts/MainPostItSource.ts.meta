@@ -31,10 +31,16 @@
     debugLogging: false
     fallbackRayDistance: false
     followInteractorWhileHeld: false
+    forceLayeredStackVisual: false
     notePrefab: false
+    postReleaseCaptureSec: false
     sourceInteractable: false
     spawnForwardOffset: false
     spawnParent: false
+    stackLayerCount: false
+    stackLayerGap: false
+    stackLayerOffsetSpread: false
+    stackLayerThickness: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -53,6 +59,12 @@
       followInteractorWhileHeld: true
       allowMultipleActiveNotes: false
       debugLogging: false
+      postReleaseCaptureSec: !<float> 6.000000
+      forceLayeredStackVisual: true
+      stackLayerCount: 10
+      stackLayerThickness: 0.035000
+      stackLayerGap: 0.028000
+      stackLayerOffsetSpread: 0.018000
   ScriptTypes:
     -
       {}
@@ -66,3 +78,9 @@
     - // @input bool followInteractorWhileHeld = true
     - // @input bool allowMultipleActiveNotes
     - // @input bool debugLogging
+    - '// @input float postReleaseCaptureSec = 12 {"hint":"Keep transcript capture active briefly after release"}'
+    - '// @input bool forceLayeredStackVisual = true {"hint":"Render source as layered sticky-note stack"}'
+    - // @input int stackLayerCount = 10
+    - // @input float stackLayerThickness = 0.035
+    - // @input float stackLayerGap = 0.028
+    - // @input float stackLayerOffsetSpread = 0.018

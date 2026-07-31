@@ -26,6 +26,8 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    cullProbeDistanceMeters: false
+    cullSettleSec: false
     fastGrowthTimeSec: false
     goalText: false
     placeTourObjects: false
@@ -33,6 +35,7 @@
     runOnce: false
     seedSettleSec: false
     startupDelaySec: false
+    verifyDistanceCullRoundTrip: false
     walkMeters: false
   ScriptTypesHidden:
     {}
@@ -48,6 +51,9 @@
       runOnce: true
       goalText: I want to walk 20 meters
       walkMeters: !<float> 20.000000
+      verifyDistanceCullRoundTrip: true
+      cullProbeDistanceMeters: !<float> 21.000000
+      cullSettleSec: !<float> 1.000000
       fastGrowthTimeSec: 1.500000
       placeTourObjects: true
       seedSettleSec: 0.700000
@@ -60,6 +66,9 @@
     - // @input bool runOnce = true
     - '// @input string goalText = "I want to walk 20 meters"'
     - // @input float walkMeters = 20
+    - // @input bool verifyDistanceCullRoundTrip = true
+    - // @input float cullProbeDistanceMeters = 21
+    - // @input float cullSettleSec = 1
     - // @input float fastGrowthTimeSec = 1.5
     - // @input bool placeTourObjects = true
     - // @input float seedSettleSec = 0.7

@@ -27,11 +27,18 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     anchorController: false
+    cancelButtonRadiusCm: false
     colliderSize: false
+    colorBlobProxyRadiusCm: false
     debugLogging: false
     enableGrabSounds: false
+    enablePalettePainting: false
     grabSoundTrack: false
     grabSoundVolume: false
+    paintDotScaleCm: false
+    paintMaxDistanceFromPaletteCm: false
+    paintRayDistanceCm: false
+    paintSampleStepCm: false
     releaseSoundTrack: false
     releaseSoundVolume: false
   ScriptTypesHidden:
@@ -51,6 +58,13 @@
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
       anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      enablePalettePainting: true
+      paintDotScaleCm: 1.100000
+      paintSampleStepCm: 1.200000
+      paintRayDistanceCm: !<float> 32.000000
+      paintMaxDistanceFromPaletteCm: !<float> 120.000000
+      colorBlobProxyRadiusCm: 2.600000
+      cancelButtonRadiusCm: 3.200000
   ScriptTypes:
     -
       {}
@@ -63,3 +77,10 @@
     - // @input float releaseSoundVolume = 0.8
     - // @input bool enableGrabSounds = true
     - // @input Component.ScriptComponent anchorController
+    - // @input bool enablePalettePainting = true
+    - // @input float paintDotScaleCm = 1.1
+    - // @input float paintSampleStepCm = 1.2
+    - // @input float paintRayDistanceCm = 32
+    - '// @input float paintMaxDistanceFromPaletteCm = 120 {"hint":"Max paint distance from palette center (cm)"}'
+    - // @input float colorBlobProxyRadiusCm = 2.6
+    - // @input float cancelButtonRadiusCm = 3.2

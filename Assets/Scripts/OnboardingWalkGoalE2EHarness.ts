@@ -2,6 +2,7 @@ import { PlantLifecycle, PlantStage } from './PlantLifecycle';
 
 type AnchorControllerLike = {
   createGoalPlantedPotAtWorldPosition?: (goalText: string, worldPos: vec3) => SceneObject | null;
+  camera?: SceneObject | null;
 };
 
 /**
@@ -26,6 +27,15 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
   walkMeters: number = 20;
 
   @input
+  verifyDistanceCullRoundTrip: boolean = true;
+
+  @input
+  cullProbeDistanceMeters: number = 21;
+
+  @input
+  cullSettleSec: number = 1.0;
+
+  @input
   fastGrowthTimeSec: number = 1.5;
 
   @input
@@ -35,6 +45,8 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
   seedSettleSec: number = 0.7;
 
   private ran = false;
+  private cullTargets: SceneObject[] = [];
+  private anchorCamera: SceneObject | null = null;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -84,6 +96,7 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
         print(`[OnboardingWalkGoalE2E] placed ${tourNames[i]}`);
       }
     }
+    this.cullTargets = this.collectCullTargets(tourNames);
 
     const parsed = PlantLifecycle.parseWalkGoalMeters(this.goalText);
     if (Math.abs(parsed - this.walkMeters) > 0.01) {
@@ -100,8 +113,9 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
       print(`[OnboardingWalkGoalE2E] FAIL ${failures.join('; ')}`);
       return;
     }
+    this.anchorCamera = this.resolveAnchorCamera(anchor);
 
-    const camera = this.findCameraObject();
+    const camera = this.getPreferredCamera();
     const spawnPos = !isNull(camera)
       ? camera.getTransform().getWorldPosition().add(new vec3(0, -20, -60))
       : new vec3(0, -20, -80);
@@ -177,15 +191,78 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
       print(`[OnboardingWalkGoalE2E] pre-walk stage=${stageBefore} (expect Growing/paused)`);
     }
 
-    // Prefer real camera motion; fall back to inject if tracking overwrites motion.
-    const camera = this.findCameraObject();
+    if (this.verifyDistanceCullRoundTrip) {
+      this.runDistanceCullRoundTrip(failures, () => this.finishWalkGoal(plant, failures));
+      return;
+    }
+    this.finishWalkGoal(plant, failures);
+  }
+
+  private runDistanceCullRoundTrip(failures: string[], done: () => void): void {
+    const camera = this.getPreferredCamera();
+    if (isNull(camera)) {
+      failures.push('distance cull check skipped: camera missing');
+      done();
+      return;
+    }
+    const camTransform = camera.getTransform();
+    const start = camTransform.getWorldPosition();
+    const probeDistCm = Math.max(2005, this.cullProbeDistanceMeters * 100);
+    const settleSec = Math.max(0.25, this.cullSettleSec);
+
+    camTransform.setWorldPosition(new vec3(start.x + probeDistCm, start.y, start.z));
+    print(`[OnboardingWalkGoalE2E] moved far for cull probe +${probeDistCm.toFixed(0)}cm`);
+
+    const afterHide = this.createEvent('DelayedCallbackEvent');
+    afterHide.bind(() => {
+      const hiddenNames: string[] = [];
+      for (let i = 0; i < this.cullTargets.length; i++) {
+        const target = this.cullTargets[i];
+        if (isNull(target)) {
+          continue;
+        }
+        if (!target.enabled) {
+          hiddenNames.push(target.name);
+        } else {
+          failures.push(`distance cull did not hide ${target.name} beyond 20m`);
+        }
+      }
+      print(`[OnboardingWalkGoalE2E] cull hidden=${hiddenNames.join(', ') || 'none'}`);
+
+      camTransform.setWorldPosition(start);
+      print('[OnboardingWalkGoalE2E] returned near for cull probe');
+
+      const afterShow = this.createEvent('DelayedCallbackEvent');
+      afterShow.bind(() => {
+        const shownNames: string[] = [];
+        for (let i = 0; i < this.cullTargets.length; i++) {
+          const target = this.cullTargets[i];
+          if (isNull(target)) {
+            continue;
+          }
+          if (target.enabled) {
+            shownNames.push(target.name);
+          } else {
+            failures.push(`distance cull did not restore ${target.name} within 20m`);
+          }
+        }
+        print(`[OnboardingWalkGoalE2E] cull restored=${shownNames.join(', ') || 'none'}`);
+        done();
+      });
+      afterShow.reset(settleSec);
+    });
+    afterHide.reset(settleSec);
+  }
+
+  private finishWalkGoal(plant: PlantLifecycle, failures: string[]): void {
+    const camera = this.getPreferredCamera();
     let usedInject = false;
     if (!isNull(camera)) {
       const t = camera.getTransform();
       const start = t.getWorldPosition();
-      // 20 meters = 2000 cm world units. Move in one big hop; tracker samples horizontal delta.
-      t.setWorldPosition(new vec3(start.x + 2000, start.y, start.z));
-      print('[OnboardingWalkGoalE2E] moved Camera Object +2000cm');
+      const walkCm = Math.max(200, this.walkMeters * 100);
+      t.setWorldPosition(new vec3(start.x + walkCm, start.y, start.z));
+      print(`[OnboardingWalkGoalE2E] moved Camera Object +${walkCm.toFixed(0)}cm`);
     }
 
     const settle = this.createEvent('DelayedCallbackEvent');
@@ -302,6 +379,20 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
     return null;
   }
 
+  private resolveAnchorCamera(anchor: AnchorControllerLike): SceneObject | null {
+    if (!isNull(anchor) && !isNull(anchor.camera)) {
+      return anchor.camera as SceneObject;
+    }
+    return null;
+  }
+
+  private getPreferredCamera(): SceneObject | null {
+    if (!isNull(this.anchorCamera)) {
+      return this.anchorCamera;
+    }
+    return this.findCameraObject();
+  }
+
   private findSceneObjectByName(name: string): SceneObject | null {
     const rootCount = global.scene.getRootObjectsCount();
     for (let i = 0; i < rootCount; i++) {
@@ -325,5 +416,16 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
       }
     }
     return null;
+  }
+
+  private collectCullTargets(names: string[]): SceneObject[] {
+    const targets: SceneObject[] = [];
+    for (let i = 0; i < names.length; i++) {
+      const obj = this.findSceneObjectByName(names[i]);
+      if (!isNull(obj)) {
+        targets.push(obj);
+      }
+    }
+    return targets;
   }
 }
