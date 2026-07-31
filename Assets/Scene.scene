@@ -3797,8 +3797,6 @@
   ScriptInputsDefault:
     debugLogging: true
     colliderSize: true
-    grabSoundTrack: true
-    releaseSoundTrack: true
     grabSoundVolume: true
     releaseSoundVolume: true
     enableGrabSounds: true
@@ -3808,8 +3806,8 @@
     "":
       debugLogging: false
       colliderSize: !<Vec3> {x: 80.000000, y: 80.000000, z: 30.000000}
-      grabSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
-      releaseSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
@@ -7170,8 +7168,6 @@
   ScriptInputsDefault:
     debugLogging: true
     colliderSize: true
-    grabSoundTrack: true
-    releaseSoundTrack: true
     grabSoundVolume: true
     releaseSoundVolume: true
     enableGrabSounds: true
@@ -7181,8 +7177,8 @@
     "":
       debugLogging: false
       colliderSize: !<Vec3> {x: 1.200000, y: 1.200000, z: 1.200000}
-      grabSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
-      releaseSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
@@ -8769,8 +8765,6 @@
   ScriptInputsDefault:
     debugLogging: true
     colliderSize: true
-    grabSoundTrack: true
-    releaseSoundTrack: true
     grabSoundVolume: true
     releaseSoundVolume: true
     enableGrabSounds: true
@@ -8780,8 +8774,8 @@
     "":
       debugLogging: false
       colliderSize: !<Vec3> {x: 1000.000000, y: 700.000000, z: 250.000000}
-      grabSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
-      releaseSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true

@@ -298,7 +298,7 @@ export class GlobeGrab extends BaseScriptComponent {
     assigned: AudioTrackAsset | null | undefined,
     assetPath: string
   ): AudioTrackAsset | null {
-    if (!isNull(assigned)) {
+    if (!isNull(assigned) && assigned) {
       return assigned;
     }
 
@@ -311,9 +311,7 @@ export class GlobeGrab extends BaseScriptComponent {
       }
     }
 
-    if (this.debugLogging) {
-      print(`[GlobeGrab] missing sound asset ${assetPath}`);
-    }
+    print(`[GlobeGrab] missing sound asset ${assetPath}`);
     return null;
   }
 
