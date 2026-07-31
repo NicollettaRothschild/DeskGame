@@ -202,6 +202,8 @@
     enableGrabSounds: true
     enableSpeechBubble: true
     enableTts: true
+    grabSpeechTrack: true
+    releaseSpeechTrack: true
     grabBubbleText: true
     releaseBubbleText: true
     speechBubbleHideDelaySec: true
@@ -226,6 +228,8 @@
       enableSpeechBubble: true
       enableTts: true
       agentTts: !<MappingBased.AssignableType> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      releaseSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       grabBubbleText: Whee!
       releaseBubbleText: Thanks!
       speechBubbleHideDelaySec: !<float> 4.000000

@@ -40,6 +40,7 @@
     grabBubbleText: false
     grabSoundTrack: false
     grabSoundVolume: false
+    grabSpeechTrack: false
     idleBobAmplitudeCm: false
     idleBobSpeed: false
     lookAtDistanceMeters: false
@@ -48,6 +49,7 @@
     releaseBubbleText: false
     releaseSoundTrack: false
     releaseSoundVolume: false
+    releaseSpeechTrack: false
     speechBubbleHideDelaySec: false
   ScriptTypesHidden:
     {}
@@ -68,6 +70,8 @@
       enableSpeechBubble: true
       enableTts: true
       agentTts: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      releaseSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       grabBubbleText: Whee!
       releaseBubbleText: Thanks!
       speechBubbleHideDelaySec: !<float> 4.000000
@@ -95,6 +99,8 @@
     - // @input bool enableSpeechBubble = true
     - // @input bool enableTts = true
     - // @input AssignableType agentTts
+    - // @input Asset.AudioTrackAsset grabSpeechTrack
+    - // @input Asset.AudioTrackAsset releaseSpeechTrack
     - '// @input string grabBubbleText = "Whee!"'
     - '// @input string releaseBubbleText = "Thanks!"'
     - // @input float speechBubbleHideDelaySec = 4
