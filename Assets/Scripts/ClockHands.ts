@@ -2,7 +2,8 @@
  * Rotates the Clock hour and minute hands to match the device local time.
  * Hands keep the FBX rest pitch (X = -90°) and spin on local Y.
  *
- * This face has XII at the bottom (VI at top), so zeroOffsetDegrees defaults to 180.
+ * Clock root is rolled so XII is at the top (standard wall-clock layout).
+ * invertDirection defaults true because +Y on this mesh runs counter-clockwise on the face.
  */
 @component
 export class ClockHands extends BaseScriptComponent {
@@ -15,15 +16,14 @@ export class ClockHands extends BaseScriptComponent {
   minuteHand!: SceneObject;
 
   /**
-   * Degrees added after time math. 180 = XII at bottom (this mesh).
-   * Use 0 if XII is at the top.
+   * Degrees added after time math. 0 = noon at XII (top after upright roll).
    */
   @input('float')
-  zeroOffsetDegrees: number = 180;
+  zeroOffsetDegrees: number = 0;
 
   /** Flip if hands run counter-clockwise on this mesh. */
   @input
-  invertDirection: boolean = false;
+  invertDirection: boolean = true;
 
   @input
   debugLogging: boolean = false;

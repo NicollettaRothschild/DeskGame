@@ -634,7 +634,7 @@
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -76.379738}
-    Rotation: {x: -90.000000, y: 180.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: 180.000000, z: 180.000000}
     Scale: {x: 0.060000, y: 0.060000, z: 0.060000}
     HasSegmentScaleCompensation: false
   Children:
@@ -2829,8 +2829,8 @@
     "":
       hourHand: !<reference.SceneObject> 7ef42083-20d6-457c-9a29-6fe47e67a0b9
       minuteHand: !<reference.SceneObject> fd0a732e-9433-4662-b855-647e6194b4d5
-      zeroOffsetDegrees: !<float> 180.000000
-      invertDirection: false
+      zeroOffsetDegrees: !<float> 0.000000
+      invertDirection: true
       debugLogging: false
   ScriptTypes:
     "":
