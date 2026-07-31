@@ -88,42 +88,7 @@
       png: Performance Compression
     Overrides:
       {}
-- !<RenderMeshVisual/02ce7bfc-23f4-42c5-7e40-a7f7abf72d5b>
-  PrefabRemaps:
-    []
-  Name: BézierCurve.006
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> 08809a2f-224d-4672-96ae-368107199cb0
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<SceneObject/0f94b2e0-fdfa-4a39-55fb-8428bf527c18>
-  PrefabRemaps:
-    []
-  Name: antenna R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> ee402373-3fe2-401f-58b3-b30e03964e0b
-- !<RenderMeshVisual/19150f2a-a265-4967-63c1-baeaa08eca06>
+- !<RenderMeshVisual/030cefcc-9a53-4850-5a08-e91b073f1481>
   PrefabRemaps:
     []
   Name: BézierCurve.008
@@ -143,12 +108,82 @@
   BlendNormals: false
   BlendShapes:
     {}
+- !<RenderMeshVisual/055fae86-5031-4eec-5a71-379e83ebe8bb>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.007
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> ca8f8884-2493-4ed5-ad72-ed1ccb302012
+  Mesh: !<reference> ca686132-f3bd-4697-bc03-b8760b683704
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/0d3b117d-5149-495e-761a-5a9ee04cd120>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.001
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 7501a91c-7692-4055-8d0b-8e91e178f340
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/0f9689cc-5254-41c4-54be-d5bff2466ab4>
+  PrefabRemaps:
+    []
+  Name: Wing_01.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 1.092691, z: -0.000000}
+    Rotation: {x: 0.000000, y: -0.000000, z: -60.809353}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 4f894b21-78e9-48c2-6a91-f627abcf11cd
+  Components:
+    []
+- !<SceneObject/25c72937-6d7e-4800-7c87-747ef709541d>
+  PrefabRemaps:
+    []
+  Name: Glow Orb L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> d536f221-dd65-4c1d-4e92-7780d13c79bb
 - !<ObjectPrefabAssetData/2826eaea-2c98-4f8e-878b-4783cbd3ccfc>
   Prototype: !<ObjectOwner/0c8b1d1a-6289-425e-ac0d-8daba1a6745f>
     PackagePath: ""
     objects:
-      - !<own> 4aff3271-d4b5-48b3-454d-904a07c0033f
-- !<SceneObject/2a67755c-0c1d-4c4f-7284-719ea983fc3a>
+      - !<own> bd022189-9656-4637-604f-e97bce911829
+- !<SceneObject/2e3e4d30-af8a-4030-76c1-825a6f93d3b2>
   PrefabRemaps:
     []
   Name: Bones
@@ -160,20 +195,421 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    - !<own> ad60e773-53f5-45fc-50f2-b802cdea6783
-    - !<own> 0f94b2e0-fdfa-4a39-55fb-8428bf527c18
-    - !<own> 5848fbe1-26e5-48d3-4bcc-bc249c79c17e
-    - !<own> 7813dcec-8658-4a6f-68bc-006cb08ef2ad
-    - !<own> d826d57c-fb50-4659-4389-a5da2ae057c5
-    - !<own> 9b2fe6bd-18a2-4f20-669d-573ab92a3fb1
-    - !<own> ccb61486-2ef0-4b86-7d9e-07de223671b8
-    - !<own> 8e4d8a92-94ae-4bab-585a-ae1230c72d36
-    - !<own> 85defd99-6d10-4fbc-63ec-5ddd31be2c83
-    - !<own> 9b22087b-2ffd-45c7-5100-4460e0186afa
-    - !<own> e9883d21-c5fb-4d74-6dbd-6e0eadc0be2d
+    - !<own> de009b95-9d56-4046-4bd5-2febefc32b8b
+    - !<own> 6348d308-1a2d-4648-5e44-5156628e64bb
+    - !<own> 91202e96-55eb-4c79-46d3-91916c4c0c91
+    - !<own> 59338fbd-f974-4eea-731a-0a35ec9f0b00
+    - !<own> f5658917-61a9-4397-5848-a1a00dad6edc
+    - !<own> 25c72937-6d7e-4800-7c87-747ef709541d
+    - !<own> df6ec73b-be10-44d6-607e-ce1fdb2d1c8f
+    - !<own> b2cc915c-5d21-4662-4cc6-3e4827b81d3b
+    - !<own> d070e8f9-9103-4b7f-6f7a-2e3d211cd2e7
+    - !<own> a6330d17-f317-4a97-730c-d7312ea0ed37
+    - !<own> ad2657d8-987a-4d52-43f2-ed3aeca731c1
   Components:
     []
-- !<AnimationPlayer/2fbc9673-f733-48d9-40b5-bb1e436ca37a>
+- !<SceneObject/38b197f7-b6ae-408e-4148-783a5747fd29>
+  PrefabRemaps:
+    []
+  Name: Antenna_02.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 0.378487, z: 0.000000}
+    Rotation: {x: 27.181923, y: -0.452854, z: 0.145837}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> c568fa69-0480-4b03-6662-61119f972300
+  Components:
+    []
+- !<SceneObject/3dc52222-25a5-4146-5f92-4a088a2d9ff9>
+  PrefabRemaps:
+    []
+  Name: Scene
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 2e3e4d30-af8a-4030-76c1-825a6f93d3b2
+  Components:
+    - !<own> dc9f008e-ff9d-409c-66ae-2fbc1bab3f89
+    - !<own> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+- !<SceneObject/433fca95-69e1-41bc-4187-a702e3d99c8d>
+  PrefabRemaps:
+    []
+  Name: Wing_02.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 2.197986, z: 0.000000}
+    Rotation: {x: 0.000000, y: -0.000000, z: -4.963778}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/4f894b21-78e9-48c2-6a91-f627abcf11cd>
+  PrefabRemaps:
+    []
+  Name: Wing_02.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 2.197986, z: -0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 4.963777}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<RenderMeshVisual/53b8a876-ce5c-4a1d-4785-5af5f1e2756b>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.002
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 1fbfa4b9-991e-433d-ac58-20094ba824d7
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/56568b4c-c387-4fdd-7b68-05eaffe2120d>
+  PrefabRemaps:
+    []
+  Name: Antenna_01.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.355957, y: 1.869728, z: 0.870218}
+    Rotation: {x: 36.530468, y: 1.199157, z: -14.126577}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 38b197f7-b6ae-408e-4148-783a5747fd29
+  Components:
+    []
+- !<SceneObject/59338fbd-f974-4eea-731a-0a35ec9f0b00>
+  PrefabRemaps:
+    []
+  Name: Body
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 53b8a876-ce5c-4a1d-4785-5af5f1e2756b
+- !<RenderMeshVisual/5cce1f1a-f1e3-4f48-70b0-65332d79bb2b>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.006
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 08809a2f-224d-4672-96ae-368107199cb0
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/5f0cfc21-063a-49e4-7a5a-a1ac7f9b41f8>
+  PrefabRemaps:
+    []
+  Name: Scenes
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 3dc52222-25a5-4146-5f92-4a088a2d9ff9
+  Components:
+    []
+- !<SceneObject/6348d308-1a2d-4648-5e44-5156628e64bb>
+  PrefabRemaps:
+    []
+  Name: antenna R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 0d3b117d-5149-495e-761a-5a9ee04cd120
+- !<SceneObject/63d31928-5a59-4b51-78c6-f9df9809b6ed>
+  PrefabRemaps:
+    []
+  Name: Antenna_03.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.326327, z: 0.000000}
+    Rotation: {x: 36.531979, y: -3.127979, z: 9.459065}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/67d40d07-2094-4b73-7f62-c1589b8e938a>
+  PrefabRemaps:
+    []
+  Name: Antenna_02.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.378487, z: -0.000000}
+    Rotation: {x: 27.181927, y: 0.452855, z: -0.145826}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 63d31928-5a59-4b51-78c6-f9df9809b6ed
+  Components:
+    []
+- !<RenderMeshVisual/6b5e367a-ec44-43c5-6901-71ec32b3a150>
+  PrefabRemaps:
+    []
+  Name: BézierCurve
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> bf38b7b4-0944-4142-8a79-44de0065143c
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/84a1b351-f726-42d2-49e0-f02cd9b8f48c>
+  PrefabRemaps:
+    []
+  Name: Antenna_01.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.359832, y: 1.874151, z: 0.870218}
+    Rotation: {x: 36.530464, y: -1.199154, z: 13.418386}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 67d40d07-2094-4b73-7f62-c1589b8e938a
+  Components:
+    []
+- !<Skin/904ae524-f4a6-486c-5d91-4a0162ae27b0>
+  PrefabRemaps:
+    []
+  Name: component_10
+  Enabled: true
+  skinBones:
+    Antenna_01.L: !<reference> 84a1b351-f726-42d2-49e0-f02cd9b8f48c
+    Antenna_01.R: !<reference> 56568b4c-c387-4fdd-7b68-05eaffe2120d
+    Antenna_02.L: !<reference> 67d40d07-2094-4b73-7f62-c1589b8e938a
+    Antenna_02.R: !<reference> 38b197f7-b6ae-408e-4148-783a5747fd29
+    Antenna_03.L: !<reference> 63d31928-5a59-4b51-78c6-f9df9809b6ed
+    Antenna_03.R: !<reference> c568fa69-0480-4b03-6662-61119f972300
+    Body: !<reference> 59338fbd-f974-4eea-731a-0a35ec9f0b00
+    Bones: !<reference> 2e3e4d30-af8a-4030-76c1-825a6f93d3b2
+    Face: !<reference> f5658917-61a9-4397-5848-a1a00dad6edc
+    Glow Orb L: !<reference> 25c72937-6d7e-4800-7c87-747ef709541d
+    Glow Orb R: !<reference> df6ec73b-be10-44d6-607e-ce1fdb2d1c8f
+    Wing L: !<reference> b2cc915c-5d21-4662-4cc6-3e4827b81d3b
+    Wing R: !<reference> d070e8f9-9103-4b7f-6f7a-2e3d211cd2e7
+    Wing_01.L: !<reference> e9bd9544-e7bc-487d-598d-1dc382011dd4
+    Wing_01.R: !<reference> 0f9689cc-5254-41c4-54be-d5bff2466ab4
+    Wing_02.L: !<reference> 433fca95-69e1-41bc-4187-a702e3d99c8d
+    Wing_02.R: !<reference> 4f894b21-78e9-48c2-6a91-f627abcf11cd
+    antenna L: !<reference> de009b95-9d56-4046-4bd5-2febefc32b8b
+    antenna R: !<reference> 6348d308-1a2d-4648-5e44-5156628e64bb
+    antenna.008: !<reference> 91202e96-55eb-4c79-46d3-91916c4c0c91
+    neutral_bone: !<reference> ad2657d8-987a-4d52-43f2-ed3aeca731c1
+- !<SceneObject/91202e96-55eb-4c79-46d3-91916c4c0c91>
+  PrefabRemaps:
+    []
+  Name: antenna.008
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 030cefcc-9a53-4850-5a08-e91b073f1481
+- !<RenderMeshVisual/9fabd46d-fd15-433f-4092-b60ff515e75d>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.004
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 75f69f3e-be19-4fea-8507-fe86b12c374d
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/a6330d17-f317-4a97-730c-d7312ea0ed37>
+  PrefabRemaps:
+    []
+  Name: Body
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: -0.416426}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.354092}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> e9bd9544-e7bc-487d-598d-1dc382011dd4
+    - !<own> 0f9689cc-5254-41c4-54be-d5bff2466ab4
+    - !<own> 84a1b351-f726-42d2-49e0-f02cd9b8f48c
+    - !<own> 56568b4c-c387-4fdd-7b68-05eaffe2120d
+  Components:
+    []
+- !<SceneObject/ad2657d8-987a-4d52-43f2-ed3aeca731c1>
+  PrefabRemaps:
+    []
+  Name: neutral_bone
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/b2cc915c-5d21-4662-4cc6-3e4827b81d3b>
+  PrefabRemaps:
+    []
+  Name: Wing L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> de6368a5-03e1-47a8-6cad-f3b0fb4546ef
+- !<SceneObject/bd022189-9656-4637-604f-e97bce911829>
+  PrefabRemaps:
+    []
+  Name: friend
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 5f0cfc21-063a-49e4-7a5a-a1ac7f9b41f8
+  Components:
+    []
+- !<SceneObject/c568fa69-0480-4b03-6662-61119f972300>
+  PrefabRemaps:
+    []
+  Name: Antenna_03.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.326327, z: 0.000000}
+    Rotation: {x: 36.531975, y: 3.128000, z: -9.459055}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/d070e8f9-9103-4b7f-6f7a-2e3d211cd2e7>
+  PrefabRemaps:
+    []
+  Name: Wing R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 5cce1f1a-f1e3-4f48-70b0-65332d79bb2b
+- !<RenderMeshVisual/d536f221-dd65-4c1d-4e92-7780d13c79bb>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.003
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 9a3bd599-d2a1-459d-a543-16edb88a421a
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<AnimationPlayer/dc9f008e-ff9d-409c-66ae-2fbc1bab3f89>
   PrefabRemaps:
     []
   Name: component_9
@@ -194,288 +630,7 @@
       BlendMode: Default
       ScaleMode: Multiply
       PlaybackMode: Loop
-- !<SceneObject/361bdd2c-6a16-4e08-4a0c-191437f32b6c>
-  PrefabRemaps:
-    []
-  Name: Antenna_03.R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.326327, z: 0.000000}
-    Rotation: {x: 36.531975, y: 3.128000, z: -9.459055}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    []
-- !<SceneObject/3ea746e1-1c8d-4cfd-7b77-bb2a98c59783>
-  PrefabRemaps:
-    []
-  Name: Antenna_01.R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.355957, y: 1.869728, z: 0.870218}
-    Rotation: {x: 36.530468, y: 1.199157, z: -14.126577}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> 5fd1cbc0-48a3-43b4-4787-19b29675798a
-  Components:
-    []
-- !<SceneObject/4aff3271-d4b5-48b3-454d-904a07c0033f>
-  PrefabRemaps:
-    []
-  Name: friend
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> b644c2b8-7e14-455b-774c-c85da05f668a
-  Components:
-    []
-- !<SceneObject/4cd159ed-57bd-4f99-4910-4401d23df356>
-  PrefabRemaps:
-    []
-  Name: Wing_01.L
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: -0.000000, y: 1.092691, z: -0.000000}
-    Rotation: {x: -0.000000, y: -0.000000, z: 60.101177}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> a0fff5c3-5adc-48f8-6699-0c5026b62f14
-  Components:
-    []
-- !<SceneObject/502f6472-aee4-4869-64f1-a6e5be5add34>
-  PrefabRemaps:
-    []
-  Name: Scene
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> 2a67755c-0c1d-4c4f-7284-719ea983fc3a
-  Components:
-    - !<own> 2fbc9673-f733-48d9-40b5-bb1e436ca37a
-    - !<own> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-- !<SceneObject/5848fbe1-26e5-48d3-4bcc-bc249c79c17e>
-  PrefabRemaps:
-    []
-  Name: antenna.008
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 19150f2a-a265-4967-63c1-baeaa08eca06
-- !<SceneObject/5fd1cbc0-48a3-43b4-4787-19b29675798a>
-  PrefabRemaps:
-    []
-  Name: Antenna_02.R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: -0.000000, y: 0.378487, z: 0.000000}
-    Rotation: {x: 27.181921, y: -0.452854, z: 0.145837}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> 361bdd2c-6a16-4e08-4a0c-191437f32b6c
-  Components:
-    []
-- !<SceneObject/7813dcec-8658-4a6f-68bc-006cb08ef2ad>
-  PrefabRemaps:
-    []
-  Name: Body
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> d0c9ef93-6778-46d8-4d29-27ecbec55f9c
-- !<SceneObject/85defd99-6d10-4fbc-63ec-5ddd31be2c83>
-  PrefabRemaps:
-    []
-  Name: Wing R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 02ce7bfc-23f4-42c5-7e40-a7f7abf72d5b
-- !<Skin/8b25a0c9-5493-4941-5c6f-06ebdc71776a>
-  PrefabRemaps:
-    []
-  Name: component_10
-  Enabled: true
-  skinBones:
-    Antenna_01.L: !<reference> 8f402ea6-7d18-42bf-725b-bdc61b953b66
-    Antenna_01.R: !<reference> 3ea746e1-1c8d-4cfd-7b77-bb2a98c59783
-    Antenna_02.L: !<reference> b1050f50-0f43-49ca-4e62-8f8d62d91820
-    Antenna_02.R: !<reference> 5fd1cbc0-48a3-43b4-4787-19b29675798a
-    Antenna_03.L: !<reference> d70ff2f5-51c2-4e5e-5bc7-405b3eb2a542
-    Antenna_03.R: !<reference> 361bdd2c-6a16-4e08-4a0c-191437f32b6c
-    Body: !<reference> 7813dcec-8658-4a6f-68bc-006cb08ef2ad
-    Bones: !<reference> 2a67755c-0c1d-4c4f-7284-719ea983fc3a
-    Face: !<reference> d826d57c-fb50-4659-4389-a5da2ae057c5
-    Glow Orb L: !<reference> 9b2fe6bd-18a2-4f20-669d-573ab92a3fb1
-    Glow Orb R: !<reference> ccb61486-2ef0-4b86-7d9e-07de223671b8
-    Wing L: !<reference> 8e4d8a92-94ae-4bab-585a-ae1230c72d36
-    Wing R: !<reference> 85defd99-6d10-4fbc-63ec-5ddd31be2c83
-    Wing_01.L: !<reference> 4cd159ed-57bd-4f99-4910-4401d23df356
-    Wing_01.R: !<reference> db71e9d6-8edc-4a80-5d62-507538a81ca2
-    Wing_02.L: !<reference> a0fff5c3-5adc-48f8-6699-0c5026b62f14
-    Wing_02.R: !<reference> b42aa382-d072-4a09-5379-efc658853064
-    antenna L: !<reference> ad60e773-53f5-45fc-50f2-b802cdea6783
-    antenna R: !<reference> 0f94b2e0-fdfa-4a39-55fb-8428bf527c18
-    antenna.008: !<reference> 5848fbe1-26e5-48d3-4bcc-bc249c79c17e
-    neutral_bone: !<reference> e9883d21-c5fb-4d74-6dbd-6e0eadc0be2d
-- !<SceneObject/8e4d8a92-94ae-4bab-585a-ae1230c72d36>
-  PrefabRemaps:
-    []
-  Name: Wing L
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> d9d5af6f-1772-490d-56e5-60339815e0cf
-- !<SceneObject/8f402ea6-7d18-42bf-725b-bdc61b953b66>
-  PrefabRemaps:
-    []
-  Name: Antenna_01.L
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: -0.359832, y: 1.874151, z: 0.870218}
-    Rotation: {x: 36.530464, y: -1.199154, z: 13.418386}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> b1050f50-0f43-49ca-4e62-8f8d62d91820
-  Components:
-    []
-- !<SceneObject/9b22087b-2ffd-45c7-5100-4460e0186afa>
-  PrefabRemaps:
-    []
-  Name: Body
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: -0.416426}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.354092}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> 4cd159ed-57bd-4f99-4910-4401d23df356
-    - !<own> db71e9d6-8edc-4a80-5d62-507538a81ca2
-    - !<own> 8f402ea6-7d18-42bf-725b-bdc61b953b66
-    - !<own> 3ea746e1-1c8d-4cfd-7b77-bb2a98c59783
-  Components:
-    []
-- !<SceneObject/9b2fe6bd-18a2-4f20-669d-573ab92a3fb1>
-  PrefabRemaps:
-    []
-  Name: Glow Orb L
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 9c42853b-fb55-4139-40dc-7ea7fc939f2e
-- !<RenderMeshVisual/9c42853b-fb55-4139-40dc-7ea7fc939f2e>
-  PrefabRemaps:
-    []
-  Name: BézierCurve.003
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> 9a3bd599-d2a1-459d-a543-16edb88a421a
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<RenderMeshVisual/9e57979b-756e-4391-51c6-9d89ae7cef39>
-  PrefabRemaps:
-    []
-  Name: BézierCurve
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> bf38b7b4-0944-4142-8a79-44de0065143c
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<SceneObject/a0fff5c3-5adc-48f8-6699-0c5026b62f14>
-  PrefabRemaps:
-    []
-  Name: Wing_02.L
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 2.197986, z: 0.000000}
-    Rotation: {x: 0.000000, y: -0.000000, z: -4.963778}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    []
-- !<SceneObject/ad60e773-53f5-45fc-50f2-b802cdea6783>
+- !<SceneObject/de009b95-9d56-4046-4bd5-2febefc32b8b>
   PrefabRemaps:
     []
   Name: antenna L
@@ -489,158 +644,8 @@
   Children:
     []
   Components:
-    - !<own> 9e57979b-756e-4391-51c6-9d89ae7cef39
-- !<RenderMeshVisual/b05ecf07-357d-4fad-763d-6314c4644e2e>
-  PrefabRemaps:
-    []
-  Name: BézierCurve.004
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> 75f69f3e-be19-4fea-8507-fe86b12c374d
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<SceneObject/b1050f50-0f43-49ca-4e62-8f8d62d91820>
-  PrefabRemaps:
-    []
-  Name: Antenna_02.L
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.378487, z: -0.000000}
-    Rotation: {x: 27.181927, y: 0.452855, z: -0.145826}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> d70ff2f5-51c2-4e5e-5bc7-405b3eb2a542
-  Components:
-    []
-- !<RenderMeshVisual/b2de880d-ba3e-4869-7916-c934a38a456c>
-  PrefabRemaps:
-    []
-  Name: BézierCurve.007
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> ca8f8884-2493-4ed5-ad72-ed1ccb302012
-  Mesh: !<reference> ca686132-f3bd-4697-bc03-b8760b683704
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<SceneObject/b42aa382-d072-4a09-5379-efc658853064>
-  PrefabRemaps:
-    []
-  Name: Wing_02.R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: -0.000000, y: 2.197986, z: -0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 4.963777}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    []
-- !<SceneObject/b644c2b8-7e14-455b-774c-c85da05f668a>
-  PrefabRemaps:
-    []
-  Name: Scenes
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> 502f6472-aee4-4869-64f1-a6e5be5add34
-  Components:
-    []
-- !<SceneObject/ccb61486-2ef0-4b86-7d9e-07de223671b8>
-  PrefabRemaps:
-    []
-  Name: Glow Orb R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> b05ecf07-357d-4fad-763d-6314c4644e2e
-- !<RenderMeshVisual/d0c9ef93-6778-46d8-4d29-27ecbec55f9c>
-  PrefabRemaps:
-    []
-  Name: BézierCurve.002
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    []
-  Mesh: !<reference> 1fbfa4b9-991e-433d-ac58-20094ba824d7
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<SceneObject/d70ff2f5-51c2-4e5e-5bc7-405b3eb2a542>
-  PrefabRemaps:
-    []
-  Name: Antenna_03.L
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.326327, z: 0.000000}
-    Rotation: {x: 36.531979, y: -3.127979, z: 9.459065}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    []
-- !<SceneObject/d826d57c-fb50-4659-4389-a5da2ae057c5>
-  PrefabRemaps:
-    []
-  Name: Face
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> b2de880d-ba3e-4869-7916-c934a38a456c
-- !<RenderMeshVisual/d9d5af6f-1772-490d-56e5-60339815e0cf>
+    - !<own> 6b5e367a-ec44-43c5-6901-71ec32b3a150
+- !<RenderMeshVisual/de6368a5-03e1-47a8-6cad-f3b0fb4546ef>
   PrefabRemaps:
     []
   Name: BézierCurve.005
@@ -655,58 +660,53 @@
   Materials:
     []
   Mesh: !<reference> 26144497-fade-429a-a808-53eb39b984f0
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
+  Skin: !<reference> 904ae524-f4a6-486c-5d91-4a0162ae27b0
   BlendShapesEnabled: true
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/db71e9d6-8edc-4a80-5d62-507538a81ca2>
+- !<SceneObject/df6ec73b-be10-44d6-607e-ce1fdb2d1c8f>
   PrefabRemaps:
     []
-  Name: Wing_01.R
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: -0.000000, y: 1.092691, z: -0.000000}
-    Rotation: {x: 0.000000, y: -0.000000, z: -60.809353}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> b42aa382-d072-4a09-5379-efc658853064
-  Components:
-    []
-- !<SceneObject/e9883d21-c5fb-4d74-6dbd-6e0eadc0be2d>
-  PrefabRemaps:
-    []
-  Name: neutral_bone
+  Name: Glow Orb R
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: -90.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
   Components:
-    []
-- !<RenderMeshVisual/ee402373-3fe2-401f-58b3-b30e03964e0b>
+    - !<own> 9fabd46d-fd15-433f-4092-b60ff515e75d
+- !<SceneObject/e9bd9544-e7bc-487d-598d-1dc382011dd4>
   PrefabRemaps:
     []
-  Name: BézierCurve.001
+  Name: Wing_01.L
   Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 1.092691, z: -0.000000}
+    Rotation: {x: -0.000000, y: -0.000000, z: 60.101177}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 433fca95-69e1-41bc-4187-a702e3d99c8d
+  Components:
     []
-  Mesh: !<reference> 7501a91c-7692-4055-8d0b-8e91e178f340
-  Skin: !<reference> 8b25a0c9-5493-4941-5c6f-06ebdc71776a
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
+- !<SceneObject/f5658917-61a9-4397-5848-a1a00dad6edc>
+  PrefabRemaps:
+    []
+  Name: Face
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 055fae86-5031-4eec-5a71-379e83ebe8bb

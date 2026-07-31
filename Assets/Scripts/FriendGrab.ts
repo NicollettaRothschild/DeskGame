@@ -68,6 +68,15 @@ export class FriendGrab extends BaseScriptComponent {
   @allowUndefined
   agentTts!: FlowGardenTTS;
 
+  /** Fallback voice clip when cloud/native TTS is unavailable (Specs preview). */
+  @input
+  @allowUndefined
+  grabSpeechTrack!: AudioTrackAsset;
+
+  @input
+  @allowUndefined
+  releaseSpeechTrack!: AudioTrackAsset;
+
   @input
   grabBubbleText: string = 'Whee!';
 
@@ -154,7 +163,11 @@ export class FriendGrab extends BaseScriptComponent {
     this.scheduleGrabWireRetry(0.75);
   }
 
-  public showSpeech(text: string, speak: boolean = true): void {
+  public showSpeech(
+    text: string,
+    speak: boolean = true,
+    fallbackTrack: AudioTrackAsset | null = null
+  ): void {
     const message = String(text || '').trim();
     if (!message) {
       this.hideSpeechBubble();
@@ -169,7 +182,7 @@ export class FriendGrab extends BaseScriptComponent {
     }
 
     if (speak && this.enableTts) {
-      this.speakText(message);
+      this.speakText(message, fallbackTrack);
     }
   }
 
@@ -187,20 +200,40 @@ export class FriendGrab extends BaseScriptComponent {
     return this.agentTts;
   }
 
-  private speakText(text: string): void {
+  private speakText(text: string, fallbackTrack: AudioTrackAsset | null = null): void {
     const tts = this.resolveTts();
     if (isNull(tts)) {
-      if (this.debugLogging) {
-        print('[FriendGrab] TTS unavailable (FlowGardenTTS not registered)');
-      }
+      print('[FriendGrab] TTS unavailable (FlowGardenTTS not registered) — trying phrase clip');
+      this.playPhraseFallback(fallbackTrack, text);
       return;
     }
 
     tts.speak(text, (ok) => {
+      if (!ok) {
+        print(`[FriendGrab] TTS failed for "${text}" — trying phrase clip`);
+        this.playPhraseFallback(fallbackTrack, text);
+        return;
+      }
       if (this.debugLogging) {
-        print(`[FriendGrab] TTS ${ok ? 'played' : 'failed'}: ${text}`);
+        print(`[FriendGrab] TTS played: ${text}`);
       }
     });
+  }
+
+  private playPhraseFallback(track: AudioTrackAsset | null, label: string): void {
+    const resolved =
+      track ||
+      this.resolveSoundTrack(
+        null,
+        label.toLowerCase().indexOf('thank') >= 0
+          ? 'Audio/friend_thanks.wav'
+          : 'Audio/friend_whee.wav'
+      );
+    if (isNull(resolved)) {
+      print(`[FriendGrab] no phrase clip for "${label}"`);
+      return;
+    }
+    this.playFriendSound(resolved, this.grabSoundVolume, 'grab');
   }
 
   private scheduleGrabWireRetry(delaySec: number): void {
@@ -354,7 +387,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.resetIdleBobOffset();
     this.playFriendSound(this.resolvedGrabTrack, this.grabSoundVolume, 'grab');
     if (this.grabBubbleText) {
-      this.showSpeech(this.grabBubbleText);
+      this.showSpeech(this.grabBubbleText, true, this.grabSpeechTrack);
     }
     if (this.debugLogging) {
       print('[FriendGrab] grab start');
@@ -369,7 +402,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.captureIdleBasePosition();
     this.playFriendSound(this.resolvedReleaseTrack, this.releaseSoundVolume, 'release');
     if (this.releaseBubbleText) {
-      this.showSpeech(this.releaseBubbleText);
+      this.showSpeech(this.releaseBubbleText, true, this.releaseSpeechTrack);
     }
     if (this.debugLogging) {
       print('[FriendGrab] grab end');

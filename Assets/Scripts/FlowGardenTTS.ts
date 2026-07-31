@@ -53,6 +53,24 @@ export class FlowGardenTTS extends BaseScriptComponent {
   onAwake(): void {
     registerFlowGardenTts(this);
     this.audioPlayer = this.getSceneObject().createComponent('Component.AudioComponent') as AudioComponent;
+    this.createEvent('OnStartEvent').bind(() => this.configureAudioPlayer());
+    print('[FlowGardenTTS] registered');
+  }
+
+  private configureAudioPlayer(): void {
+    if (isNull(this.audioPlayer)) {
+      return;
+    }
+    try {
+      const configured = this.audioPlayer as AudioComponent & { playbackMode?: number };
+      if (typeof configured.playbackMode !== 'undefined') {
+        configured.playbackMode = Audio.PlaybackMode.LowLatency;
+      }
+    } catch (e) {
+      if (this.debugLogging) {
+        print('[FlowGardenTTS] LowLatency unavailable: ' + e);
+      }
+    }
   }
 
   public speak(text: string, onDone?: (ok: boolean) => void): void {
@@ -65,16 +83,16 @@ export class FlowGardenTTS extends BaseScriptComponent {
     }
 
     if (this.speaking) {
-      if (this.debugLogging) {
-        print('[FlowGardenTTS] already speaking — skipping overlap');
+      print('[FlowGardenTTS] already speaking — skipping overlap');
+      if (onDone) {
+        onDone(false);
       }
+      return;
     }
 
     this.speaking = true;
     this.beginVoiceCommandSuppression(spokenText);
-    if (this.debugLogging) {
-      print('[FlowGardenTTS] Speaking: ' + spokenText.slice(0, 120));
-    }
+    print('[FlowGardenTTS] Speaking: ' + spokenText.slice(0, 120));
 
     const finish = (ok: boolean): void => {
       // Native/cloud play() returns immediately — wait out spoken duration before unblocking mic.
@@ -97,7 +115,8 @@ export class FlowGardenTTS extends BaseScriptComponent {
       this.preferArvisVoiceWhenPaired &&
       !isNull(this.specsApi) &&
       !isNull(this.deviceRegistry) &&
-      (this.deviceRegistry.isPaired() || this.specsApi.isEditorMockActive())
+      this.deviceRegistry.isPaired() &&
+      !this.specsApi.isEditorMockActive()
     ) {
       this.speakViaArvis(spokenText, (ok) => {
         if (ok) {
@@ -169,9 +188,7 @@ export class FlowGardenTTS extends BaseScriptComponent {
 
   private speakViaNative(text: string, onDone?: (ok: boolean) => void): void {
     if (isNull(this.ttsModule)) {
-      if (this.debugLogging) {
-        print('[FlowGardenTTS] Missing TextToSpeechModule asset');
-      }
+      print('[FlowGardenTTS] Missing TextToSpeechModule asset');
       if (onDone) {
         onDone(false);
       }

@@ -3659,7 +3659,7 @@
   PrefabRemaps:
     []
   Name: Text3D UserID
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 27.054745, y: 0.000000, z: -72.451370}
@@ -3673,7 +3673,6 @@
     - !<own> 86f6985a-0620-412d-b342-0cfadc2d0e8f
     - !<own> f6a7b8c9-0d1e-4f5a-9b0c-1d2e3f4a5b6d
     - !<own> 9f2d3e4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
-    - !<own> a1b2c3d4-e5f6-7890-abcd-ef1234567892
 - !<ScriptComponent/75e07e24-4315-42d3-9ca4-e6332e4ab55a>
   PrefabRemaps:
     []
@@ -5885,7 +5884,7 @@
       speed: !<float> 1.000000
       preferArvisVoiceWhenPaired: true
       agentName: Arvis
-      debugLogging: false
+      debugLogging: true
   ScriptTypes:
     "":
       {}
@@ -7946,6 +7945,7 @@
     - !<own> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
     - !<own> 5d1a9b7c-4e6f-7a8b-1c2d-3e4f5a718293
     - !<own> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
+    - !<own> a1b2c3d4-e5f6-7890-abcd-ef1234567892
 - !<ScreenTransform/d36216bd-792a-43a6-be71-1656039955f0>
   PrefabRemaps:
     []

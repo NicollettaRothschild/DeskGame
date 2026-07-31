@@ -36,14 +36,14 @@
     baseTex:
       typeIdx: 9
       value:
-        id: 87a05e3a-1ab9-41db-a0c5-73f1429aa2d7
+        id: e9c10b12-e241-4dae-9115-c5c4c41c2f9e
         sampler:
           filteringMode: Trilinear
           wrapModeU: Repeat
-          wrapModeV: Repeat
+          wrapModeV: ClampToEdge
           wrapModeW: Repeat
           borderColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-          mipmaps: false
+          mipmaps: true
         type: Texture2D
     baseTexTransform:
       typeIdx: 7
