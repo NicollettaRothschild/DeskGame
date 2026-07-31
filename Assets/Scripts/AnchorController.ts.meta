@@ -29,12 +29,14 @@
     anchorComponent: false
     anchorModule: false
     camera: false
+    globeRoot: false
     growthCompleteTrack: false
     growthStartTrack: false
     hoverTrack: false
     menuRoot: false
     moveHandleGlowMaterial: false
     moveHandleMaterial: false
+    paletteRoot: false
     placeObjectTrack: false
     plantConfigs: false
     plantPrefab: false
@@ -99,6 +101,8 @@
       waterSourceRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       planterRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       seedsRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      paletteRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      globeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
@@ -137,6 +141,8 @@
     - // @input SceneObject waterSourceRoot
     - // @input SceneObject planterRoot
     - // @input SceneObject seedsRoot
+    - // @input SceneObject paletteRoot
+    - // @input SceneObject globeRoot
     - // @input Component.ScriptComponent spacePanel
     - // @input AssignableType_3 specsApi
     - // @input Asset.Material sackMaterial

@@ -19,8 +19,10 @@ import {
 import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
 import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
 
-const ANCHOR_CONTROLLER_VERSION = 'v32-garden-source-anchors';
+const ANCHOR_CONTROLLER_VERSION = 'v33-desk-prop-anchors';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
+/** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
+const DESK_PROP_NAMES = ['palette', 'Globe'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
 const TRASH_BIN_SOURCE_NAME = 'TrashBin';
 const GARDEN_MOVE_HANDLE_REFERENCE_SOURCE = 'Water Source';
@@ -180,6 +182,14 @@ export class AnchorController extends BaseScriptComponent {
   @input
   @allowUndefined
   seedsRoot!: SceneObject;
+
+  @input
+  @allowUndefined
+  paletteRoot!: SceneObject;
+
+  @input
+  @allowUndefined
+  globeRoot!: SceneObject;
 
   @input
   @allowUndefined
@@ -1733,6 +1743,8 @@ export class AnchorController extends BaseScriptComponent {
       this.waterSourceRoot,
       this.planterRoot,
       this.seedsRoot,
+      this.paletteRoot,
+      this.globeRoot,
       this.getTrashSceneObject(),
       this.getSceneObject(),
     ];
@@ -1793,6 +1805,12 @@ export class AnchorController extends BaseScriptComponent {
     if (name === 'Seeds' && !isNull(this.seedsRoot)) {
       return this.seedsRoot;
     }
+    if (name === 'palette' && !isNull(this.paletteRoot)) {
+      return this.paletteRoot;
+    }
+    if (name === 'Globe' && !isNull(this.globeRoot)) {
+      return this.globeRoot;
+    }
     const searchRoots = this.getSceneSearchRoots();
     for (let i = 0; i < searchRoots.length; i++) {
       const found = this.findSceneObjectByName(searchRoots[i], name);
@@ -1804,16 +1822,21 @@ export class AnchorController extends BaseScriptComponent {
     return null;
   }
 
+  private getAnchorLayoutSourceNames(): string[] {
+    return GARDEN_SPAWN_SOURCE_NAMES.concat(DESK_PROP_NAMES);
+  }
+
   private isGardenSpawnSourceObject(candidate: SceneObject): boolean {
     if (isNull(candidate)) {
       return false;
     }
 
+    const layoutNames = this.getAnchorLayoutSourceNames();
     let current: SceneObject | null = candidate;
     while (!isNull(current)) {
       const name = String(current.name || '');
-      for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-        if (name === GARDEN_SPAWN_SOURCE_NAMES[i]) {
+      for (let i = 0; i < layoutNames.length; i++) {
+        if (name === layoutNames[i]) {
           return true;
         }
       }
@@ -1824,12 +1847,13 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private captureGardenSpawnSourceDefaults(): void {
-    if (this.gardenSpawnSourceDefaults.size > 0) {
-      return;
-    }
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      const name = layoutNames[i];
+      if (this.gardenSpawnSourceDefaults.has(name)) {
+        continue;
+      }
 
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
       const source = this.findGardenSpawnSource(name);
       if (isNull(source)) {
         continue;
@@ -2009,18 +2033,20 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private allGardenSourcesRestoreApplied(): boolean {
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      if (!this.gardenSourceRestoreApplied.get(GARDEN_SPAWN_SOURCE_NAMES[i])) {
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      if (!this.gardenSourceRestoreApplied.get(layoutNames[i])) {
         return false;
       }
     }
 
-    return GARDEN_SPAWN_SOURCE_NAMES.length > 0;
+    return layoutNames.length > 0;
   }
 
   private captureGardenSourcesInitialTransforms(): void {
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      const name = layoutNames[i];
       if (this.gardenSourceFixedWorldPositions.has(name)) {
         continue;
       }
@@ -2039,16 +2065,18 @@ export class AnchorController extends BaseScriptComponent {
 
   private restoreGardenSourcesFromStorage(): void {
     const useWorldSpace = this.shouldRestoreAIContainerInWorldSpace();
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      const name = layoutNames[i];
       this.restoreGardenSourceTransform(name, useWorldSpace);
       this.gardenSourceRestoreApplied.set(name, true);
     }
   }
 
   private applyGardenSourcesSavedPoses(): void {
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      this.applyGardenSourceSavedPose(GARDEN_SPAWN_SOURCE_NAMES[i]);
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      this.applyGardenSourceSavedPose(layoutNames[i]);
     }
   }
 
@@ -2059,12 +2087,17 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
+    if (!isNull(this.activeManipulatedRoot) && this.activeManipulatedRoot === source) {
+      return;
+    }
+
     source.getTransform().setWorldPosition(savedPos);
   }
 
   private maintainGardenSourceAnchorBindings(): void {
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      this.maintainGardenSourceAnchorBinding(GARDEN_SPAWN_SOURCE_NAMES[i]);
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      this.maintainGardenSourceAnchorBinding(layoutNames[i]);
     }
   }
 
@@ -2122,8 +2155,9 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      const name = layoutNames[i];
       const source = this.findGardenSpawnSource(name);
       if (isNull(source)) {
         continue;
@@ -2247,11 +2281,12 @@ export class AnchorController extends BaseScriptComponent {
 
   private restoreGardenSpawnSourcesLayout(reason: string): void {
     const sceneRoot = this.findSceneRoot();
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      const name = layoutNames[i];
       const source = this.findGardenSpawnSource(name);
       if (isNull(source)) {
-        print(`Garden source missing: ${name} (${reason})`);
+        print(`Anchor layout object missing: ${name} (${reason})`);
         continue;
       }
 
@@ -2276,7 +2311,7 @@ export class AnchorController extends BaseScriptComponent {
         this.gardenSourceFixedWorldPositions.delete(name);
         this.gardenSourceLastPersistedWorld.delete(name);
         this.gardenSourceRestoreApplied.delete(name);
-        print(`Garden source ${name} reset (${reason})`);
+        print(`Anchor layout object ${name} reset (${reason})`);
         continue;
       }
 
@@ -2306,7 +2341,7 @@ export class AnchorController extends BaseScriptComponent {
 
       const worldPos = source.getTransform().getWorldPosition();
       print(
-        `Garden source ${name} ready (${reason}) at world: {x: ${worldPos.x}, y: ${worldPos.y}, z: ${worldPos.z}}`
+        `Anchor layout object ${name} ready (${reason}) at world: {x: ${worldPos.x}, y: ${worldPos.y}, z: ${worldPos.z}}`
       );
     }
   }
@@ -2928,8 +2963,9 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private persistAllGardenSourceTransforms(): void {
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      this.persistGardenSourceTransform(GARDEN_SPAWN_SOURCE_NAMES[i]);
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      this.persistGardenSourceTransform(layoutNames[i]);
     }
   }
 
