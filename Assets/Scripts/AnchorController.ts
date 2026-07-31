@@ -19,7 +19,7 @@ import {
 import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
 import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
 
-const ANCHOR_CONTROLLER_VERSION = 'v35-postit-notes-stack';
+const ANCHOR_CONTROLLER_VERSION = 'v36-respect-disabled-sources';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
 const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
@@ -280,6 +280,8 @@ export class AnchorController extends BaseScriptComponent {
     string,
     { pos: vec3; rot: quat; scale: vec3 }
   >();
+  /** Scene editor enabled flags — layout must not force-enable disabled sources. */
+  private gardenSourceSceneEnabled = new Map<string, boolean>();
   private gardenSourceFixedWorldPositions = new Map<string, vec3>();
   private gardenSourceLastPersistedWorld = new Map<string, vec3>();
   private gardenSourcePersistCooldowns = new Map<string, number>();
@@ -1872,12 +1874,16 @@ export class AnchorController extends BaseScriptComponent {
     const layoutNames = this.getAnchorLayoutSourceNames();
     for (let i = 0; i < layoutNames.length; i++) {
       const name = layoutNames[i];
-      if (this.gardenSpawnSourceDefaults.has(name)) {
+      const source = this.findGardenSpawnSource(name);
+      if (isNull(source)) {
         continue;
       }
 
-      const source = this.findGardenSpawnSource(name);
-      if (isNull(source)) {
+      if (!this.gardenSourceSceneEnabled.has(name)) {
+        this.gardenSourceSceneEnabled.set(name, source.enabled);
+      }
+
+      if (this.gardenSpawnSourceDefaults.has(name)) {
         continue;
       }
 
@@ -2312,7 +2318,16 @@ export class AnchorController extends BaseScriptComponent {
         continue;
       }
 
-      source.enabled = true;
+      // Honor the scene checkbox — do not revive sources disabled in the editor.
+      const sceneEnabled = this.gardenSourceSceneEnabled.has(name)
+        ? this.gardenSourceSceneEnabled.get(name)
+        : source.enabled;
+      source.enabled = !!sceneEnabled;
+      if (!sceneEnabled) {
+        print(`Anchor layout object ${name} left disabled (${reason})`);
+        continue;
+      }
+
       this.sanitizeGardenSpawnSourcePresentation(source, name);
 
       if (reason === 'reset') {
@@ -2995,7 +3010,7 @@ export class AnchorController extends BaseScriptComponent {
     for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
       const name = GARDEN_SPAWN_SOURCE_NAMES[i];
       const source = this.findGardenSpawnSource(name);
-      if (isNull(source)) {
+      if (isNull(source) || !source.enabled) {
         continue;
       }
 
