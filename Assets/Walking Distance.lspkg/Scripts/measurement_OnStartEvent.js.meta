@@ -1,0 +1,88 @@
+- !<AssetImportMetadata/de4e97d6-8264-d70b-2995-21cb8d3ce633>
+  ImportedAssetIds:
+    JavaScriptAsset: !<reference> 1a9b5488-e02a-495b-b5b1-76064f0b5753
+  ImporterName: JavaScriptAssetImporter
+  PrimaryAsset: !<reference> 1a9b5488-e02a-495b-b5b1-76064f0b5753
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    JavaScriptAsset: !<own> e44fa96f-428c-41d2-92b6-93f061af0a5f
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ScriptAssetData/e44fa96f-428c-41d2-92b6-93f061af0a5f>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 237f321a-5754-48d9-849d-d87e40857540
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    anchorObject: false
+    calcheck: false
+    caldist: false
+    calories: false
+    caloriesText: false
+    cameraObject: false
+    date: false
+    displayCalories: false
+    displayDistance: false
+    displaySpeed: false
+    displaySteps: false
+    displayTime: false
+    distanceText: false
+    fulldist: false
+    sameDay: false
+    score: false
+    speedFloat: false
+    speedText: false
+    steps: false
+    stepsText: false
+    storeData: false
+    timeSinceText: false
+    timer: false
+    totaldist: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - storeData: false
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      anchorObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      displayDistance: false
+      distanceText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      displaySteps: false
+      stepsText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      displaySpeed: false
+      speedText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      displayCalories: false
+      caloriesText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      displayTime: false
+      timeSinceText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      sameDay: false
+      fulldist: !<float> 0.000000
+      totaldist: !<float> 0.000000
+      caldist: !<float> 0.000000
+      calories: !<float> 0.000000
+      timer: !<float> 0.000000
+      speedFloat: !<float> 0.000000
+      steps: 0
+      score: !<float> 0.000000
+      date: ""
+      calcheck: !<float> 0.000000
+  ScriptTypes:
+    -
+      {}

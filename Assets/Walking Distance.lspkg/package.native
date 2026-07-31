@@ -1,0 +1,37 @@
+- !<NativePackageDescriptor/be4b8e2f-84f4-4e27-b000-4d77eb4e73b1>
+  PackagePath: ""
+  StudioVersion:
+    major: 5
+    minor: 15
+    patch: 1
+    build: 25102815
+    type: Unset
+    buildFlavor: ""
+    timestamp: 0
+    commit: ""
+  Description: Walking Distance This script measures the distance and speed moved by the users device (phone or spectacles) and estimates the number of steps and calories burned based on this movement. It can be used for exercise or general distance tracking. Learn more here
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  UpdateCheckpoint: 76
+  ExportUid: fa6d25dd-559c-44c4-9ee4-69caef66d6d6
+  ComponentUid: 3929b114-b1ed-48a6-aa9c-12d67787a167
+  PackagePolicy: CanBeUnpackedTransparent
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  Instantiable: !<reference> 00000000-0000-0000-0000-000000000000
+  AssetLibraryDependencyStructure: !<AssetLibraryDependencyStructure>
+    Name: ""
+    AssetId: ""
+    Hash: ""
+    Version:
+      major: 0
+      minor: 0
+      patch: 0
+      build: 0
