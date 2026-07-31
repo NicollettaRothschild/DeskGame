@@ -15,6 +15,7 @@ import {
   getSharedFlowGardenTts,
   getSharedSpeechRecognition,
 } from './FlowGardenServiceRegistry';
+import { PlantLifecycle } from './PlantLifecycle';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
@@ -317,8 +318,15 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   }
 
   private tryCompleteCommand(text: string): boolean {
-    if (!/\b(complete|done|finish)\b/.test(text)) {
+    if (!/\b(complete|done|finish|finished|i did)\b/.test(text)) {
       return false;
+    }
+
+    const goalPlant = PlantLifecycle.tryCompleteGoalBySpeech(text);
+    if (!isNull(goalPlant)) {
+      const goal = goalPlant.getGoalText() || 'goal';
+      this.setStatus(`Goal grown: ${goal}`);
+      return true;
     }
 
     const manager = this.taskBerryManager as unknown as TaskBerryManagerLike;
@@ -328,7 +336,7 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
     }
 
     const remainder = text
-      .replace(/\b(complete|done|finish|the|task|todo|berry)\b/g, ' ')
+      .replace(/\b(complete|done|finish|finished|the|task|todo|berry|goal|my|i|did|it)\b/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
 

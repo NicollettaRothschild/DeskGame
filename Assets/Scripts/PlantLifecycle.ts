@@ -23,6 +23,10 @@ export type PlantLifecycleSaveState = {
   plantedGrowthOffsetX?: number;
   plantedGrowthOffsetY?: number;
   plantedGrowthOffsetZ?: number;
+  /** Spoken goal this plant represents (onboarding goal seeds). */
+  goalText?: string;
+  requiresGoalCompletion?: boolean;
+  goalCompleted?: boolean;
 };
 
 type AnchorPersistence = {
@@ -105,6 +109,13 @@ export class PlantLifecycle extends BaseScriptComponent {
   private seedWaterScaleOutStartScale: vec3 | null = null;
   private static readonly DEFAULT_CONTAINER_WORLD_SCALE = 0.1;
   private static readonly GROWTH_SIZE_DIVISOR = 3;
+  /** Goal plants pause ~60% grown until the player says they finished. */
+  private static readonly GOAL_GROWTH_CAP_RATIO = 0.6;
+  private static goalPlantRegistry: PlantLifecycle[] = [];
+
+  private goalText = '';
+  private requiresGoalCompletion = false;
+  private goalCompleted = false;
 
   onAwake(): void {
     this.debugLog(`awake plantType=${this.plantTypeId}`);
@@ -251,6 +262,179 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.scaleUpSize = Math.max(0.001, scaleUpSize);
   }
 
+  /**
+   * Bind a spoken life-goal to this seed. Growth will pause before Adult
+   * until completeGoal() (usually via speech).
+   */
+  public bindGoal(goalText: string): void {
+    const text = String(goalText || '').trim();
+    if (!text) {
+      return;
+    }
+    this.goalText = text;
+    this.requiresGoalCompletion = true;
+    this.goalCompleted = false;
+    PlantLifecycle.registerGoalPlant(this);
+    this.notifyAnchorStateChanged();
+    print(`[PlantLifecycle] ${this.getSceneObject().name}: bound goal "${text}"`);
+  }
+
+  public getGoalText(): string {
+    return this.goalText;
+  }
+
+  public requiresGoal(): boolean {
+    return this.requiresGoalCompletion && !this.goalCompleted;
+  }
+
+  public isGoalCompleted(): boolean {
+    return this.goalCompleted;
+  }
+
+  /** Finish the bound goal and bloom to Adult if the plant is growing. */
+  public completeGoal(): boolean {
+    if (!this.requiresGoalCompletion || this.goalCompleted) {
+      return false;
+    }
+    this.goalCompleted = true;
+    print(`[PlantLifecycle] ${this.getSceneObject().name}: goal completed "${this.goalText}"`);
+
+    if (this.currentStage === PlantStage.Growing || this.currentStage === PlantStage.WateredBaby) {
+      this.finishGrowthToAdult();
+    } else if (this.currentStage === PlantStage.Seed && this.isPlanted && this.hasBeenWatered) {
+      this.startGrowth();
+      this.finishGrowthToAdult();
+    } else {
+      this.notifyAnchorStateChanged();
+    }
+    return true;
+  }
+
+  public static tryCompleteGoalBySpeech(spokenText: string): PlantLifecycle | null {
+    PlantLifecycle.pruneGoalPlantRegistry();
+    const query = String(spokenText || '')
+      .trim()
+      .toLowerCase();
+    if (!query || PlantLifecycle.goalPlantRegistry.length === 0) {
+      return null;
+    }
+
+    const wantsComplete =
+      /\b(finished|finish|completed|complete|done|did it|i did|achieved|accomplished)\b/.test(
+        query
+      ) || /\b(my )?goal\b/.test(query);
+    if (!wantsComplete) {
+      // Still allow matching the goal wording itself ("i ran one kilometer").
+      let matched: PlantLifecycle | null = null;
+      for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+        const plant = PlantLifecycle.goalPlantRegistry[i];
+        if (isNull(plant) || !plant.requiresGoal()) {
+          continue;
+        }
+        const goal = plant.getGoalText().toLowerCase();
+        if (goal && (query.indexOf(goal) >= 0 || goal.indexOf(query) >= 0 || this.sharesGoalTokens(query, goal))) {
+          matched = plant;
+          break;
+        }
+      }
+      if (isNull(matched)) {
+        return null;
+      }
+      if (matched.completeGoal()) {
+        return matched;
+      }
+      return null;
+    }
+
+    let target: PlantLifecycle | null = null;
+    for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+      const plant = PlantLifecycle.goalPlantRegistry[i];
+      if (isNull(plant) || !plant.requiresGoal()) {
+        continue;
+      }
+      const goal = plant.getGoalText().toLowerCase();
+      if (goal && (query.indexOf(goal) >= 0 || this.sharesGoalTokens(query, goal))) {
+        target = plant;
+        break;
+      }
+    }
+    if (isNull(target)) {
+      for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+        const plant = PlantLifecycle.goalPlantRegistry[i];
+        if (!isNull(plant) && plant.requiresGoal()) {
+          target = plant;
+          break;
+        }
+      }
+    }
+    if (isNull(target) || !target.completeGoal()) {
+      return null;
+    }
+    return target;
+  }
+
+  private static sharesGoalTokens(spoken: string, goal: string): boolean {
+    const stop = new Set([
+      'i',
+      'want',
+      'to',
+      'a',
+      'an',
+      'the',
+      'my',
+      'do',
+      'and',
+      'for',
+      'of',
+      'in',
+      'on',
+      'is',
+      'it',
+      'me',
+    ]);
+    const tokens = goal.split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !stop.has(t));
+    if (tokens.length === 0) {
+      return false;
+    }
+    let hits = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      if (spoken.indexOf(tokens[i]) >= 0) {
+        hits += 1;
+      }
+    }
+    return hits >= Math.min(2, tokens.length);
+  }
+
+  private static registerGoalPlant(plant: PlantLifecycle): void {
+    PlantLifecycle.pruneGoalPlantRegistry();
+    for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+      if (PlantLifecycle.goalPlantRegistry[i] === plant) {
+        return;
+      }
+    }
+    PlantLifecycle.goalPlantRegistry.push(plant);
+  }
+
+  private static pruneGoalPlantRegistry(): void {
+    const next: PlantLifecycle[] = [];
+    for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+      const plant = PlantLifecycle.goalPlantRegistry[i];
+      if (isNull(plant)) {
+        continue;
+      }
+      try {
+        const obj = plant.getSceneObject();
+        if (isNull(obj)) {
+          continue;
+        }
+        next.push(plant);
+      } catch (_e) {
+        // destroyed
+      }
+    }
+    PlantLifecycle.goalPlantRegistry = next;
+  }
+
   public water(): boolean {
     if (!this.isPlanted) {
       const pot = this.findParentPlantPot();
@@ -278,8 +462,12 @@ export class PlantLifecycle extends BaseScriptComponent {
         this.startGrowth();
       }
       playInteractionSound((sounds) => sounds.playWatering());
+      const goalNote =
+        this.requiresGoalCompletion && !this.goalCompleted
+          ? ' (paused until goal complete)'
+          : '';
       print(
-        `[PlantLifecycle] ${this.getSceneObject().name}: watered seed -> growing (${this.growthTime.toFixed(1)}s to adult)`
+        `[PlantLifecycle] ${this.getSceneObject().name}: watered seed -> growing (${this.growthTime.toFixed(1)}s to adult)${goalNote}`
       );
       return true;
     }
@@ -305,6 +493,9 @@ export class PlantLifecycle extends BaseScriptComponent {
       growthElapsed: this.growthElapsed,
       hasBeenWatered: this.hasBeenWatered,
       isPlanted: this.isPlanted,
+      goalText: this.goalText,
+      requiresGoalCompletion: this.requiresGoalCompletion,
+      goalCompleted: this.goalCompleted,
     };
 
     if (
@@ -343,6 +534,12 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.growthElapsed = Math.max(0, state.growthElapsed);
     this.currentStage = this.normalizeStage(state.stage);
     this.isPlanted = state.isPlanted;
+    this.goalText = String(state.goalText || '').trim();
+    this.requiresGoalCompletion = !!state.requiresGoalCompletion && !!this.goalText;
+    this.goalCompleted = !!state.goalCompleted;
+    if (this.requiresGoalCompletion && !this.goalCompleted) {
+      PlantLifecycle.registerGoalPlant(this);
+    }
 
     if (this.currentStage === PlantStage.Seed) {
       this.showSeed();
@@ -396,18 +593,35 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     if (this.currentStage === PlantStage.Growing) {
       this.growthElapsed += getDeltaTime();
+
+      if (this.requiresGoalCompletion && !this.goalCompleted) {
+        const cap = Math.max(0.5, this.growthTime * PlantLifecycle.GOAL_GROWTH_CAP_RATIO);
+        if (this.growthElapsed > cap) {
+          this.growthElapsed = cap;
+        }
+        this.applyGrowthScale();
+        return;
+      }
+
       this.applyGrowthScale();
 
       if (this.growthTime <= 0 || this.growthElapsed >= this.growthTime) {
-        this.currentStage = PlantStage.Adult;
-        this.growthElapsed = Math.max(0, this.growthTime);
-        this.applyAdultScale();
-        this.updateInteractionForPlantedState();
-        this.notifyAnchorStateChanged();
-        playInteractionSound((sounds) => sounds.playGrowthComplete());
-        print(`[PlantLifecycle] ${this.getSceneObject().name}: growth complete -> adult`);
+        this.finishGrowthToAdult();
       }
     }
+  }
+
+  private finishGrowthToAdult(): void {
+    if (this.currentStage === PlantStage.Adult) {
+      return;
+    }
+    this.currentStage = PlantStage.Adult;
+    this.growthElapsed = Math.max(this.growthElapsed, this.growthTime);
+    this.applyAdultScale();
+    this.updateInteractionForPlantedState();
+    this.notifyAnchorStateChanged();
+    playInteractionSound((sounds) => sounds.playGrowthComplete());
+    print(`[PlantLifecycle] ${this.getSceneObject().name}: growth complete -> adult`);
   }
 
   private beginSeedWaterScaleOut(): void {

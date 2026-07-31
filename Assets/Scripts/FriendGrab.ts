@@ -2,7 +2,11 @@ import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interact
 import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
 import { ArvisGhostSpeechBubble } from './ArvisGhostSpeechBubble';
 import { estimateSpeechDurationSec, FlowGardenTTS } from './FlowGardenTTS';
-import { getSharedFlowGardenTts } from './FlowGardenServiceRegistry';
+import {
+  getSharedFlowGardenTts,
+  getSharedSpeechRecognition,
+} from './FlowGardenServiceRegistry';
+import { PlantLifecycle } from './PlantLifecycle';
 
 type InteractableLike = ScriptComponent & {
   targetingMode?: number;
@@ -91,15 +95,25 @@ export class FriendGrab extends BaseScriptComponent {
   @hint('Wait for grab+release on movable desk props before revealing the next')
   onboardingRequirePractice: boolean = true;
 
+  /** How far in front of Friend (toward the camera) each tour object appears, in cm. */
+  @input('float')
+  @label('Present Distance (cm)')
+  onboardingPresentDistanceCm: number = 22;
+
+  /** Height offset from Friend when presenting (cm). */
+  @input('float')
+  @label('Present Height Offset (cm)')
+  onboardingPresentHeightCm: number = 0;
+
   @input
   @label('Welcome Line')
   onboardingWelcomeLine: string =
-    "Hi! I'm your desk buddy. I'll show you the desk one piece at a time.";
+    "Hi! I'm your buddy. I'll show you things one piece at a time.";
 
   @input
   @label('Closing Line')
   onboardingClosingLine: string =
-    "You're all set! Say hey Arvis if you need help. Have fun!";
+    "You're all set! When you finish your goal, say I finished my goal. Have fun!";
 
   @input
   @allowUndefined
@@ -139,7 +153,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Planter Line')
   onboardingPlanterLine: string =
-    "Here's the planter stack. Pinch it to grab a pot for your garden.";
+    "Here's the planter. Pinch it to grab a pot — you'll plant your goal seed in one next.";
 
   @input
   @allowUndefined
@@ -160,6 +174,25 @@ export class FriendGrab extends BaseScriptComponent {
   @label('Trash Line')
   onboardingTrashLine: string =
     "Here's the trash. Drop things into it to clean up.";
+
+  @input
+  @label('Goal Prompt Line')
+  @hint('Spoken after the planter; Friend waits for the player to say a goal')
+  onboardingGoalPromptLine: string =
+    "What goal should we grow together? Say something like: I want to run one kilometer.";
+
+  @input
+  @label('Goal Seed Line')
+  onboardingGoalSeedLine: string =
+    "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!";
+
+  @input('float')
+  @label('Goal Listen Timeout (sec)')
+  onboardingGoalListenTimeoutSec: number = 22;
+
+  @input
+  @label('Goal Fallback Example')
+  onboardingGoalFallback: string = 'I want to run one kilometer';
 
   @input
   @allowUndefined
@@ -237,6 +270,10 @@ export class FriendGrab extends BaseScriptComponent {
   private onboardingActive = false;
   private onboardingToken = 0;
   private onboardingPracticeDone = false;
+  private onboardingGoalListening = false;
+  private goalCompletionWired = false;
+  private lastGoalCompleteUtterance = '';
+  private lastGoalCompleteAt = 0;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -696,12 +733,6 @@ export class FriendGrab extends BaseScriptComponent {
         requirePractice: true,
       },
       {
-        key: 'planter',
-        object: resolve(this.onboardingPlanter, 'Planter'),
-        line: this.onboardingPlanterLine,
-        requirePractice: false,
-      },
-      {
         key: 'postit',
         object: resolve(this.onboardingPostIt, 'PostItNotes'),
         line: this.onboardingPostItLine,
@@ -711,6 +742,12 @@ export class FriendGrab extends BaseScriptComponent {
         key: 'trash',
         object: resolve(this.onboardingTrash, 'TrashBin'),
         line: this.onboardingTrashLine,
+        requirePractice: false,
+      },
+      {
+        key: 'planter',
+        object: resolve(this.onboardingPlanter, 'Planter'),
+        line: this.onboardingPlanterLine,
         requirePractice: false,
       },
     ];
@@ -731,15 +768,143 @@ export class FriendGrab extends BaseScriptComponent {
     for (let i = 0; i < steps.length; i++) {
       const obj = steps[i].object;
       if (!isNull(obj)) {
+        // Keep already-revealed props where the player left them; only place
+        // anything that never got a presentation slot (still disabled).
+        const needsPlacement = !obj.enabled;
         obj.enabled = true;
+        if (needsPlacement) {
+          this.placeObjectInFrontOfFriend(obj, steps[i].key);
+        }
       }
     }
+  }
+
+  /**
+   * Put the tour object in a clear presentation slot just in front of Friend
+   * (toward the camera), so it doesn't pop in at a distant desk-anchor pose.
+   */
+  private placeObjectInFrontOfFriend(obj: SceneObject, key: string): void {
+    if (isNull(obj)) {
+      return;
+    }
+
+    const friendTransform = this.getSceneObject().getTransform();
+    const friendPos = friendTransform.getWorldPosition();
+
+    let dirX = 0;
+    let dirZ = -1; // Lens forward default when no camera yet
+    if (isNull(this.lookAtCamera)) {
+      this.lookAtCamera = this.findCameraObject();
+    }
+    if (!isNull(this.lookAtCamera)) {
+      const camPos = this.lookAtCamera.getTransform().getWorldPosition();
+      const dx = camPos.x - friendPos.x;
+      const dz = camPos.z - friendPos.z;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len > 0.5) {
+        dirX = dx / len;
+        dirZ = dz / len;
+      }
+    } else {
+      // Friend LookAt uses +Z toward the user when active.
+      try {
+        const forward = friendTransform.forward;
+        if (!isNull(forward)) {
+          const len = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
+          if (len > 0.001) {
+            dirX = forward.x / len;
+            dirZ = forward.z / len;
+          }
+        }
+      } catch (_e) {
+        // keep default -Z
+      }
+    }
+
+    let distance = Math.max(8, this.onboardingPresentDistanceCm);
+    let height = this.onboardingPresentHeightCm;
+    // Larger props sit a bit farther / lower so they don't swallow Friend.
+    if (key === 'planter' || key === 'trash') {
+      distance = Math.max(distance, 32);
+      height = height - 4;
+    } else if (key === 'palette') {
+      height = height - 2;
+    } else if (key === 'globe') {
+      height = height + 2;
+    }
+
+    const present = new vec3(
+      friendPos.x + dirX * distance,
+      friendPos.y + height,
+      friendPos.z + dirZ * distance
+    );
+    obj.getTransform().setWorldPosition(present);
+
+    if (this.debugLogging) {
+      print(
+        `[FriendGrab] present ${key} at ${present.x.toFixed(1)}, ${present.y.toFixed(1)}, ${present.z.toFixed(1)}`
+      );
+    }
+  }
+
+  /** Rewire + force-show garden MoveHandle after onboarding re-enables a source. */
+  private ensureOnboardingSourceHandle(source: SceneObject, key: string): void {
+    if (key !== 'planter' && key !== 'trash' && key !== 'postit') {
+      return;
+    }
+
+    const handle = this.findNamedChild(source, 'MoveHandle');
+    if (isNull(handle)) {
+      print(`[FriendGrab] onboarding ${key} has no MoveHandle child`);
+      return;
+    }
+
+    handle.enabled = true;
+    const sourceLabel =
+      key === 'planter' ? 'Planter' : key === 'trash' ? 'TrashBin' : 'PostItNotes';
+    const scripts = handle.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const script = scripts[i] as ScriptComponent & {
+        sourceRoot?: SceneObject;
+        sourceName?: string;
+        wireMoveInteraction?: () => void;
+        presentHandle?: () => void;
+        clearPresentedHandle?: () => void;
+      };
+      if (isNull(script) || typeof script.wireMoveInteraction !== 'function') {
+        continue;
+      }
+      script.sourceRoot = source;
+      script.sourceName = sourceLabel;
+      script.wireMoveInteraction();
+      if (typeof script.presentHandle === 'function') {
+        script.presentHandle();
+      }
+      print(`[FriendGrab] onboarding ${key} move handle ready`);
+    }
+  }
+
+  private findNamedChild(parent: SceneObject, name: string): SceneObject | null {
+    if (isNull(parent)) {
+      return null;
+    }
+    const count = parent.getChildrenCount();
+    for (let i = 0; i < count; i++) {
+      const child = parent.getChild(i);
+      if (!isNull(child) && child.name === name) {
+        return child;
+      }
+    }
+    return null;
   }
 
   private scheduleOnboarding(): void {
     if (!this.enableOnboarding) {
       return;
     }
+
+    // Wipe last-session plants/layout so the tour never starts with leftover anchors.
+    this.requestOnboardingSessionClear();
 
     // Hide tour props immediately so the desk starts empty aside from Friend.
     this.hideOnboardingTourObjects();
@@ -753,6 +918,7 @@ export class FriendGrab extends BaseScriptComponent {
         return;
       }
       // Re-hide in case AnchorController layout re-enabled props during boot.
+      this.requestOnboardingSessionClear();
       this.hideOnboardingTourObjects();
       print('[FriendGrab] onboarding tour start');
       this.runOnboardingWelcome(token);
@@ -760,12 +926,59 @@ export class FriendGrab extends BaseScriptComponent {
     delay.reset(delaySec);
   }
 
+  private requestOnboardingSessionClear(): void {
+    const anchor = this.findAnchorController();
+    if (isNull(anchor)) {
+      return;
+    }
+    if (typeof anchor.clearPreviousSessionForOnboarding === 'function') {
+      anchor.clearPreviousSessionForOnboarding();
+    }
+  }
+
+  private findAnchorController(): { clearPreviousSessionForOnboarding?: () => void } | null {
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const found = this.findAnchorControllerOn(global.scene.getRootObject(i));
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findAnchorControllerOn(
+    node: SceneObject
+  ): { clearPreviousSessionForOnboarding?: () => void } | null {
+    if (isNull(node)) {
+      return null;
+    }
+
+    const scripts = node.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as ScriptComponent & {
+        clearPreviousSessionForOnboarding?: () => void;
+      };
+      if (candidate && typeof candidate.clearPreviousSessionForOnboarding === 'function') {
+        return candidate;
+      }
+    }
+
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      const found = this.findAnchorControllerOn(node.getChild(i));
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
   private runOnboardingWelcome(token: number): void {
     if (token !== this.onboardingToken || !this.enableOnboarding) {
       return;
     }
     this.onboardingActive = true;
-    const welcome = String(this.onboardingWelcomeLine || '').trim();
+    const welcome = this.resolveOnboardingWelcomeLine();
     if (!welcome) {
       this.runOnboardingStep(0, token);
       return;
@@ -773,6 +986,19 @@ export class FriendGrab extends BaseScriptComponent {
     this.speakOnboardingText(welcome, token, () => {
       this.delayOnboarding(token, () => this.runOnboardingStep(0, token));
     });
+  }
+
+  /** Prefer live script default; rewrite legacy Inspector "desk buddy" copy. */
+  private resolveOnboardingWelcomeLine(): string {
+    const preferred = "Hi! I'm your buddy. I'll show you things one piece at a time.";
+    const raw = String(this.onboardingWelcomeLine || '').trim();
+    if (!raw) {
+      return preferred;
+    }
+    if (/desk\s+buddy/i.test(raw) || /\bthe desk\b/i.test(raw)) {
+      return preferred;
+    }
+    return raw;
   }
 
   private runOnboardingStep(index: number, token: number): void {
@@ -783,7 +1009,7 @@ export class FriendGrab extends BaseScriptComponent {
 
     const steps = this.getOnboardingTourSteps();
     if (index < 0 || index >= steps.length) {
-      this.finishOnboardingTour(token);
+      this.runOnboardingGoalStep(token);
       return;
     }
 
@@ -796,22 +1022,37 @@ export class FriendGrab extends BaseScriptComponent {
 
     this.onboardingActive = true;
     step.object.enabled = true;
+    this.placeObjectInFrontOfFriend(step.object, step.key);
+    this.ensureOnboardingSourceHandle(step.object, step.key);
     print(`[FriendGrab] onboarding reveal ${step.key}`);
+
+    const needsPractice =
+      this.onboardingRequirePractice && step.requirePractice && !isNull(step.object);
+
+    // Arm grab practice immediately so grabs during the spoken line still count.
+    let speechDone = false;
+    let practiceDone = !needsPractice;
+    const tryAdvance = (): void => {
+      if (token !== this.onboardingToken || !speechDone || !practiceDone) {
+        return;
+      }
+      this.delayOnboarding(token, () => this.runOnboardingStep(index + 1, token));
+    };
+
+    if (needsPractice) {
+      this.waitForOnboardingPractice(step.object as SceneObject, token, () => {
+        practiceDone = true;
+        tryAdvance();
+      });
+    }
 
     const line = String(step.line || '').trim();
     const afterSpeech = (): void => {
       if (token !== this.onboardingToken) {
         return;
       }
-      const needsPractice =
-        this.onboardingRequirePractice && step.requirePractice && !isNull(step.object);
-      if (!needsPractice) {
-        this.delayOnboarding(token, () => this.runOnboardingStep(index + 1, token));
-        return;
-      }
-      this.waitForOnboardingPractice(step.object as SceneObject, token, () => {
-        this.delayOnboarding(token, () => this.runOnboardingStep(index + 1, token));
-      });
+      speechDone = true;
+      tryAdvance();
     };
 
     if (!line) {
@@ -821,11 +1062,238 @@ export class FriendGrab extends BaseScriptComponent {
     this.speakOnboardingText(line, token, afterSpeech);
   }
 
+  private runOnboardingGoalStep(token: number): void {
+    if (token !== this.onboardingToken || !this.enableOnboarding) {
+      this.onboardingActive = false;
+      return;
+    }
+
+    this.onboardingActive = true;
+    const prompt = String(this.onboardingGoalPromptLine || '').trim();
+    print('[FriendGrab] onboarding goal prompt');
+    const afterPrompt = (): void => {
+      if (token !== this.onboardingToken) {
+        return;
+      }
+      this.waitForOnboardingGoalSpeech(token, (goalText) => {
+        if (token !== this.onboardingToken) {
+          return;
+        }
+        const goal = String(goalText || '').trim() || String(this.onboardingGoalFallback || '').trim();
+        print(`[FriendGrab] onboarding goal heard: ${goal}`);
+        this.spawnOnboardingGoalSeed(goal, token, () => {
+          if (token !== this.onboardingToken) {
+            return;
+          }
+          const seedLine = String(this.onboardingGoalSeedLine || '').trim();
+          if (!seedLine) {
+            this.finishOnboardingTour(token);
+            return;
+          }
+          this.speakOnboardingText(seedLine, token, () => {
+            this.finishOnboardingTour(token);
+          });
+        });
+      });
+    };
+
+    if (!prompt) {
+      afterPrompt();
+      return;
+    }
+    this.speakOnboardingText(prompt, token, afterPrompt);
+  }
+
+  private waitForOnboardingGoalSpeech(
+    token: number,
+    onGoal: (goalText: string) => void
+  ): void {
+    const speech = getSharedSpeechRecognition();
+    if (isNull(speech)) {
+      print('[FriendGrab] onboarding goal: no SpeechRecognition — using fallback');
+      onGoal(String(this.onboardingGoalFallback || 'I want to run one kilometer'));
+      return;
+    }
+
+    this.onboardingGoalListening = true;
+    speech.suppressVoiceCommandsFor(Math.max(8, this.onboardingGoalListenTimeoutSec + 2));
+    speech.clearUtteranceState();
+
+    let settled = false;
+    const finish = (text: string): void => {
+      if (settled || token !== this.onboardingToken) {
+        return;
+      }
+      settled = true;
+      this.onboardingGoalListening = false;
+      speech.removeTranscriptListener(onTranscript);
+      speech.clearUtteranceState();
+      onGoal(text);
+    };
+
+    const onTranscript = (text: string, isFinal: boolean): void => {
+      if (token !== this.onboardingToken || !this.onboardingGoalListening) {
+        return;
+      }
+      const cleaned = this.normalizeGoalUtterance(text);
+      if (!cleaned || cleaned.length < 4) {
+        return;
+      }
+      if (this.looksLikeFriendEcho(cleaned)) {
+        return;
+      }
+      if (isFinal || cleaned.length >= 10) {
+        finish(cleaned);
+      }
+    };
+    speech.addTranscriptListener(onTranscript);
+
+    const poll = this.createEvent('UpdateEvent');
+    poll.bind(() => {
+      if (settled || token !== this.onboardingToken) {
+        poll.enabled = false;
+        return;
+      }
+      const stable = speech.getStableUtterance(1.1);
+      const cleaned = this.normalizeGoalUtterance(stable);
+      if (cleaned && cleaned.length >= 6 && !this.looksLikeFriendEcho(cleaned)) {
+        poll.enabled = false;
+        finish(cleaned);
+      }
+    });
+
+    const timeout = this.createEvent('DelayedCallbackEvent');
+    timeout.bind(() => {
+      if (settled || token !== this.onboardingToken) {
+        return;
+      }
+      poll.enabled = false;
+      const fallback = String(this.onboardingGoalFallback || 'I want to run one kilometer');
+      print(`[FriendGrab] onboarding goal timeout — using fallback: ${fallback}`);
+      finish(fallback);
+    });
+    timeout.reset(Math.max(6, this.onboardingGoalListenTimeoutSec));
+  }
+
+  private normalizeGoalUtterance(text: string): string {
+    return String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private looksLikeFriendEcho(text: string): boolean {
+    const lower = text.toLowerCase();
+    const prompts = [
+      this.onboardingGoalPromptLine,
+      this.onboardingGoalSeedLine,
+      this.onboardingWelcomeLine,
+      this.onboardingPlanterLine,
+    ];
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = String(prompts[i] || '')
+        .toLowerCase()
+        .slice(0, 40);
+      if (prompt && lower.indexOf(prompt.slice(0, 24)) >= 0) {
+        return true;
+      }
+    }
+    return (
+      lower.indexOf('what goal') >= 0 ||
+      lower.indexOf('grow together') >= 0 ||
+      lower.indexOf('say something like') >= 0
+    );
+  }
+
+  private spawnOnboardingGoalSeed(
+    goalText: string,
+    token: number,
+    onDone: () => void
+  ): void {
+    if (token !== this.onboardingToken) {
+      return;
+    }
+
+    const anchor = this.findAnchorController() as {
+      clearPreviousSessionForOnboarding?: () => void;
+      createSeedAtWorldPosition?: (worldPos: vec3) => SceneObject | null;
+    } | null;
+
+    let spawnPos = this.getSceneObject().getTransform().getWorldPosition();
+    // Present slightly in front of Friend, same slot style as tour props.
+    const friendPos = spawnPos;
+    let dirX = 0;
+    let dirZ = -1;
+    if (isNull(this.lookAtCamera)) {
+      this.lookAtCamera = this.findCameraObject();
+    }
+    if (!isNull(this.lookAtCamera)) {
+      const camPos = this.lookAtCamera.getTransform().getWorldPosition();
+      const dx = camPos.x - friendPos.x;
+      const dz = camPos.z - friendPos.z;
+      const len = Math.sqrt(dx * dx + dz * dz);
+      if (len > 0.5) {
+        dirX = dx / len;
+        dirZ = dz / len;
+      }
+    }
+    spawnPos = new vec3(
+      friendPos.x + dirX * Math.max(14, this.onboardingPresentDistanceCm * 0.7),
+      friendPos.y + this.onboardingPresentHeightCm + 2,
+      friendPos.z + dirZ * Math.max(14, this.onboardingPresentDistanceCm * 0.7)
+    );
+
+    let seed: SceneObject | null = null;
+    if (!isNull(anchor) && typeof anchor.createSeedAtWorldPosition === 'function') {
+      seed = anchor.createSeedAtWorldPosition(spawnPos);
+    }
+
+    if (isNull(seed)) {
+      print('[FriendGrab] onboarding goal seed spawn failed');
+      onDone();
+      return;
+    }
+
+    seed.enabled = true;
+    seed.getTransform().setWorldPosition(spawnPos);
+    const plant = this.findPlantLifecycle(seed);
+    if (!isNull(plant)) {
+      plant.bindGoal(goalText);
+    } else {
+      print('[FriendGrab] onboarding goal seed missing PlantLifecycle');
+    }
+
+    this.ensureGoalCompletionListening();
+    print(`[FriendGrab] onboarding goal seed spawned for "${goalText}"`);
+    onDone();
+  }
+
+  private findPlantLifecycle(root: SceneObject): PlantLifecycle | null {
+    if (isNull(root)) {
+      return null;
+    }
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop() as SceneObject;
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as PlantLifecycle;
+        if (!isNull(candidate) && typeof candidate.bindGoal === 'function') {
+          return candidate;
+        }
+      }
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+    return null;
+  }
+
   private finishOnboardingTour(token: number): void {
     if (token !== this.onboardingToken) {
       return;
     }
     this.revealAllOnboardingTourObjects();
+    this.ensureGoalCompletionListening();
     const closing = String(this.onboardingClosingLine || '').trim();
     if (!closing) {
       this.onboardingActive = false;
@@ -839,6 +1307,52 @@ export class FriendGrab extends BaseScriptComponent {
       this.onboardingActive = false;
       print('[FriendGrab] onboarding complete');
     });
+  }
+
+  private ensureGoalCompletionListening(): void {
+    if (this.goalCompletionWired) {
+      return;
+    }
+    const speech = getSharedSpeechRecognition();
+    if (isNull(speech)) {
+      return;
+    }
+    this.goalCompletionWired = true;
+    speech.addTranscriptListener((text, isFinal) => {
+      if (!isFinal && String(text || '').trim().length < 12) {
+        return;
+      }
+      if (this.onboardingGoalListening) {
+        return;
+      }
+      this.tryCompleteGoalFromSpeech(text);
+    });
+    print('[FriendGrab] goal completion listening armed');
+  }
+
+  private tryCompleteGoalFromSpeech(text: string): void {
+    const cleaned = this.normalizeGoalUtterance(text);
+    if (!cleaned || cleaned.length < 4) {
+      return;
+    }
+    const now = getTime();
+    if (
+      cleaned === this.lastGoalCompleteUtterance &&
+      now - this.lastGoalCompleteAt < 2.5
+    ) {
+      return;
+    }
+
+    const plant = PlantLifecycle.tryCompleteGoalBySpeech(cleaned);
+    if (isNull(plant)) {
+      return;
+    }
+
+    this.lastGoalCompleteUtterance = cleaned;
+    this.lastGoalCompleteAt = now;
+    const goal = plant.getGoalText() || 'your goal';
+    print(`[FriendGrab] goal plant completed: ${goal}`);
+    this.showSpeech(`You did it! "${goal}" — your plant is fully grown!`, true, null);
   }
 
   private delayOnboarding(token: number, next: () => void): void {
@@ -912,6 +1426,8 @@ export class FriendGrab extends BaseScriptComponent {
   ): void {
     this.onboardingPracticeDone = false;
     let grabbed = false;
+    let listenersWired = false;
+    const presentPos = target.getTransform().getWorldPosition();
 
     const finish = (reason: string): void => {
       if (this.onboardingPracticeDone || token !== this.onboardingToken) {
@@ -922,28 +1438,86 @@ export class FriendGrab extends BaseScriptComponent {
       onDone();
     };
 
-    const manip = this.findManipulationInTree(target);
-    if (!isNull(manip)) {
-      if (manip.onManipulationStart) {
-        manip.onManipulationStart.add(() => {
-          if (token !== this.onboardingToken) {
-            return;
-          }
-          grabbed = true;
-        });
+    const hasMovedFromPresent = (): boolean => {
+      const pos = target.getTransform().getWorldPosition();
+      return pos.distance(presentPos) > 2.5;
+    };
+
+    const onGrabStart = (): void => {
+      if (token !== this.onboardingToken || this.onboardingPracticeDone) {
+        return;
       }
-      if (manip.onManipulationEnd) {
-        manip.onManipulationEnd.add(() => {
-          if (token !== this.onboardingToken || !grabbed) {
-            return;
-          }
-          finish('grab-release');
-        });
+      grabbed = true;
+    };
+
+    const onGrabEnd = (): void => {
+      if (token !== this.onboardingToken || this.onboardingPracticeDone) {
+        return;
       }
-    } else {
-      print(
-        `[FriendGrab] onboarding no grab handler on ${target.name} — using timeout`
-      );
+      // Count release even if we armed mid-grab (missed the start event).
+      if (grabbed || hasMovedFromPresent()) {
+        finish('grab-release');
+      }
+    };
+
+    const tryWireListeners = (): boolean => {
+      if (listenersWired || this.onboardingPracticeDone || token !== this.onboardingToken) {
+        return listenersWired;
+      }
+
+      const manip = this.findManipulationInTree(target);
+      const interactable = this.findInteractableInTree(target);
+      if (isNull(manip) && isNull(interactable)) {
+        return false;
+      }
+
+      listenersWired = true;
+      if (!isNull(manip)) {
+        if (manip.onManipulationStart) {
+          manip.onManipulationStart.add(onGrabStart);
+        }
+        if (manip.onManipulationEnd) {
+          manip.onManipulationEnd.add(onGrabEnd);
+        }
+      }
+      if (!isNull(interactable)) {
+        if (interactable.onDragStart) {
+          interactable.onDragStart.add(onGrabStart);
+        }
+        if (interactable.onDragEnd) {
+          interactable.onDragEnd.add(onGrabEnd);
+        }
+        if (interactable.onTriggerEnd) {
+          interactable.onTriggerEnd.add(onGrabEnd);
+        }
+        if (interactable.onTriggerEndOutside) {
+          interactable.onTriggerEndOutside.add(onGrabEnd);
+        }
+        if (interactable.onInteractorTriggerEnd) {
+          interactable.onInteractorTriggerEnd.add(onGrabEnd);
+        }
+        if (interactable.onInteractorTriggerEndOutside) {
+          interactable.onInteractorTriggerEndOutside.add(onGrabEnd);
+        }
+      }
+      print(`[FriendGrab] onboarding practice armed on ${target.name}`);
+      return true;
+    };
+
+    if (!tryWireListeners()) {
+      // GlobeGrab / ClockGrab / PaletteGrab often wire a moment after enable.
+      const retryDelays = [0.2, 0.5, 1.0, 1.6];
+      for (let i = 0; i < retryDelays.length; i++) {
+        const retry = this.createEvent('DelayedCallbackEvent');
+        retry.bind(() => {
+          if (!tryWireListeners() && i === retryDelays.length - 1) {
+            print(
+              `[FriendGrab] onboarding no grab handler on ${target.name} — using timeout`
+            );
+          }
+        });
+        retry.reset(retryDelays[i]);
+      }
     }
 
     const timeoutSec = Math.max(3, this.onboardingPracticeTimeoutSec);
@@ -951,7 +1525,7 @@ export class FriendGrab extends BaseScriptComponent {
     timeout.bind(() => finish('timeout'));
     timeout.reset(timeoutSec);
 
-    // Nudge player if they're still waiting.
+    // Nudge only if they still haven't practiced (don't nag after a mid-speech grab).
     const tip = this.createEvent('DelayedCallbackEvent');
     tip.bind(() => {
       if (this.onboardingPracticeDone || token !== this.onboardingToken) {
@@ -959,7 +1533,33 @@ export class FriendGrab extends BaseScriptComponent {
       }
       this.showSpeech('Try grabbing it, then release.', true, null);
     });
-    tip.reset(Math.min(5, timeoutSec * 0.45));
+    tip.reset(Math.min(8, Math.max(5.5, timeoutSec * 0.45)));
+  }
+
+  private findInteractableInTree(root: SceneObject): InteractableLike | null {
+    if (isNull(root)) {
+      return null;
+    }
+    const scripts = root.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as InteractableLike;
+      if (
+        !isNull(candidate) &&
+        (candidate.onDragStart !== undefined ||
+          candidate.onTriggerEnd !== undefined ||
+          candidate.targetingMode !== undefined)
+      ) {
+        return candidate;
+      }
+    }
+    const childCount = root.getChildrenCount();
+    for (let i = 0; i < childCount; i++) {
+      const nested = this.findInteractableInTree(root.getChild(i));
+      if (!isNull(nested)) {
+        return nested;
+      }
+    }
+    return null;
   }
 
   private findManipulationInTree(root: SceneObject): InteractableManipulationLike | null {

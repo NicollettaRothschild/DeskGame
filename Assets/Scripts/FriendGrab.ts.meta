@@ -47,14 +47,30 @@
     lookAtDistanceMeters: false
     lookAtExitPaddingMeters: false
     lookAtTurnSpeed: false
+    onboardingClock: false
+    onboardingClockLine: false
+    onboardingClosingLine: false
     onboardingGapSec: false
-    onboardingLine1: false
-    onboardingLine2: false
-    onboardingLine3: false
-    onboardingLine4: false
-    onboardingLine5: false
-    onboardingLine6: false
+    onboardingGlobe: false
+    onboardingGlobeLine: false
+    onboardingGoalFallback: false
+    onboardingGoalListenTimeoutSec: false
+    onboardingGoalPromptLine: false
+    onboardingGoalSeedLine: false
+    onboardingPalette: false
+    onboardingPaletteLine: false
+    onboardingPlanter: false
+    onboardingPlanterLine: false
+    onboardingPostIt: false
+    onboardingPostItLine: false
+    onboardingPracticeTimeoutSec: false
+    onboardingPresentDistanceCm: false
+    onboardingPresentHeightCm: false
+    onboardingRequirePractice: false
     onboardingStartDelaySec: false
+    onboardingTrash: false
+    onboardingTrashLine: false
+    onboardingWelcomeLine: false
     releaseBubbleText: false
     releaseSoundTrack: false
     releaseSoundVolume: false
@@ -81,12 +97,28 @@
       enableOnboarding: false
       onboardingStartDelaySec: 2.500000
       onboardingGapSec: 0.500000
-      onboardingLine1: "Hi! I'm your desk buddy. Here's a quick tour!"
-      onboardingLine2: "Pinch and drag me, the clock, globe, or palette to move them."
-      onboardingLine3: "Grab a planter, then add seeds and water to grow plants."
-      onboardingLine4: Pull a sticky note and speak — your words appear on it.
-      onboardingLine5: Drop things in the trash to clean up.
-      onboardingLine6: Say hey Arvis if you need help. Have fun!
+      onboardingPracticeTimeoutSec: !<float> 14.000000
+      onboardingRequirePractice: true
+      onboardingPresentDistanceCm: !<float> 22.000000
+      onboardingPresentHeightCm: !<float> 0.000000
+      onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
+      onboardingClosingLine: "You're all set! Say hey Arvis if you need help. Have fun!"
+      onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
+      onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
+      onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
+      onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
+      onboardingPostIt: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
+      onboardingTrash: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingTrashLine: "Here's the trash. Drop things into it to clean up."
+      onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
+      onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
+      onboardingGoalListenTimeoutSec: !<float> 22.000000
+      onboardingGoalFallback: I want to run one kilometer
       agentTts: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       releaseSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -116,15 +148,31 @@
     - // @input bool enableGrabSounds = true
     - // @input bool enableSpeechBubble = true
     - // @input bool enableTts = true
-    - '// @input bool enableOnboarding {"label":"Enable Onboarding", "hint":"Friend explains the desk garden to new players on start"}'
+    - '// @input bool enableOnboarding {"label":"Enable Onboarding", "hint":"Friend reveals desk objects one at a time and explains grab / release"}'
     - '// @input float onboardingStartDelaySec = 2.5 {"label":"Onboarding Start Delay (sec)"}'
-    - '// @input float onboardingGapSec = 0.5 {"label":"Onboarding Gap (sec)"}'
-    - "// @input string onboardingLine1 = \"Hi! I'm your desk buddy. Here's a quick tour!\" {\"label\":\"Onboarding Line 1\"}"
-    - '// @input string onboardingLine2 = "Pinch and drag me, the clock, globe, or palette to move them." {"label":"Onboarding Line 2"}'
-    - '// @input string onboardingLine3 = "Grab a planter, then add seeds and water to grow plants." {"label":"Onboarding Line 3"}'
-    - '// @input string onboardingLine4 = "Pull a sticky note and speak — your words appear on it." {"label":"Onboarding Line 4"}'
-    - '// @input string onboardingLine5 = "Drop things in the trash to clean up." {"label":"Onboarding Line 5"}'
-    - '// @input string onboardingLine6 = "Say hey Arvis if you need help. Have fun!" {"label":"Onboarding Line 6"}'
+    - '// @input float onboardingGapSec = 0.6 {"label":"Onboarding Gap (sec)"}'
+    - '// @input float onboardingPracticeTimeoutSec = 14 {"label":"Practice Timeout (sec)", "hint":"Auto-advance if the player does not grab/release in time"}'
+    - '// @input bool onboardingRequirePractice = true {"label":"Require Grab Practice", "hint":"Wait for grab+release on movable desk props before revealing the next"}'
+    - '// @input float onboardingPresentDistanceCm = 22 {"label":"Present Distance (cm)"}'
+    - '// @input float onboardingPresentHeightCm {"label":"Present Height Offset (cm)"}'
+    - "// @input string onboardingWelcomeLine = \"Hi! I'm your buddy. I'll show you things one piece at a time.\" {\"label\":\"Welcome Line\"}"
+    - "// @input string onboardingClosingLine = \"You're all set! When you finish your goal, say I finished my goal. Have fun!\" {\"label\":\"Closing Line\"}"
+    - '// @input SceneObject onboardingGlobe {"label":"Tour Globe"}'
+    - "// @input string onboardingGlobeLine = \"Here's the globe. Pinch to grab it, move it, then release.\" {\"label\":\"Globe Line\"}"
+    - '// @input SceneObject onboardingClock {"label":"Tour Clock"}'
+    - "// @input string onboardingClockLine = \"Here's the clock. Grab it, move it, then let go.\" {\"label\":\"Clock Line\"}"
+    - '// @input SceneObject onboardingPalette {"label":"Tour Palette"}'
+    - "// @input string onboardingPaletteLine = \"Here's the palette. Grab and release to place it where you like.\" {\"label\":\"Palette Line\"}"
+    - '// @input SceneObject onboardingPlanter {"label":"Tour Planter"}'
+    - "// @input string onboardingPlanterLine = \"Here's the planter. Pinch it to grab a pot — you'll plant your goal seed in one next.\" {\"label\":\"Planter Line\"}"
+    - '// @input SceneObject onboardingPostIt {"label":"Tour Post-its"}'
+    - "// @input string onboardingPostItLine = \"Here's the sticky notes. Pull one and speak — your words appear on it.\" {\"label\":\"Post-it Line\"}"
+    - '// @input SceneObject onboardingTrash {"label":"Tour Trash"}'
+    - "// @input string onboardingTrashLine = \"Here's the trash. Drop things into it to clean up.\" {\"label\":\"Trash Line\"}"
+    - '// @input string onboardingGoalPromptLine = "What goal should we grow together? Say something like: I want to run one kilometer." {"label":"Goal Prompt Line", "hint":"Spoken after the planter; Friend waits for the player to say a goal"}'
+    - "// @input string onboardingGoalSeedLine = \"Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!\" {\"label\":\"Goal Seed Line\"}"
+    - '// @input float onboardingGoalListenTimeoutSec = 22 {"label":"Goal Listen Timeout (sec)"}'
+    - '// @input string onboardingGoalFallback = "I want to run one kilometer" {"label":"Goal Fallback Example"}'
     - // @input AssignableType agentTts
     - // @input Asset.AudioTrackAsset grabSpeechTrack
     - // @input Asset.AudioTrackAsset releaseSpeechTrack

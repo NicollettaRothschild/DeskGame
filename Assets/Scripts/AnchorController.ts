@@ -19,7 +19,7 @@ import {
 import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
 import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
 
-const ANCHOR_CONTROLLER_VERSION = 'v36-respect-disabled-sources';
+const ANCHOR_CONTROLLER_VERSION = 'v37-onboarding-clear-session';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
 const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
@@ -254,6 +254,9 @@ export class AnchorController extends BaseScriptComponent {
   private aiContainerPersistencePaused = false;
   private startupWorldOnlySession = false;
   private isResetting = false;
+  /** When FriendGrab onboarding is on, wipe prior session plants/layout once. */
+  private onboardingCleanSessionApplied = false;
+  private trashSceneDefault: { pos: vec3; rot: quat; scale: vec3 } | null = null;
   private sessionEpoch = 0;
   private anchorSettleEvent?: UpdateEvent;
   private nextPlantSpawnIndex = 0;
@@ -343,6 +346,13 @@ export class AnchorController extends BaseScriptComponent {
     armGardenSourceStartupSpawnBlock(3);
     print(`AnchorController ${ANCHOR_CONTROLLER_VERSION} starting`);
     this.captureGardenSpawnSourceDefaults();
+    this.captureTrashSceneDefault();
+
+    // Onboarding must start from a clean desk — wipe last session before restore.
+    if (this.isFriendOnboardingEnabled()) {
+      this.clearPreviousSessionForOnboarding();
+    }
+
     if (!this.trashRestoreApplied) {
       this.restoreTrashFromStorage();
     }
@@ -352,13 +362,18 @@ export class AnchorController extends BaseScriptComponent {
       this.restoreGardenSourcesFromStorage();
     }
     this.applyGardenSourcesSavedPoses();
-    this.restoreGardenSpawnSourcesLayout('startup');
+    if (!this.onboardingCleanSessionApplied) {
+      this.restoreGardenSpawnSourcesLayout('startup');
+    }
 
     const store = global.persistentStorageSystem.store;
     this.purgeLooseUnplantedFromStorage(store);
     const editorPreview = this.isEditorPreviewSession();
     const hasSavedPlants =
-      !editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0;
+      !this.onboardingCleanSessionApplied &&
+      !editorPreview &&
+      store.has('widget_count') &&
+      store.getInt('widget_count') > 0;
 
     // Leave AIContainer/menuRoot enabled-state as authored in the scene
     // (currently hidden; ArvisGhost lives at scene root separately).
@@ -402,7 +417,12 @@ export class AnchorController extends BaseScriptComponent {
     // Editor preview can't persist world anchors reliably, but we should still allow restoring
     // saved desk layouts for iteration. Only clear saved data when the user explicitly resets.
 
-    if (editorPreview && store.has('widget_count') && store.getInt('widget_count') > 0) {
+    if (
+      !this.onboardingCleanSessionApplied &&
+      editorPreview &&
+      store.has('widget_count') &&
+      store.getInt('widget_count') > 0
+    ) {
       print('Editor preview: saved plants found, restoring');
       this.restoreSavedObjects(true);
       this.hasRestored = true;
@@ -2223,6 +2243,137 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`${slug}_uses_anchor_space`);
   }
 
+  private clearTrashStorage(): void {
+    const store = global.persistentStorageSystem.store;
+    store.remove('trash_bin_wx');
+    store.remove('trash_bin_wy');
+    store.remove('trash_bin_wz');
+    store.remove('trash_bin_x');
+    store.remove('trash_bin_y');
+    store.remove('trash_bin_z');
+    store.remove('trash_bin_has_data');
+    store.remove('trash_bin_uses_anchor_space');
+    this.trashFixedWorldPosition = null;
+    this.lastPersistedTrashWorld = null;
+    this.trashRestoreApplied = false;
+  }
+
+  private captureTrashSceneDefault(): void {
+    if (!isNull(this.trashSceneDefault)) {
+      return;
+    }
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject)) {
+      return;
+    }
+    const transform = trashObject.getTransform();
+    this.trashSceneDefault = {
+      pos: transform.getWorldPosition(),
+      rot: transform.getWorldRotation(),
+      scale: transform.getWorldScale(),
+    };
+  }
+
+  private resetTrashToSceneDefault(): void {
+    const trashObject = this.getTrashSceneObject();
+    if (isNull(trashObject)) {
+      return;
+    }
+    const defaults = this.trashSceneDefault;
+    if (!isNull(defaults)) {
+      const sceneRoot = this.findSceneRoot();
+      if (trashObject.getParent() !== sceneRoot) {
+        trashObject.setParent(sceneRoot);
+      }
+      trashObject.getTransform().setWorldPosition(defaults.pos);
+      trashObject.getTransform().setWorldRotation(defaults.rot);
+      trashObject.getTransform().setWorldScale(defaults.scale);
+    }
+    this.trashFixedWorldPosition = trashObject.getTransform().getWorldPosition();
+    this.lastPersistedTrashWorld = this.trashFixedWorldPosition;
+  }
+
+  /**
+   * Friend onboarding: wipe persisted plants + desk layout from the last session
+   * so the tour starts empty (no leftover Planter / plants / props from storage).
+   */
+  public clearPreviousSessionForOnboarding(): void {
+    if (this.onboardingCleanSessionApplied) {
+      return;
+    }
+    this.onboardingCleanSessionApplied = true;
+    print('Onboarding enabled: clearing previous session plants and layout anchors');
+
+    this.clearPersistedPlantStorageOnly();
+
+    const objectsToDestroy = this.wrappers.slice();
+    this.wrappers = [];
+    this.objs = [];
+    this.objectKinds = [];
+    this.objectPrefabIndices = [];
+    for (let i = 0; i < objectsToDestroy.length; i++) {
+      const wrapper = objectsToDestroy[i];
+      if (!isNull(wrapper)) {
+        wrapper.destroy();
+      }
+    }
+
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      this.clearGardenSourceStorage(layoutNames[i]);
+      this.gardenSourceFixedWorldPositions.delete(layoutNames[i]);
+      this.gardenSourceLastPersistedWorld.delete(layoutNames[i]);
+      this.gardenSourceRestoreApplied.delete(layoutNames[i]);
+    }
+    this.clearTrashStorage();
+    this.restoreGardenSpawnSourcesLayout('reset');
+    this.resetTrashToSceneDefault();
+    // Hide Friend tour props; leave Water Source / Seeds at scene-enabled state.
+    const onboardingHideNames = DESK_PROP_NAMES.concat(['Planter', 'PostItNotes']);
+    for (let i = 0; i < onboardingHideNames.length; i++) {
+      const source = this.findGardenSpawnSource(onboardingHideNames[i]);
+      if (!isNull(source)) {
+        source.enabled = false;
+      }
+    }
+    const trashObject = this.getTrashSceneObject();
+    if (!isNull(trashObject)) {
+      trashObject.enabled = false;
+    }
+    this.hasRestored = false;
+  }
+
+  private isFriendOnboardingEnabled(): boolean {
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      if (this.findFriendOnboardingFlag(global.scene.getRootObject(i))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private findFriendOnboardingFlag(node: SceneObject): boolean {
+    if (isNull(node)) {
+      return false;
+    }
+
+    const scripts = node.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as ScriptComponent & { enableOnboarding?: boolean };
+      if (candidate && candidate.enableOnboarding === true) {
+        return true;
+      }
+    }
+
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      if (this.findFriendOnboardingFlag(node.getChild(i))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private restoreGardenSourceTransform(sourceName: string, useWorldSpace: boolean): void {
     const source = this.findGardenSpawnSource(sourceName);
     if (isNull(source)) {
@@ -3010,7 +3161,9 @@ export class AnchorController extends BaseScriptComponent {
     for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
       const name = GARDEN_SPAWN_SOURCE_NAMES[i];
       const source = this.findGardenSpawnSource(name);
-      if (isNull(source) || !source.enabled) {
+      // Still wire while temporarily disabled (e.g. Friend onboarding hide) so
+      // the handle is ready the moment the source is revealed again.
+      if (isNull(source)) {
         continue;
       }
 
@@ -4424,6 +4577,15 @@ export class AnchorController extends BaseScriptComponent {
       store.remove(`w${index}_plant_growth_y`);
       store.remove(`w${index}_plant_growth_z`);
     }
+    if (state.requiresGoalCompletion && state.goalText) {
+      store.putString(`w${index}_plant_goal_text`, state.goalText);
+      store.putBool(`w${index}_plant_goal_required`, true);
+      store.putBool(`w${index}_plant_goal_done`, !!state.goalCompleted);
+    } else {
+      store.remove(`w${index}_plant_goal_text`);
+      store.remove(`w${index}_plant_goal_required`);
+      store.remove(`w${index}_plant_goal_done`);
+    }
   }
 
   private restorePlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
@@ -4499,6 +4661,14 @@ export class AnchorController extends BaseScriptComponent {
       isPlanted: isPlanted,
       plantedWorldRotation: plantedWorldRotation,
       ...plantedAlignment,
+      goalText: store.has(`w${index}_plant_goal_text`)
+        ? store.getString(`w${index}_plant_goal_text`)
+        : '',
+      requiresGoalCompletion:
+        store.has(`w${index}_plant_goal_required`) &&
+        store.getBool(`w${index}_plant_goal_required`),
+      goalCompleted:
+        store.has(`w${index}_plant_goal_done`) && store.getBool(`w${index}_plant_goal_done`),
     };
     plant.applySaveState(state);
   }
@@ -4552,6 +4722,9 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_growth_x`);
     store.remove(`w${index}_plant_growth_y`);
     store.remove(`w${index}_plant_growth_z`);
+    store.remove(`w${index}_plant_goal_text`);
+    store.remove(`w${index}_plant_goal_required`);
+    store.remove(`w${index}_plant_goal_done`);
   }
 
   private getActivePlantConfigs(): PlantSpawnConfig[] {

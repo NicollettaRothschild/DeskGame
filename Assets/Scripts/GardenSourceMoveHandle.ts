@@ -115,6 +115,20 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     this.tryWireMoveInteraction();
   }
 
+  /** Keep the yellow grab glow visible (used during Friend onboarding reveal). */
+  public presentHandle(): void {
+    this.cancelScheduledHide();
+    this.containerHovered = true;
+    this.applyHandleVisual(this.getSceneObject());
+    this.refreshHandleVisibility(true);
+  }
+
+  public clearPresentedHandle(): void {
+    this.containerHovered = false;
+    this.handleHovered = false;
+    this.scheduleHandleHide();
+  }
+
   public refreshManipulationRootBinding(): void {
     const sourceRoot = this.getSourceRoot();
     if (isNull(sourceRoot)) {
