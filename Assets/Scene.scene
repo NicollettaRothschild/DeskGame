@@ -3202,6 +3202,7 @@
       seedsRoot: !<reference.SceneObject> 8ee0f565-368b-4fd9-957d-8e90c5fb48d2
       paletteRoot: !<reference.SceneObject> 9aa42fcc-a72f-4475-a934-1f79675ea728
       globeRoot: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
+      clockRoot: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
       spacePanel: !<reference.ScriptComponent> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
       specsApi: !<MappingBased.AssignableType_3> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
       sackMaterial: !<reference.Material> ea3432dd-be57-41c3-a289-4c81ee0b0e0f
@@ -3842,6 +3843,7 @@
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
+      anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
   ScriptTypes:
     "":
       {}

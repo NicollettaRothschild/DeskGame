@@ -31,61 +31,90 @@ export class ClockHands extends BaseScriptComponent {
   private readonly basePitchDeg = -90;
   private hourTransform: Transform | null = null;
   private minuteTransform: Transform | null = null;
+  private loggedTimeOnce = false;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
       this.resolveHands();
-      this.applyTime();
+      this.applyTime(true);
       if (this.debugLogging) {
         print('[ClockHands] started');
       }
     });
 
     this.createEvent('UpdateEvent').bind(() => {
-      this.applyTime();
+      this.applyTime(false);
     });
   }
 
   private resolveHands(): void {
-    if (!this.hourHand || !this.minuteHand) {
-      const children = this.sceneObject.getChildrenCount();
+    if (isNull(this.hourHand) || isNull(this.minuteHand)) {
+      const root = this.getSceneObject();
+      const children = root.getChildrenCount();
       for (let i = 0; i < children; i++) {
-        const child = this.sceneObject.getChild(i);
+        const child = root.getChild(i);
         const name = child.name;
-        if (!this.hourHand && name === 'Hour Hand') {
+        if (isNull(this.hourHand) && name === 'Hour Hand') {
           this.hourHand = child;
-        } else if (!this.minuteHand && name === 'Minute Hand') {
+        } else if (isNull(this.minuteHand) && name === 'Minute Hand') {
           this.minuteHand = child;
         }
       }
     }
 
-    this.hourTransform = this.hourHand ? this.hourHand.getTransform() : null;
-    this.minuteTransform = this.minuteHand ? this.minuteHand.getTransform() : null;
+    this.hourTransform = !isNull(this.hourHand) ? this.hourHand.getTransform() : null;
+    this.minuteTransform = !isNull(this.minuteHand)
+      ? this.minuteHand.getTransform()
+      : null;
 
     if (this.debugLogging) {
       print(
-        `[ClockHands] hour=${this.hourHand ? this.hourHand.name : 'missing'} ` +
-          `minute=${this.minuteHand ? this.minuteHand.name : 'missing'}`
+        `[ClockHands] hour=${!isNull(this.hourHand) ? this.hourHand.name : 'missing'} ` +
+          `minute=${!isNull(this.minuteHand) ? this.minuteHand.name : 'missing'}`
       );
     }
   }
 
-  private applyTime(): void {
-    if (!this.hourTransform && !this.minuteTransform) {
-      return;
-    }
-
+  /** Device-local wall clock (hours/minutes/seconds), never UTC accessors. */
+  private readLocalClock(): { hours12: number; minutes: number; seconds: number; label: string } {
     const now = new Date();
     const seconds = now.getSeconds() + now.getMilliseconds() / 1000;
     const minutes = now.getMinutes() + seconds / 60;
-    const hours = (now.getHours() % 12) + minutes / 60;
+    const hours24 = now.getHours();
+    const hours12 = (hours24 % 12) + minutes / 60;
 
+    let label = `${hours24}:${now.getMinutes() < 10 ? '0' : ''}${now.getMinutes()}:${
+      now.getSeconds() < 10 ? '0' : ''
+    }${now.getSeconds()}`;
+    try {
+      const localization = (global as unknown as {
+        localizationSystem?: { getTimeFormatted?: (date: Date) => string };
+      }).localizationSystem;
+      if (!isNull(localization) && typeof localization.getTimeFormatted === 'function') {
+        label = localization.getTimeFormatted(now);
+      }
+    } catch (_e) {
+      // Preview/device without LocalizationSystem — keep Date label.
+    }
+
+    return { hours12, minutes, seconds, label };
+  }
+
+  private applyTime(forceLog: boolean): void {
+    if (isNull(this.hourTransform) && isNull(this.minuteTransform)) {
+      this.resolveHands();
+    }
+    if (isNull(this.hourTransform) && isNull(this.minuteTransform)) {
+      return;
+    }
+
+    const clock = this.readLocalClock();
     const dir = this.invertDirection ? -1 : 1;
-    const minuteDeg = dir * minutes * 6 + this.zeroOffsetDegrees;
-    const hourDeg = dir * hours * 30 + this.zeroOffsetDegrees;
+    // 6° per minute, 30° per hour on a 12-hour face.
+    const minuteDeg = dir * clock.minutes * 6 + this.zeroOffsetDegrees;
+    const hourDeg = dir * clock.hours12 * 30 + this.zeroOffsetDegrees;
 
-    if (this.minuteTransform) {
+    if (!isNull(this.minuteTransform)) {
       this.minuteTransform.setLocalRotation(
         quat.fromEulerAngles(
           this.basePitchDeg * MathUtils.DegToRad,
@@ -95,13 +124,21 @@ export class ClockHands extends BaseScriptComponent {
       );
     }
 
-    if (this.hourTransform) {
+    if (!isNull(this.hourTransform)) {
       this.hourTransform.setLocalRotation(
         quat.fromEulerAngles(
           this.basePitchDeg * MathUtils.DegToRad,
           hourDeg * MathUtils.DegToRad,
           0
         )
+      );
+    }
+
+    if ((forceLog || !this.loggedTimeOnce) && this.debugLogging) {
+      this.loggedTimeOnce = true;
+      print(
+        `[ClockHands] local=${clock.label} hourY=${hourDeg.toFixed(1)} minuteY=${minuteDeg.toFixed(1)} ` +
+          `offset=${this.zeroOffsetDegrees} invert=${this.invertDirection}`
       );
     }
   }

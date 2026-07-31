@@ -53,6 +53,10 @@ export class ClockGrab extends BaseScriptComponent {
   @input
   enableGrabSounds: boolean = true;
 
+  @input
+  @allowUndefined
+  anchorController!: ScriptComponent;
+
   private grabInteractable: InteractableLike | null = null;
   private grabManipulation: InteractableManipulationLike | null = null;
   private moveInteractionWired = false;
@@ -61,6 +65,21 @@ export class ClockGrab extends BaseScriptComponent {
   private grabAudioPlayer: AudioComponent | null = null;
   private resolvedGrabTrack: AudioTrackAsset | null = null;
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
+
+  private static readonly ANCHOR_SOURCE_NAME = 'Clock';
+
+  private getAnchorHandler(): {
+    persistGardenSourceTransform?: (sourceName: string) => void;
+    setActiveManipulatedRoot?: (root: SceneObject | null) => void;
+  } | null {
+    if (isNull(this.anchorController)) {
+      return null;
+    }
+    return this.anchorController as unknown as {
+      persistGardenSourceTransform?: (sourceName: string) => void;
+      setActiveManipulatedRoot?: (root: SceneObject | null) => void;
+    };
+  }
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => {
@@ -214,6 +233,10 @@ export class ClockGrab extends BaseScriptComponent {
       return;
     }
     this.moveActive = true;
+    const handler = this.getAnchorHandler();
+    if (!isNull(handler) && typeof handler.setActiveManipulatedRoot === 'function') {
+      handler.setActiveManipulatedRoot(this.getSceneObject());
+    }
     this.playGrabSound(this.resolvedGrabTrack, this.grabSoundVolume, 'grab');
     if (this.debugLogging) {
       print('[ClockGrab] grab start');
@@ -225,6 +248,15 @@ export class ClockGrab extends BaseScriptComponent {
       return;
     }
     this.moveActive = false;
+    const handler = this.getAnchorHandler();
+    if (!isNull(handler)) {
+      if (typeof handler.setActiveManipulatedRoot === 'function') {
+        handler.setActiveManipulatedRoot(null);
+      }
+      if (typeof handler.persistGardenSourceTransform === 'function') {
+        handler.persistGardenSourceTransform(ClockGrab.ANCHOR_SOURCE_NAME);
+      }
+    }
     this.playGrabSound(this.resolvedReleaseTrack, this.releaseSoundVolume, 'release');
     if (this.debugLogging) {
       print('[ClockGrab] grab end');

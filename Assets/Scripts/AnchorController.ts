@@ -19,10 +19,10 @@ import {
 import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
 import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
 
-const ANCHOR_CONTROLLER_VERSION = 'v33-desk-prop-anchors';
+const ANCHOR_CONTROLLER_VERSION = 'v34-clock-desk-anchor';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
-const DESK_PROP_NAMES = ['palette', 'Globe'];
+const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
 const TRASH_BIN_SOURCE_NAME = 'TrashBin';
 const GARDEN_MOVE_HANDLE_REFERENCE_SOURCE = 'Water Source';
@@ -190,6 +190,10 @@ export class AnchorController extends BaseScriptComponent {
   @input
   @allowUndefined
   globeRoot!: SceneObject;
+
+  @input
+  @allowUndefined
+  clockRoot!: SceneObject;
 
   @input
   @allowUndefined
@@ -1745,6 +1749,7 @@ export class AnchorController extends BaseScriptComponent {
       this.seedsRoot,
       this.paletteRoot,
       this.globeRoot,
+      this.clockRoot,
       this.getTrashSceneObject(),
       this.getSceneObject(),
     ];
@@ -1810,6 +1815,9 @@ export class AnchorController extends BaseScriptComponent {
     }
     if (name === 'Globe' && !isNull(this.globeRoot)) {
       return this.globeRoot;
+    }
+    if (name === 'Clock' && !isNull(this.clockRoot)) {
+      return this.clockRoot;
     }
     const searchRoots = this.getSceneSearchRoots();
     for (let i = 0; i < searchRoots.length; i++) {
