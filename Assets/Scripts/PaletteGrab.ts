@@ -134,6 +134,8 @@ export class PaletteGrab extends BaseScriptComponent {
   private strokeRoot: SceneObject | null = null;
   private paletteMoveEnabled = true;
   private paintStrokeActive = false;
+  private paintArmReadyAt = 0;
+  private paintNeedsReleaseAfterPick = false;
 
   private static readonly ANCHOR_SOURCE_NAME = 'palette';
   private static readonly COLORS_NODE_NAME = 'Colors';
@@ -337,6 +339,9 @@ export class PaletteGrab extends BaseScriptComponent {
     this.activePaintInteractor = interactor;
     this.lastPaintPoint = null;
     this.paintStrokeActive = false;
+    // Color tap should only arm paint mode. User must release and pinch again to draw.
+    this.paintNeedsReleaseAfterPick = true;
+    this.paintArmReadyAt = getTime() + 0.12;
   }
 
   private setPaintMode(active: boolean): void {
@@ -363,6 +368,8 @@ export class PaletteGrab extends BaseScriptComponent {
       this.activePaintInteractor = null;
       this.lastPaintPoint = null;
       this.paintStrokeActive = false;
+      this.paintNeedsReleaseAfterPick = false;
+      this.paintArmReadyAt = 0;
     }
 
     if (this.debugLogging) {
@@ -924,6 +931,12 @@ export class PaletteGrab extends BaseScriptComponent {
     if (!this.paintModeActive) {
       return;
     }
+    if (this.paintNeedsReleaseAfterPick) {
+      return;
+    }
+    if (getTime() < this.paintArmReadyAt) {
+      return;
+    }
     this.activePaintInteractor = event?.interactor || null;
     this.paintStrokeActive = true;
     this.lastPaintPoint = null;
@@ -943,6 +956,10 @@ export class PaletteGrab extends BaseScriptComponent {
   private onPaintDragEnd(): void {
     if (!this.paintModeActive) {
       return;
+    }
+    if (this.paintNeedsReleaseAfterPick) {
+      // First release after selecting a color unlocks the next pinch-to-paint.
+      this.paintNeedsReleaseAfterPick = false;
     }
     this.paintStrokeActive = false;
     this.activePaintInteractor = null;
