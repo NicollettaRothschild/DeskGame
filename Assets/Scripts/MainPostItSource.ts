@@ -46,6 +46,11 @@ type AnchorNoteSpawner = {
   placeTrackedContentAtWorld?: (content: SceneObject, worldPos: vec3, worldRot?: quat) => void;
 };
 
+type NoteTranscriptLike = {
+  beginCapture?: () => void;
+  endCapture?: () => void;
+};
+
 type PullState = {
   noteObject: SceneObject;
   interactor: InteractorLike | null;
@@ -109,6 +114,7 @@ export class MainPostItSource extends BaseScriptComponent {
     }
 
     const noteObject = this.activePull.noteObject;
+    this.endNoteTranscriptCapture(noteObject);
     setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
@@ -226,6 +232,7 @@ export class MainPostItSource extends BaseScriptComponent {
       rayDistance: rayDistance,
     };
     setGardenSourceSpawnPullActive(this.getSceneObject(), true);
+    this.beginNoteTranscriptCapture(noteObject);
     const anchorSpawner = this.getAnchorNoteSpawner();
     if (!isNull(anchorSpawner)) {
       const spawner = anchorSpawner as AnchorNoteSpawner;
@@ -466,6 +473,7 @@ export class MainPostItSource extends BaseScriptComponent {
   }
 
   private finalizeReleasedPull(releasedNote: SceneObject): void {
+    this.endNoteTranscriptCapture(releasedNote);
     this.abandonActivePull();
 
     const anchorSpawner = this.getAnchorNoteSpawner();
@@ -485,6 +493,42 @@ export class MainPostItSource extends BaseScriptComponent {
         spawner.saveObjectPosition();
       }
     }
+  }
+
+  private beginNoteTranscriptCapture(noteObject: SceneObject): void {
+    const transcript = this.findNoteTranscript(noteObject);
+    if (isNull(transcript) || typeof transcript.beginCapture !== 'function') {
+      this.debugLog('spawned note has no PostItNoteTranscript component.');
+      return;
+    }
+    transcript.beginCapture();
+  }
+
+  private endNoteTranscriptCapture(noteObject: SceneObject): void {
+    const transcript = this.findNoteTranscript(noteObject);
+    if (isNull(transcript) || typeof transcript.endCapture !== 'function') {
+      return;
+    }
+    transcript.endCapture();
+  }
+
+  private findNoteTranscript(noteObject: SceneObject): NoteTranscriptLike | null {
+    if (isNull(noteObject)) {
+      return null;
+    }
+
+    const scripts = noteObject.getComponents('Component.ScriptComponent');
+    for (let i = 0; i < scripts.length; i++) {
+      const candidate = scripts[i] as NoteTranscriptLike;
+      if (
+        !isNull(candidate) &&
+        typeof candidate.beginCapture === 'function' &&
+        typeof candidate.endCapture === 'function'
+      ) {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   private debugLog(message: string): void {

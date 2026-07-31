@@ -22,11 +22,19 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
-  ComponentUid: 00000000-0000-0000-0000-000000000000
+  ComponentUid: 47dbce3f-60af-451d-9f70-284c339b7930
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    {}
+    allowMultipleActiveNotes: false
+    anchorController: false
+    debugLogging: false
+    fallbackRayDistance: false
+    followInteractorWhileHeld: false
+    notePrefab: false
+    sourceInteractable: false
+    spawnForwardOffset: false
+    spawnParent: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -36,10 +44,25 @@
   Attachments:
     []
   DefaultScriptInputs:
-    -
-      {}
+    - notePrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      sourceInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      spawnParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnForwardOffset: !<float> 0.000000
+      fallbackRayDistance: !<float> 35.000000
+      followInteractorWhileHeld: true
+      allowMultipleActiveNotes: false
+      debugLogging: false
   ScriptTypes:
     -
       {}
   InputLines:
-    []
+    - // @input Asset.ObjectPrefab notePrefab
+    - // @input Component.ScriptComponent anchorController
+    - // @input Component.ScriptComponent sourceInteractable
+    - // @input SceneObject spawnParent
+    - // @input float spawnForwardOffset
+    - // @input float fallbackRayDistance = 35
+    - // @input bool followInteractorWhileHeld = true
+    - // @input bool allowMultipleActiveNotes
+    - // @input bool debugLogging

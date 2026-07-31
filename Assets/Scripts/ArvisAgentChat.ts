@@ -189,6 +189,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
     if (this.speechRecognition.isSuppressingVoiceCommands()) {
       return;
     }
+    if (this.speechRecognition.isPostItCaptureActive()) {
+      return;
+    }
 
     const tts = getSharedFlowGardenTts();
     if (!isNull(tts) && (tts.isBlockingVoiceCommands() || tts.isSpeaking())) {

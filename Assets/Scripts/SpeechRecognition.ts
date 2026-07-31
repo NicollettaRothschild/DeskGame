@@ -157,6 +157,8 @@ export class SpeechRecognition extends BaseScriptComponent {
   public finalTranscript: string = '';
   public lastHeard: string = '';
   public interimTranscript: string = '';
+  /** Original-casing live text for UI surfaces (post-its, bubbles). */
+  public displayTranscript: string = '';
 
   private agentSessionActive = false;
   private lastLoggedHeard = '';
@@ -166,6 +168,8 @@ export class SpeechRecognition extends BaseScriptComponent {
   private emptyUpdateLogCount = 0;
   private lastHeardChangeTime = 0;
   private suppressVoiceCommandsUntil = 0;
+  private transcriptListeners: Array<(text: string, isFinal: boolean) => void> = [];
+  private postItCaptureDepth = 0;
 
   onAwake(): void {
     if (this.startupDisabled) {
@@ -377,12 +381,51 @@ export class SpeechRecognition extends BaseScriptComponent {
   public clearFinalTranscript(): void {
     this.finalTranscript = '';
     this.interimTranscript = '';
+    this.displayTranscript = '';
   }
 
   public getLiveTranscript(): string {
     return String(
       this.interimTranscript || this.finalTranscript || this.lastHeard || ''
     ).trim();
+  }
+
+  /** Original-casing transcript for display (falls back to normalized live text). */
+  public getDisplayTranscript(): string {
+    const display = String(this.displayTranscript || '').trim();
+    if (display) {
+      return display;
+    }
+    return this.getLiveTranscript();
+  }
+
+  public addTranscriptListener(
+    listener: (text: string, isFinal: boolean) => void
+  ): void {
+    if (!listener) {
+      return;
+    }
+    for (let i = 0; i < this.transcriptListeners.length; i++) {
+      if (this.transcriptListeners[i] === listener) {
+        return;
+      }
+    }
+    this.transcriptListeners.push(listener);
+  }
+
+  public removeTranscriptListener(
+    listener: (text: string, isFinal: boolean) => void
+  ): void {
+    if (!listener) {
+      return;
+    }
+    const next: Array<(text: string, isFinal: boolean) => void> = [];
+    for (let i = 0; i < this.transcriptListeners.length; i++) {
+      if (this.transcriptListeners[i] !== listener) {
+        next.push(this.transcriptListeners[i]);
+      }
+    }
+    this.transcriptListeners = next;
   }
 
   /** ASR often emits interim-only updates; treat stable live text as an utterance. */
@@ -411,10 +454,24 @@ export class SpeechRecognition extends BaseScriptComponent {
     return getTime() < this.suppressVoiceCommandsUntil;
   }
 
+  public beginPostItCapture(): void {
+    this.postItCaptureDepth += 1;
+    this.ensureListening();
+  }
+
+  public endPostItCapture(): void {
+    this.postItCaptureDepth = Math.max(0, this.postItCaptureDepth - 1);
+  }
+
+  public isPostItCaptureActive(): boolean {
+    return this.postItCaptureDepth > 0;
+  }
+
   public clearUtteranceState(): void {
     this.finalTranscript = '';
     this.interimTranscript = '';
     this.lastHeard = '';
+    this.displayTranscript = '';
     this.lastLoggedHeard = '';
     this.lastPushedTranscriptKey = '';
   }
@@ -503,13 +560,26 @@ export class SpeechRecognition extends BaseScriptComponent {
     this.lastCommandTime = getTime();
   }
 
+  private notifyTranscriptListeners(text: string, isFinal: boolean): void {
+    for (let i = 0; i < this.transcriptListeners.length; i++) {
+      try {
+        this.transcriptListeners[i](text, isFinal);
+      } catch (e) {
+        if (this.debugLogging) {
+          print('[SpeechRecognition] transcript listener error: ' + e);
+        }
+      }
+    }
+  }
+
   private applyTranscript(rawText: string, isFinal: boolean): void {
     // Drop mic bleed from our own TTS — prevents news/reply echo loops in preview.
     if (this.isSuppressingVoiceCommands() && !this.agentSessionActive) {
       return;
     }
 
-    const text = String(rawText || '').trim().toLowerCase();
+    const displayText = String(rawText || '').trim();
+    const text = displayText.toLowerCase();
     if (!text) {
       if (this.debugLogging && this.emptyUpdateLogCount < 3) {
         this.emptyUpdateLogCount++;
@@ -525,7 +595,9 @@ export class SpeechRecognition extends BaseScriptComponent {
     }
 
     this.lastHeard = text;
+    this.displayTranscript = displayText;
     this.setTranscriptText(text);
+    this.notifyTranscriptListeners(displayText, isFinal);
     if (!isFinal) {
       this.interimTranscript = text;
       // Surface embedded wake early from noisy interim streams.

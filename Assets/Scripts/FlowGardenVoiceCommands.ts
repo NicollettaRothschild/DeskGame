@@ -120,6 +120,10 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       return;
     }
 
+    if (this.speechRecognition.isPostItCaptureActive()) {
+      return;
+    }
+
     const tts = getSharedFlowGardenTts();
     if (!isNull(tts) && (tts.isBlockingVoiceCommands() || tts.isSpeaking())) {
       return;
