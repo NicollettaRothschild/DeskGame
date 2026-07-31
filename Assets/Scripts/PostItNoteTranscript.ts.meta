@@ -26,7 +26,10 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    {}
+    debugLogging: false
+    maxCharacters: false
+    noteInteractable: false
+    textSize: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -36,10 +39,15 @@
   Attachments:
     []
   DefaultScriptInputs:
-    -
-      {}
+    - noteInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
+      maxCharacters: !<float> 0.000000
+      textSize: !<float> 0.000000
+      debugLogging: false
   ScriptTypes:
     -
       {}
   InputLines:
-    []
+    - // @input Component.ScriptComponent noteInteractable
+    - // @input float maxCharacters
+    - // @input float textSize
+    - // @input bool debugLogging

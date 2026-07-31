@@ -3158,6 +3158,7 @@
     waterSplashIntensity: true
     waterSplashMaxParticles: true
     hoverTrack: true
+    postItNotesRoot: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -3200,6 +3201,7 @@
       waterSourceRoot: !<reference.SceneObject> bcbb9be7-d298-4132-a5c8-1ef0b9e78dab
       planterRoot: !<reference.SceneObject> 7c7350dc-41a2-4426-a5bb-047d14525a11
       seedsRoot: !<reference.SceneObject> 8ee0f565-368b-4fd9-957d-8e90c5fb48d2
+      postItNotesRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       paletteRoot: !<reference.SceneObject> 9aa42fcc-a72f-4475-a934-1f79675ea728
       globeRoot: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
       clockRoot: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
@@ -3757,7 +3759,7 @@
       Offset: 0.000000
       Reversed: false
       Disabled: false
-      BlendMode: Additive
+      BlendMode: Default
       ScaleMode: Multiply
       PlaybackMode: Loop
 - !<SceneObject/776f6005-3713-4720-a125-974af63bc8d3>
