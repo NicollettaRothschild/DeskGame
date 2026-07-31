@@ -19,8 +19,8 @@ import {
 import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
 import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
 
-const ANCHOR_CONTROLLER_VERSION = 'v34-clock-desk-anchor';
-const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds'];
+const ANCHOR_CONTROLLER_VERSION = 'v35-postit-notes-stack';
+const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
 const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
@@ -31,6 +31,7 @@ const TRASH_MOVE_HANDLE_REFERENCE_SOURCE = 'Planter';
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_OFFSETS: { [sourceName: string]: vec3 } = {
   'Water Source': new vec3(1.35, 0.08, 1.35),
   Seeds: new vec3(1.25, 0.08, 1.25),
+  PostItNotes: new vec3(0.55, 0.08, 0.55),
 };
 const SEEDS_STATIC_CHILD_NAMES = new Set([
   'Pot1',
@@ -77,6 +78,11 @@ const GARDEN_SOURCE_SCENE_DEFAULTS: Record<
     pos: new vec3(55.521027, -20.640976, -79.907722),
     rot: quat.quatIdentity(),
     scale: new vec3(8, 8, 8),
+  },
+  PostItNotes: {
+    pos: new vec3(-10.0, -20.64, -79.9),
+    rot: quat.quatIdentity(),
+    scale: new vec3(1, 1, 1),
   },
 };
 const STARTUP_REBIND_DELAY_SEC = 0.35;
@@ -182,6 +188,10 @@ export class AnchorController extends BaseScriptComponent {
   @input
   @allowUndefined
   seedsRoot!: SceneObject;
+
+  @input
+  @allowUndefined
+  postItNotesRoot!: SceneObject;
 
   @input
   @allowUndefined
@@ -1747,6 +1757,7 @@ export class AnchorController extends BaseScriptComponent {
       this.waterSourceRoot,
       this.planterRoot,
       this.seedsRoot,
+      this.postItNotesRoot,
       this.paletteRoot,
       this.globeRoot,
       this.clockRoot,
@@ -1809,6 +1820,9 @@ export class AnchorController extends BaseScriptComponent {
     }
     if (name === 'Seeds' && !isNull(this.seedsRoot)) {
       return this.seedsRoot;
+    }
+    if (name === 'PostItNotes' && !isNull(this.postItNotesRoot)) {
+      return this.postItNotesRoot;
     }
     if (name === 'palette' && !isNull(this.paletteRoot)) {
       return this.paletteRoot;

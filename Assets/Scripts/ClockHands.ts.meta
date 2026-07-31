@@ -52,5 +52,5 @@
     - // @input SceneObject hourHand
     - // @input SceneObject minuteHand
     - // @input float zeroOffsetDegrees
-    - // @input bool invertDirection
+    - // @input bool invertDirection = true
     - // @input bool debugLogging

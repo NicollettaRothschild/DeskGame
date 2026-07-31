@@ -124,6 +124,7 @@ export class TrashBin extends BaseScriptComponent {
     'Planter',
     'Seeds',
     'Water Source',
+    'PostItNotes',
     'AnchorController',
     'SpectaclesInteractionKit',
     'SpacePanel',
@@ -131,7 +132,12 @@ export class TrashBin extends BaseScriptComponent {
     'Text3D UserID',
   ];
 
-  private readonly gardenSourceContainerNames = ['Water Source', 'Planter', 'Seeds'];
+  private readonly gardenSourceContainerNames = [
+    'Water Source',
+    'Planter',
+    'Seeds',
+    'PostItNotes',
+  ];
 
   private recentDestroyRoots: SceneObject[] = [];
   private recentDestroyTimes: number[] = [];

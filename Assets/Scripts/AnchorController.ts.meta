@@ -43,6 +43,7 @@
     plantPrefab: false
     plantSeedTrack: false
     planterRoot: false
+    postItNotesRoot: false
     potPrefabs: false
     sackMaterial: false
     sackTexture: false
@@ -102,6 +103,7 @@
       waterSourceRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       planterRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       seedsRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      postItNotesRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       paletteRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       globeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       clockRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
@@ -143,6 +145,7 @@
     - // @input SceneObject waterSourceRoot
     - // @input SceneObject planterRoot
     - // @input SceneObject seedsRoot
+    - // @input SceneObject postItNotesRoot
     - // @input SceneObject paletteRoot
     - // @input SceneObject globeRoot
     - // @input SceneObject clockRoot

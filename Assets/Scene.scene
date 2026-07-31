@@ -2829,8 +2829,8 @@
     "":
       hourHand: !<reference.SceneObject> 7ef42083-20d6-457c-9a29-6fe47e67a0b9
       minuteHand: !<reference.SceneObject> fd0a732e-9433-4662-b855-647e6194b4d5
-      zeroOffsetDegrees: !<float> 0.000000
-      invertDirection: true
+      zeroOffsetDegrees: !<float> 180.000000
+      invertDirection: false
       debugLogging: false
   ScriptTypes:
     "":
@@ -3837,7 +3837,7 @@
   ScriptInputs:
     "":
       debugLogging: false
-      colliderSize: !<Vec3> {x: 140.000000, y: 140.000000, z: 55.000000}
+      colliderSize: !<Vec3> {x: 80.000000, y: 80.000000, z: 30.000000}
       grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
       releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000
@@ -5022,7 +5022,7 @@
   PrefabRemaps:
     []
   Name: Seeds
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 55.521027, y: -20.640976, z: -79.907722}
@@ -6474,7 +6474,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Position: {x: 0.000000, y: 0.000000, z: -8.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
@@ -6841,7 +6841,7 @@
   PrefabRemaps:
     []
   Name: Water Source
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 14.318802, y: -20.641001, z: -79.907700}
@@ -8047,7 +8047,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Position: {x: 0.000000, y: 0.000000, z: -8.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
