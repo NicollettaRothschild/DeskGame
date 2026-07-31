@@ -674,7 +674,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 0.100000, y: 0.100000, z: 0.100000}
+    Scale: {x: 30.000000, y: 30.000000, z: 30.000000}
     HasSegmentScaleCompensation: false
   Children:
     - !<own> c817f8c8-9a78-4af5-9cd1-3d065547a941
@@ -1176,7 +1176,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 95906f20-c498-43c7-bfe7-8f30e75a1570
+    - !<reference> d4cda6de-2fc7-4fd7-97a3-70db40f9a239
   Mesh: !<reference> ed79966d-b0d1-4e7f-98ad-9cf4efcf9a4c
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -3349,7 +3349,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 1372f668-a523-41ee-8dc0-07047c6193cf
+    - !<reference> 5bc35158-e864-4bb0-9683-aea463a96d1e
   Mesh: !<reference> 5ad25167-4eb6-4047-b7d5-e233924c1847
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -3440,7 +3440,7 @@
   PrefabRemaps:
     []
   Name: BinHandle
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
@@ -4546,7 +4546,7 @@
   PrefabRemaps:
     []
   Name: BinRim
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
@@ -4984,12 +4984,12 @@
   PrefabRemaps:
     []
   Name: BinLid
-  Enabled: true
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 16.000000, y: 16.000000, z: 16.000000}
+    Scale: {x: 5.000000, y: 5.000000, z: 5.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -7319,7 +7319,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 16.000000, y: 16.000000, z: 16.000000}
+    Scale: {x: 5.000000, y: 5.000000, z: 5.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -9301,7 +9301,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 4910bb8d-d1f5-4d64-945a-628fce003627
+    - !<reference> 6505f080-1bab-4569-8243-01cb94f9316c
   Mesh: !<reference> 1dab3ad9-0e24-4329-b460-ba138cbb8807
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
@@ -10271,7 +10271,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 4910bb8d-d1f5-4d64-945a-628fce003627
+    - !<reference> 6505f080-1bab-4569-8243-01cb94f9316c
   Mesh: !<reference> ea347066-4836-43dc-b74f-24aa9a04ce44
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
