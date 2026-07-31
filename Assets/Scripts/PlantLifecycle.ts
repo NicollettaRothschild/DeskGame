@@ -109,13 +109,23 @@ export class PlantLifecycle extends BaseScriptComponent {
   private seedWaterScaleOutStartScale: vec3 | null = null;
   private static readonly DEFAULT_CONTAINER_WORLD_SCALE = 0.1;
   private static readonly GROWTH_SIZE_DIVISOR = 3;
-  /** Goal plants pause ~60% grown until the player says they finished. */
+  /** Goal plants pause ~60% grown until the player finishes the goal. */
   private static readonly GOAL_GROWTH_CAP_RATIO = 0.6;
+  /** Ignore sub-cm camera jitter when accumulating walk distance (world units = cm). */
+  private static readonly WALK_SAMPLE_MIN_CM = 2;
   private static goalPlantRegistry: PlantLifecycle[] = [];
+  private static goalCompleteListeners: Array<(plant: PlantLifecycle) => void> = [];
 
   private goalText = '';
   private requiresGoalCompletion = false;
   private goalCompleted = false;
+  /** Parsed walk/run target in meters; 0 = not a distance goal. */
+  private walkGoalMeters = 0;
+  private walkedMeters = 0;
+  private walkTrackingActive = false;
+  private walkLastCameraPos: vec3 | null = null;
+  private walkCamera: SceneObject | null = null;
+  private walkProgressLogTimer = 0;
 
   onAwake(): void {
     this.debugLog(`awake plantType=${this.plantTypeId}`);
@@ -264,7 +274,7 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   /**
    * Bind a spoken life-goal to this seed. Growth will pause before Adult
-   * until completeGoal() (usually via speech).
+   * until completeGoal() (speech, or auto when a walk/run distance is met).
    */
   public bindGoal(goalText: string): void {
     const text = String(goalText || '').trim();
@@ -274,6 +284,20 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.goalText = text;
     this.requiresGoalCompletion = true;
     this.goalCompleted = false;
+    this.walkGoalMeters = PlantLifecycle.parseWalkGoalMeters(text);
+    this.walkedMeters = 0;
+    this.walkLastCameraPos = null;
+    this.walkProgressLogTimer = 0;
+    this.walkTrackingActive = this.walkGoalMeters > 0;
+    if (this.walkTrackingActive) {
+      this.ensureWalkCamera();
+      if (!isNull(this.walkCamera)) {
+        this.walkLastCameraPos = this.walkCamera.getTransform().getWorldPosition();
+      }
+      print(
+        `[PlantLifecycle] ${this.getSceneObject().name}: walk goal armed target=${this.walkGoalMeters.toFixed(2)}m`
+      );
+    }
     PlantLifecycle.registerGoalPlant(this);
     this.notifyAnchorStateChanged();
     print(`[PlantLifecycle] ${this.getSceneObject().name}: bound goal "${text}"`);
@@ -281,6 +305,23 @@ export class PlantLifecycle extends BaseScriptComponent {
 
   public getGoalText(): string {
     return this.goalText;
+  }
+
+  public getWalkGoalMeters(): number {
+    return this.walkGoalMeters;
+  }
+
+  public getWalkedMeters(): number {
+    return this.walkedMeters;
+  }
+
+  /** Preview/harness helper to shorten growth without resetting stage visuals. */
+  public setGrowthTimeForTests(seconds: number): void {
+    this.growthTime = Math.max(0.1, seconds);
+  }
+
+  public getCurrentStage(): PlantStage {
+    return this.currentStage;
   }
 
   public requiresGoal(): boolean {
@@ -291,12 +332,137 @@ export class PlantLifecycle extends BaseScriptComponent {
     return this.goalCompleted;
   }
 
+  public static addGoalCompleteListener(listener: (plant: PlantLifecycle) => void): void {
+    if (!listener) {
+      return;
+    }
+    for (let i = 0; i < PlantLifecycle.goalCompleteListeners.length; i++) {
+      if (PlantLifecycle.goalCompleteListeners[i] === listener) {
+        return;
+      }
+    }
+    PlantLifecycle.goalCompleteListeners.push(listener);
+  }
+
+  /**
+   * Parse goals like "walk 20 meters", "run 1 km", "walk twenty meters".
+   * Returns meters or 0 if not a distance goal.
+   */
+  public static parseWalkGoalMeters(goalText: string): number {
+    const raw = String(goalText || '')
+      .trim()
+      .toLowerCase()
+      .replace(/,/g, '');
+    if (!raw) {
+      return 0;
+    }
+    if (!/\b(walk|walked|walking|run|ran|running|jog|jogged|jogging)\b/.test(raw)) {
+      return 0;
+    }
+
+    const unitMatch = raw.match(
+      /(\d+(?:\.\d+)?)\s*(kilometers?|kilometres?|km|meters?|metres?|m)\b/
+    );
+    if (unitMatch) {
+      const value = parseFloat(unitMatch[1]);
+      if (!(value > 0)) {
+        return 0;
+      }
+      const unit = unitMatch[2];
+      if (unit.indexOf('km') === 0 || unit.indexOf('kilo') === 0) {
+        return value * 1000;
+      }
+      return value;
+    }
+
+    const wordMatch = raw.match(
+      /\b(a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)\b(?:\s+\b(one|two|three|four|five|six|seven|eight|nine)\b)?\s*(kilometers?|kilometres?|km|meters?|metres?|m)\b/
+    );
+    if (!wordMatch) {
+      return 0;
+    }
+    const tensMap: {[key: string]: number} = {
+      a: 1,
+      an: 1,
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+      thirteen: 13,
+      fourteen: 14,
+      fifteen: 15,
+      sixteen: 16,
+      seventeen: 17,
+      eighteen: 18,
+      nineteen: 19,
+      twenty: 20,
+      thirty: 30,
+      forty: 40,
+      fifty: 50,
+      sixty: 60,
+      seventy: 70,
+      eighty: 80,
+      ninety: 90,
+      hundred: 100,
+    };
+    let value = tensMap[wordMatch[1]] || 0;
+    if (wordMatch[2] && tensMap[wordMatch[2]]) {
+      value += tensMap[wordMatch[2]];
+    }
+    if (!(value > 0)) {
+      return 0;
+    }
+    const unit = wordMatch[3];
+    if (unit.indexOf('km') === 0 || unit.indexOf('kilo') === 0) {
+      return value * 1000;
+    }
+    return value;
+  }
+
+  /** Test/harness helper: accumulate walked meters as if the camera moved. */
+  public addWalkedMeters(meters: number): void {
+    if (!this.requiresGoalCompletion || this.goalCompleted || !(meters > 0)) {
+      return;
+    }
+    if (!(this.walkGoalMeters > 0)) {
+      return;
+    }
+    this.walkedMeters += meters;
+    print(
+      `[PlantLifecycle] ${this.getSceneObject().name}: walked ${this.walkedMeters.toFixed(2)}/${this.walkGoalMeters.toFixed(2)}m (injected)`
+    );
+    this.tryCompleteWalkGoal();
+  }
+
+  public static injectWalkedMetersForTests(meters: number): number {
+    PlantLifecycle.pruneGoalPlantRegistry();
+    let updated = 0;
+    for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+      const plant = PlantLifecycle.goalPlantRegistry[i];
+      if (isNull(plant) || !plant.requiresGoal() || !(plant.walkGoalMeters > 0)) {
+        continue;
+      }
+      plant.addWalkedMeters(meters);
+      updated += 1;
+    }
+    return updated;
+  }
+
   /** Finish the bound goal and bloom to Adult if the plant is growing. */
   public completeGoal(): boolean {
     if (!this.requiresGoalCompletion || this.goalCompleted) {
       return false;
     }
     this.goalCompleted = true;
+    this.walkTrackingActive = false;
     print(`[PlantLifecycle] ${this.getSceneObject().name}: goal completed "${this.goalText}"`);
 
     if (this.currentStage === PlantStage.Growing || this.currentStage === PlantStage.WateredBaby) {
@@ -306,6 +472,14 @@ export class PlantLifecycle extends BaseScriptComponent {
       this.finishGrowthToAdult();
     } else {
       this.notifyAnchorStateChanged();
+    }
+
+    for (let i = 0; i < PlantLifecycle.goalCompleteListeners.length; i++) {
+      try {
+        PlantLifecycle.goalCompleteListeners[i](this);
+      } catch (_e) {
+        // listener failure should not block completion
+      }
     }
     return true;
   }
@@ -403,6 +577,118 @@ export class PlantLifecycle extends BaseScriptComponent {
       }
     }
     return hits >= Math.min(2, tokens.length);
+  }
+
+  private tryCompleteWalkGoal(): void {
+    if (
+      !this.requiresGoalCompletion ||
+      this.goalCompleted ||
+      !(this.walkGoalMeters > 0) ||
+      this.walkedMeters + 0.001 < this.walkGoalMeters
+    ) {
+      return;
+    }
+    print(
+      `[PlantLifecycle] ${this.getSceneObject().name}: walk goal reached ${this.walkedMeters.toFixed(2)}/${this.walkGoalMeters.toFixed(2)}m`
+    );
+    this.completeGoal();
+  }
+
+  private updateWalkTracking(): void {
+    this.ensureWalkCamera();
+    if (isNull(this.walkCamera)) {
+      return;
+    }
+    const pos = this.walkCamera.getTransform().getWorldPosition();
+    if (isNull(this.walkLastCameraPos)) {
+      this.walkLastCameraPos = pos;
+      return;
+    }
+
+    const last = this.walkLastCameraPos as vec3;
+    const dx = pos.x - last.x;
+    const dz = pos.z - last.z;
+    const stepCm = Math.sqrt(dx * dx + dz * dz);
+    if (stepCm >= PlantLifecycle.WALK_SAMPLE_MIN_CM) {
+      // World units are centimeters.
+      this.walkedMeters += stepCm / 100;
+      this.walkLastCameraPos = pos;
+      this.tryCompleteWalkGoal();
+    }
+
+    this.walkProgressLogTimer += getDeltaTime();
+    if (this.walkProgressLogTimer >= 2.5) {
+      this.walkProgressLogTimer = 0;
+      print(
+        `[PlantLifecycle] ${this.getSceneObject().name}: walk progress ${this.walkedMeters.toFixed(2)}/${this.walkGoalMeters.toFixed(2)}m`
+      );
+    }
+  }
+
+  private ensureWalkCamera(): void {
+    if (!isNull(this.walkCamera)) {
+      return;
+    }
+    const preferredNames = ['Camera Object', 'Camera', 'Device Camera'];
+    for (let i = 0; i < preferredNames.length; i++) {
+      const found = this.findSceneObjectByName(preferredNames[i]);
+      if (!isNull(found) && !isNull(found.getComponent('Component.Camera'))) {
+        this.walkCamera = found;
+        return;
+      }
+    }
+    this.walkCamera = this.findObjectWithCameraComponent();
+  }
+
+  private findSceneObjectByName(name: string): SceneObject | null {
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const match = this.findNamedRecursive(global.scene.getRootObject(i), name);
+      if (!isNull(match)) {
+        return match;
+      }
+    }
+    return null;
+  }
+
+  private findNamedRecursive(node: SceneObject, name: string): SceneObject | null {
+    if (String(node.name || '') === name) {
+      return node;
+    }
+    const count = node.getChildrenCount();
+    for (let i = 0; i < count; i++) {
+      const found = this.findNamedRecursive(node.getChild(i), name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findObjectWithCameraComponent(): SceneObject | null {
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const found = this.findCameraComponentRecursive(global.scene.getRootObject(i));
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findCameraComponentRecursive(node: SceneObject): SceneObject | null {
+    const cam = node.getComponent('Component.Camera') as Camera;
+    if (!isNull(cam)) {
+      return node;
+    }
+    const count = node.getChildrenCount();
+    for (let i = 0; i < count; i++) {
+      const found = this.findCameraComponentRecursive(node.getChild(i));
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
   }
 
   private static registerGoalPlant(plant: PlantLifecycle): void {
@@ -537,7 +823,19 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.goalText = String(state.goalText || '').trim();
     this.requiresGoalCompletion = !!state.requiresGoalCompletion && !!this.goalText;
     this.goalCompleted = !!state.goalCompleted;
-    if (this.requiresGoalCompletion && !this.goalCompleted) {
+    this.walkGoalMeters = this.requiresGoalCompletion
+      ? PlantLifecycle.parseWalkGoalMeters(this.goalText)
+      : 0;
+    this.walkedMeters = 0;
+    this.walkTrackingActive =
+      this.requiresGoalCompletion && !this.goalCompleted && this.walkGoalMeters > 0;
+    if (this.walkTrackingActive) {
+      this.ensureWalkCamera();
+      if (!isNull(this.walkCamera)) {
+        this.walkLastCameraPos = this.walkCamera.getTransform().getWorldPosition();
+      }
+      PlantLifecycle.registerGoalPlant(this);
+    } else if (this.requiresGoalCompletion && !this.goalCompleted) {
       PlantLifecycle.registerGoalPlant(this);
     }
 
@@ -573,6 +871,10 @@ export class PlantLifecycle extends BaseScriptComponent {
   private onUpdate(): void {
     if (this.isPlanted && !this.allowTrashManipulation) {
       this.enforcePlantedAnchor();
+    }
+
+    if (this.walkTrackingActive && this.requiresGoalCompletion && !this.goalCompleted) {
+      this.updateWalkTracking();
     }
 
     if (this.seedWaterScaleOutActive) {

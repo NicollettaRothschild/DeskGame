@@ -1,0 +1,65 @@
+- !<AssetImportMetadata/396d3829-f880-4b2a-8c7a-d09163ec2b42>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 6db55206-7483-42a7-a4ed-c7d965e45ac5
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 6db55206-7483-42a7-a4ed-c7d965e45ac5
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 647afa2b-c2f4-4d94-9cf6-309cad6ffeaf
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/647afa2b-c2f4-4d94-9cf6-309cad6ffeaf>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 2c057135-df43-45e8-82e7-da03aefc566b
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    fastGrowthTimeSec: false
+    goalText: false
+    placeTourObjects: false
+    runHarness: false
+    runOnce: false
+    seedSettleSec: false
+    startupDelaySec: false
+    walkMeters: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - runHarness: true
+      startupDelaySec: !<float> 2.000000
+      runOnce: true
+      goalText: I want to walk 20 meters
+      walkMeters: !<float> 20.000000
+      fastGrowthTimeSec: 1.500000
+      placeTourObjects: true
+      seedSettleSec: 0.700000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input bool runHarness = true
+    - // @input float startupDelaySec = 2
+    - // @input bool runOnce = true
+    - '// @input string goalText = "I want to walk 20 meters"'
+    - // @input float walkMeters = 20
+    - // @input float fastGrowthTimeSec = 1.5
+    - // @input bool placeTourObjects = true
+    - // @input float seedSettleSec = 0.7

@@ -18,8 +18,9 @@ import {
 } from './GardenSourceSpawnGuard';
 import { GardenSourceMoveHandle } from './GardenSourceMoveHandle';
 import { TrashBin, TrashObjectStoreSnapshot, TrashStashEntry } from './TrashBin';
+import { shouldRunFriendOnboardingTour } from './FriendOnboardingStorage';
 
-const ANCHOR_CONTROLLER_VERSION = 'v37-onboarding-clear-session';
+const ANCHOR_CONTROLLER_VERSION = 'v41-treat-as-new-user';
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
 const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
@@ -82,7 +83,7 @@ const GARDEN_SOURCE_SCENE_DEFAULTS: Record<
   PostItNotes: {
     pos: new vec3(-10.0, -20.64, -79.9),
     rot: quat.quatIdentity(),
-    scale: new vec3(1, 1, 1),
+    scale: new vec3(6, 6, 6),
   },
 };
 const STARTUP_REBIND_DELAY_SEC = 0.35;
@@ -229,6 +230,25 @@ export class AnchorController extends BaseScriptComponent {
   @allowUndefined
   moveHandleGlowMaterial!: Material;
 
+  /** Hide desk/garden objects when the camera is farther than this (meters). */
+  @input
+  enableDistanceCull: boolean = true;
+
+  @input('float')
+  @hint('Hide objects when farther than this many meters from the camera')
+  distanceCullHideMeters: number = 20;
+
+  @input('float')
+  @hint('Show objects again when closer than this (keep below hide distance to avoid flicker)')
+  distanceCullShowMeters: number = 18;
+
+  @input('float')
+  distanceCullCheckIntervalSec: number = 0.35;
+
+  @input
+  @hint('Also hide Friend when far away')
+  distanceCullIncludeFriend: boolean = false;
+
   private anchorSession?: AnchorSession;
   private clonedSackMaterial: Material | null = null;
   private wrappers: SceneObject[] = [];
@@ -291,6 +311,11 @@ export class AnchorController extends BaseScriptComponent {
   private gardenSourceRestoreApplied = new Map<string, boolean>();
   private readonly gardenSourcePersistIntervalSec = 0.35;
   private readonly gardenSourceMoveEpsilon = 0.5;
+  private distanceCullEvent: UpdateEvent | null = null;
+  private distanceCullCooldown = 0;
+  /** Objects currently hidden by distance cull → enabled state to restore when near again. */
+  private distanceCullHidden = new Map<SceneObject, boolean>();
+  private distanceCullLogTimer = 0;
 
   onAwake() {
     this.setupInteractionSounds();
@@ -405,6 +430,7 @@ export class AnchorController extends BaseScriptComponent {
       this.scheduleGardenAndTrashHandleWiring();
       this.restoreGardenSpawnSourcesLayout('minimal-boot');
       this.hasRestored = true;
+      this.startDistanceCullLoop();
       this.setStatusText(
         this.objs.length > 0
           ? `Restored ${this.objs.length} object(s)`
@@ -443,6 +469,7 @@ export class AnchorController extends BaseScriptComponent {
     this.scheduleGardenAndTrashHandleWiring();
     this.wireAIContainerMovement();
     this.startAIContainerPersistenceLoop();
+    this.startDistanceCullLoop();
 
     this.scheduleDelayed(() => {
       void this.bootAnchorSession(false);
@@ -1234,6 +1261,63 @@ export class AnchorController extends BaseScriptComponent {
     return obj;
   }
 
+  /**
+   * Spawn a pot with a goal seed already planted — used by Friend onboarding.
+   * Returns the pot root (grab/place this), or null on failure.
+   */
+  public createGoalPlantedPotAtWorldPosition(
+    goalText: string,
+    worldPos: vec3
+  ): SceneObject | null {
+    if (isNull(this.plantPrefab) || this.potPrefabs.length === 0) {
+      print('createGoalPlantedPotAtWorldPosition: missing plantPrefab or potPrefabs');
+      return null;
+    }
+
+    let potPrefab: ObjectPrefab | null = null;
+    let potPrefabIndex = 0;
+    for (let i = 0; i < this.potPrefabs.length; i++) {
+      if (!isNull(this.potPrefabs[i])) {
+        potPrefab = this.potPrefabs[i];
+        potPrefabIndex = i;
+        break;
+      }
+    }
+    if (isNull(potPrefab)) {
+      print('createGoalPlantedPotAtWorldPosition: no valid pot prefab');
+      return null;
+    }
+
+    const pot = this.createPotAtWorldPosition(potPrefab, potPrefabIndex, worldPos);
+    if (isNull(pot)) {
+      return null;
+    }
+
+    const seed = this.createSeedAtWorldPosition(worldPos);
+    if (isNull(seed)) {
+      print('createGoalPlantedPotAtWorldPosition: seed spawn failed');
+      return pot;
+    }
+
+    const plant = this.findPlantLifecycle(seed);
+    const potScript = this.findPotScript(pot);
+    if (isNull(plant) || isNull(potScript) || typeof potScript.tryAttachSeed !== 'function') {
+      print('createGoalPlantedPotAtWorldPosition: could not attach seed into pot');
+      return pot;
+    }
+
+    potScript.tryAttachSeed(plant);
+    if (typeof plant.bindGoal === 'function') {
+      plant.bindGoal(String(goalText || '').trim());
+    }
+    this.wirePotPersistence(pot);
+    this.persistPlantTransforms();
+    print(
+      `Created goal planted pot at ${worldPos.toString()} goal="${String(goalText || '').trim()}"`
+    );
+    return pot;
+  }
+
   public registerPlantedObject(objectRoot: SceneObject): void {
     const index = this.findTrackedObjectIndex(objectRoot);
     if (index < 0) {
@@ -1624,6 +1708,194 @@ export class AnchorController extends BaseScriptComponent {
       this.maybePersistTrashMove();
       this.maybePersistGardenSourceMoves();
     });
+  }
+
+  private startDistanceCullLoop(): void {
+    if (!isNull(this.distanceCullEvent)) {
+      return;
+    }
+    this.distanceCullEvent = this.createEvent('UpdateEvent');
+    this.distanceCullEvent.bind(() => this.updateDistanceCull());
+    print(
+      `[AnchorController] distance cull armed hide>${this.distanceCullHideMeters}m show<=${this.distanceCullShowMeters}m`
+    );
+  }
+
+  private updateDistanceCull(): void {
+    if (!this.enableDistanceCull) {
+      this.restoreAllDistanceCulledObjects();
+      return;
+    }
+
+    this.distanceCullCooldown -= getDeltaTime();
+    if (this.distanceCullCooldown > 0) {
+      return;
+    }
+    this.distanceCullCooldown = Math.max(0.1, this.distanceCullCheckIntervalSec);
+
+    const camera = this.resolveCullCamera();
+    if (isNull(camera)) {
+      return;
+    }
+
+    const camPos = camera.getTransform().getWorldPosition();
+    const hideCm = Math.max(1, this.distanceCullHideMeters) * 100;
+    const showCm = Math.max(0.5, Math.min(this.distanceCullShowMeters, this.distanceCullHideMeters)) * 100;
+
+    const targets = this.collectDistanceCullTargets();
+    let hiddenCount = 0;
+    let shownCount = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      const obj = targets[i];
+      if (isNull(obj)) {
+        continue;
+      }
+
+      const distCm = this.horizontalDistanceCm(camPos, obj.getTransform().getWorldPosition());
+      const isCulled = this.distanceCullHidden.has(obj);
+
+      if (!isCulled && distCm > hideCm) {
+        this.distanceCullHidden.set(obj, obj.enabled);
+        if (obj.enabled) {
+          obj.enabled = false;
+          hiddenCount += 1;
+        }
+      } else if (isCulled && distCm <= showCm) {
+        const restoreEnabled = this.distanceCullHidden.get(obj);
+        this.distanceCullHidden.delete(obj);
+        if (restoreEnabled === true && !obj.enabled) {
+          obj.enabled = true;
+          shownCount += 1;
+        } else if (restoreEnabled === false) {
+          obj.enabled = false;
+        }
+      }
+    }
+
+    // Drop entries for destroyed objects.
+    this.pruneDistanceCullMap(targets);
+
+    this.distanceCullLogTimer += Math.max(0.1, this.distanceCullCheckIntervalSec);
+    if (this.distanceCullLogTimer >= 5) {
+      this.distanceCullLogTimer = 0;
+      if (this.distanceCullHidden.size > 0 || hiddenCount > 0 || shownCount > 0) {
+        print(
+          `[AnchorController] distance cull active=${this.distanceCullHidden.size} hid=${hiddenCount} shown=${shownCount}`
+        );
+      }
+    }
+  }
+
+  private restoreAllDistanceCulledObjects(): void {
+    if (this.distanceCullHidden.size === 0) {
+      return;
+    }
+    const keys: SceneObject[] = [];
+    this.distanceCullHidden.forEach((_enabled, obj) => {
+      keys.push(obj);
+    });
+    for (let i = 0; i < keys.length; i++) {
+      const obj = keys[i];
+      if (isNull(obj)) {
+        continue;
+      }
+      const restoreEnabled = this.distanceCullHidden.get(obj);
+      if (restoreEnabled === true) {
+        obj.enabled = true;
+      }
+    }
+    this.distanceCullHidden.clear();
+  }
+
+  private pruneDistanceCullMap(liveTargets: SceneObject[]): void {
+    if (this.distanceCullHidden.size === 0) {
+      return;
+    }
+    const live = new Set<SceneObject>();
+    for (let i = 0; i < liveTargets.length; i++) {
+      if (!isNull(liveTargets[i])) {
+        live.add(liveTargets[i]);
+      }
+    }
+    const stale: SceneObject[] = [];
+    this.distanceCullHidden.forEach((_v, obj) => {
+      if (isNull(obj) || !live.has(obj)) {
+        stale.push(obj);
+      }
+    });
+    for (let i = 0; i < stale.length; i++) {
+      this.distanceCullHidden.delete(stale[i]);
+    }
+  }
+
+  private collectDistanceCullTargets(): SceneObject[] {
+    const targets: SceneObject[] = [];
+    const seen = new Set<SceneObject>();
+
+    const add = (obj: SceneObject | null): void => {
+      if (isNull(obj) || seen.has(obj)) {
+        return;
+      }
+      seen.add(obj);
+      targets.push(obj);
+    };
+
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      add(this.findGardenSpawnSource(layoutNames[i]));
+    }
+    add(this.getTrashSceneObject());
+    if (!isNull(this.menuRoot)) {
+      add(this.menuRoot);
+    }
+
+    for (let i = 0; i < this.wrappers.length; i++) {
+      add(this.wrappers[i]);
+    }
+    for (let i = 0; i < this.objs.length; i++) {
+      // Prefer wrappers; still include content if orphaned.
+      if (isNull(this.wrappers[i])) {
+        add(this.objs[i]);
+      }
+    }
+
+    if (this.distanceCullIncludeFriend) {
+      add(this.findNamedSceneObject('friend'));
+    }
+
+    return targets;
+  }
+
+  private resolveCullCamera(): SceneObject | null {
+    if (!isNull(this.camera)) {
+      return this.camera;
+    }
+    return this.findNamedSceneObject('Camera Object') || this.findNamedSceneObject('Camera');
+  }
+
+  private findNamedSceneObject(name: string): SceneObject | null {
+    const searchRoots = this.getSceneSearchRoots();
+    for (let i = 0; i < searchRoots.length; i++) {
+      const found = this.findSceneObjectByName(searchRoots[i], name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const found = this.findSceneObjectByName(global.scene.getRootObject(i), name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private horizontalDistanceCm(a: vec3, b: vec3): number {
+    const dx = a.x - b.x;
+    const dz = a.z - b.z;
+    return Math.sqrt(dx * dx + dz * dz);
   }
 
   private maybePersistAIContainerMove(): void {
@@ -2302,6 +2574,22 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
     this.onboardingCleanSessionApplied = true;
+    this.applyOnboardingCleanSession();
+  }
+
+  /**
+   * Voice / workspace move: force clear plants + layout and best-effort spatial reset
+   * so onboarding can run again in a new place.
+   */
+  public prepareOnboardingRestart(): void {
+    print('Workspace reset: preparing onboarding restart');
+    this.onboardingCleanSessionApplied = false;
+    this.applyOnboardingCleanSession();
+    this.onboardingCleanSessionApplied = true;
+    void this.resetSpatialAnchorsForWorkspaceMove();
+  }
+
+  private applyOnboardingCleanSession(): void {
     print('Onboarding enabled: clearing previous session plants and layout anchors');
 
     this.clearPersistedPlantStorageOnly();
@@ -2341,6 +2629,36 @@ export class AnchorController extends BaseScriptComponent {
       trashObject.enabled = false;
     }
     this.hasRestored = false;
+    this.nextPlantSpawnIndex = 0;
+  }
+
+  private async resetSpatialAnchorsForWorkspaceMove(): Promise<void> {
+    if (!this.anchorSession) {
+      return;
+    }
+    try {
+      const worldAnchor = this.currentAnchor as WorldAnchor | undefined;
+      if (worldAnchor?._sceneObject) {
+        try {
+          await this.anchorSession.deleteAnchor(worldAnchor);
+        } catch (_e) {
+          // continue
+        }
+      }
+      await this.anchorSession.reset();
+      print('Workspace reset: spatial anchors cleared');
+    } catch (e) {
+      print('Workspace reset: spatial anchor clear failed: ' + e);
+    }
+    this.currentAnchor = undefined;
+    this.anchorPersisted = false;
+    this.lockedAnchorId = null;
+    this.anchorBindingComplete = false;
+    try {
+      this.anchorComponent.anchor = null as unknown as Anchor;
+    } catch (_e) {
+      // ignore
+    }
   }
 
   private isFriendOnboardingEnabled(): boolean {
@@ -2360,9 +2678,14 @@ export class AnchorController extends BaseScriptComponent {
 
     const scripts = node.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
-      const candidate = scripts[i] as ScriptComponent & { enableOnboarding?: boolean };
+      const candidate = scripts[i] as ScriptComponent & {
+        enableOnboarding?: boolean;
+        treatAsNewUser?: boolean;
+      };
       if (candidate && candidate.enableOnboarding === true) {
-        return true;
+        // Returning users keep enableOnboarding on, but skip the clean wipe
+        // unless Treat As New User forces the tour every session.
+        return shouldRunFriendOnboardingTour(true, !!candidate.treatAsNewUser);
       }
     }
 
@@ -4919,6 +5242,7 @@ export class AnchorController extends BaseScriptComponent {
     setAnchorPersistence?: (persistence: AnchorController) => void;
     createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
     getPlantedLifecycle?: () => PlantLifecycle | null;
+    tryAttachSeed?: (plant: PlantLifecycle) => boolean;
   } {
     const stack: SceneObject[] = [root];
     while (stack.length > 0) {
@@ -4933,13 +5257,15 @@ export class AnchorController extends BaseScriptComponent {
           setAnchorPersistence?: (persistence: AnchorController) => void;
           createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
           getPlantedLifecycle?: () => PlantLifecycle | null;
+          tryAttachSeed?: (plant: PlantLifecycle) => boolean;
         };
         if (
           !isNull(candidate) &&
           (
             typeof candidate.setAnchorPersistence === 'function' ||
             typeof candidate.createRestoredPlant === 'function' ||
-            typeof candidate.getPlantedLifecycle === 'function'
+            typeof candidate.getPlantedLifecycle === 'function' ||
+            typeof candidate.tryAttachSeed === 'function'
           )
         ) {
           return candidate;

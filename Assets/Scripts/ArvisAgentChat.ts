@@ -2,6 +2,7 @@ import {
   getSharedArvisGhostBlob,
   getSharedFlowGardenSpacePanel,
   getSharedFlowGardenTts,
+  getSharedFriendGrab,
   getSharedSpecsApi,
   getSharedSpecsDeviceRegistry,
   getSharedSpeechRecognition,
@@ -19,6 +20,7 @@ import {
 import { isImageQuery, normalizeImagePrompt } from './ArvisImageSkill';
 import { isMeshQuery, normalizeMeshPrompt } from './ArvisMeshSkill';
 import { isMusicQuery, normalizeMusicPrompt } from './ArvisMusicSkill';
+import { looksLikeWorkspaceResetCommand } from './FriendGrab';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
@@ -529,6 +531,29 @@ export class ArvisAgentChat extends BaseScriptComponent {
     );
   }
 
+  private tryHandleLocalBuddyCommand(message: string): boolean {
+    if (!looksLikeWorkspaceResetCommand(message)) {
+      return false;
+    }
+    const friend = getSharedFriendGrab();
+    if (isNull(friend) || typeof friend.restartOnboardingTour !== 'function') {
+      this.setStatus('Buddy reset unavailable');
+      return true;
+    }
+    if (this.debugLogging) {
+      print(`[ArvisAgentChat] Local buddy command: workspace reset`);
+    }
+    this.listening = false;
+    this.wakeAwaitingPrompt = false;
+    this.resetListeningBoardCache();
+    if (!isNull(this.speechRecognition)) {
+      this.speechRecognition.cancelAgentSession();
+    }
+    const ok = friend.restartOnboardingTour('hey-friend');
+    this.setStatus(ok ? 'Restarting setup…' : 'Setup already running');
+    return true;
+  }
+
   private sendMessage(message: string): void {
     if (this.sending) {
       return;
@@ -536,6 +561,10 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     const trimmed = String(message || '').trim();
     if (!trimmed) {
+      return;
+    }
+
+    if (this.tryHandleLocalBuddyCommand(trimmed)) {
       return;
     }
 

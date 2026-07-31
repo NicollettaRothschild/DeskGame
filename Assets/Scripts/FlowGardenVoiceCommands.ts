@@ -13,8 +13,10 @@ import { isNewsIntentQuery } from './ArvisNewsSkill';
 import {
   getSharedArvisAgentChat,
   getSharedFlowGardenTts,
+  getSharedFriendGrab,
   getSharedSpeechRecognition,
 } from './FlowGardenServiceRegistry';
+import { looksLikeWorkspaceResetCommand } from './FriendGrab';
 import { PlantLifecycle } from './PlantLifecycle';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
@@ -206,6 +208,9 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
     if (this.tryTodoCommand(text)) {
       return;
     }
+    if (this.tryWorkspaceResetCommand(text)) {
+      return;
+    }
     if (this.tryCompleteCommand(text)) {
       return;
     }
@@ -255,6 +260,20 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       print(`[VoiceCommands] Forwarding to Arvis: ${trimmed.slice(0, 100)}`);
     }
     agent.sendUtterance(trimmed);
+    return true;
+  }
+
+  private tryWorkspaceResetCommand(text: string): boolean {
+    if (!looksLikeWorkspaceResetCommand(text)) {
+      return false;
+    }
+    const friend = getSharedFriendGrab();
+    if (isNull(friend) || typeof friend.restartOnboardingTour !== 'function') {
+      this.setStatus('Buddy reset unavailable');
+      return true;
+    }
+    const ok = friend.restartOnboardingTour('voice-commands');
+    this.setStatus(ok ? 'Restarting setup…' : 'Setup already running');
     return true;
   }
 

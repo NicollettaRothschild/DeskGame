@@ -32,12 +32,19 @@
     bubbleScaleCompensation: false
     colliderSize: false
     debugLogging: false
+    enableFollowAfterOnboarding: false
     enableGrabSounds: false
     enableIdleBob: false
     enableLookAt: false
     enableOnboarding: false
     enableSpeechBubble: false
     enableTts: false
+    followDistanceCm: false
+    followHeightOffsetCm: false
+    followLerpSpeed: false
+    followMinMoveCm: false
+    followSideOffsetCm: false
+    goalCongratsLine: false
     grabBubbleText: false
     grabSoundTrack: false
     grabSoundVolume: false
@@ -66,6 +73,7 @@
     onboardingPracticeTimeoutSec: false
     onboardingPresentDistanceCm: false
     onboardingPresentHeightCm: false
+    onboardingRequireGoalPotPractice: false
     onboardingRequirePractice: false
     onboardingStartDelaySec: false
     onboardingTrash: false
@@ -76,6 +84,8 @@
     releaseSoundVolume: false
     releaseSpeechTrack: false
     speechBubbleHideDelaySec: false
+    treatAsNewUser: false
+    workspaceResetLine: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -95,6 +105,7 @@
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: false
+      treatAsNewUser: false
       onboardingStartDelaySec: 2.500000
       onboardingGapSec: 0.500000
       onboardingPracticeTimeoutSec: !<float> 14.000000
@@ -119,6 +130,7 @@
       onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
       onboardingGoalFallback: I want to run one kilometer
+      onboardingRequireGoalPotPractice: true
       agentTts: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
       grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       releaseSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -135,6 +147,14 @@
       enableIdleBob: true
       idleBobAmplitudeCm: 1.500000
       idleBobSpeed: 1.800000
+      goalCongratsLine: "Woohoo! You did it! I'm so proud of you — your plant is fully grown!"
+      enableFollowAfterOnboarding: true
+      followDistanceCm: !<float> 55.000000
+      followSideOffsetCm: !<float> 18.000000
+      followHeightOffsetCm: !<float> -25.000000
+      followLerpSpeed: 3.500000
+      followMinMoveCm: !<float> 4.000000
+      workspaceResetLine: "Got it — let's set this space up again. I'll clear the anchors and walk you through onboarding."
   ScriptTypes:
     -
       {}
@@ -148,7 +168,8 @@
     - // @input bool enableGrabSounds = true
     - // @input bool enableSpeechBubble = true
     - // @input bool enableTts = true
-    - '// @input bool enableOnboarding {"label":"Enable Onboarding", "hint":"Friend reveals desk objects one at a time and explains grab / release"}'
+    - '// @input bool enableOnboarding {"label":"Enable Onboarding", "hint":"First launch: guided tour. Later sessions restore anchors unless user asks to reset."}'
+    - '// @input bool treatAsNewUser {"label":"Treat As New User", "hint":"Always play onboarding each session (ignores remembered completion). Turn off for normal returning-user restore."}'
     - '// @input float onboardingStartDelaySec = 2.5 {"label":"Onboarding Start Delay (sec)"}'
     - '// @input float onboardingGapSec = 0.6 {"label":"Onboarding Gap (sec)"}'
     - '// @input float onboardingPracticeTimeoutSec = 14 {"label":"Practice Timeout (sec)", "hint":"Auto-advance if the player does not grab/release in time"}'
@@ -156,7 +177,7 @@
     - '// @input float onboardingPresentDistanceCm = 22 {"label":"Present Distance (cm)"}'
     - '// @input float onboardingPresentHeightCm {"label":"Present Height Offset (cm)"}'
     - "// @input string onboardingWelcomeLine = \"Hi! I'm your buddy. I'll show you things one piece at a time.\" {\"label\":\"Welcome Line\"}"
-    - "// @input string onboardingClosingLine = \"You're all set! When you finish your goal, say I finished my goal. Have fun!\" {\"label\":\"Closing Line\"}"
+    - "// @input string onboardingClosingLine = \"You're all set! Say hey friend if you want to talk again. When you finish your goal, say I finished my goal. Have fun!\" {\"label\":\"Closing Line\"}"
     - '// @input SceneObject onboardingGlobe {"label":"Tour Globe"}'
     - "// @input string onboardingGlobeLine = \"Here's the globe. Pinch to grab it, move it, then release.\" {\"label\":\"Globe Line\"}"
     - '// @input SceneObject onboardingClock {"label":"Tour Clock"}'
@@ -164,15 +185,16 @@
     - '// @input SceneObject onboardingPalette {"label":"Tour Palette"}'
     - "// @input string onboardingPaletteLine = \"Here's the palette. Grab and release to place it where you like.\" {\"label\":\"Palette Line\"}"
     - '// @input SceneObject onboardingPlanter {"label":"Tour Planter"}'
-    - "// @input string onboardingPlanterLine = \"Here's the planter. Pinch it to grab a pot — you'll plant your goal seed in one next.\" {\"label\":\"Planter Line\"}"
+    - "// @input string onboardingPlanterLine = \"Here's the planter stack for extra pots later.\" {\"label\":\"Planter Line\"}"
     - '// @input SceneObject onboardingPostIt {"label":"Tour Post-its"}'
     - "// @input string onboardingPostItLine = \"Here's the sticky notes. Pull one and speak — your words appear on it.\" {\"label\":\"Post-it Line\"}"
     - '// @input SceneObject onboardingTrash {"label":"Tour Trash"}'
     - "// @input string onboardingTrashLine = \"Here's the trash. Drop things into it to clean up.\" {\"label\":\"Trash Line\"}"
-    - '// @input string onboardingGoalPromptLine = "What goal should we grow together? Say something like: I want to run one kilometer." {"label":"Goal Prompt Line", "hint":"Spoken after the planter; Friend waits for the player to say a goal"}'
-    - "// @input string onboardingGoalSeedLine = \"Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!\" {\"label\":\"Goal Seed Line\"}"
+    - '// @input string onboardingGoalPromptLine = "What goal should we grow together? Say something like: I want to walk 20 meters." {"label":"Goal Prompt Line", "hint":"Spoken after the tour; Friend waits for the player to say a goal"}'
+    - "// @input string onboardingGoalSeedLine = \"Here's your goal planter — the seed is already planted. Grab it, place it where you like, then water it. Walk goals grow automatically when you finish the distance. Or tell me when you're done!\" {\"label\":\"Goal Planted Pot Line\"}"
     - '// @input float onboardingGoalListenTimeoutSec = 22 {"label":"Goal Listen Timeout (sec)"}'
-    - '// @input string onboardingGoalFallback = "I want to run one kilometer" {"label":"Goal Fallback Example"}'
+    - '// @input string onboardingGoalFallback = "I want to walk 20 meters" {"label":"Goal Fallback Example"}'
+    - '// @input bool onboardingRequireGoalPotPractice = true {"label":"Require Place Goal Pot", "hint":"Wait for grab+release on the planted goal pot before finishing onboarding"}'
     - // @input AssignableType agentTts
     - // @input Asset.AudioTrackAsset grabSpeechTrack
     - // @input Asset.AudioTrackAsset releaseSpeechTrack
@@ -189,3 +211,11 @@
     - // @input bool enableIdleBob = true
     - // @input float idleBobAmplitudeCm = 1.5
     - // @input float idleBobSpeed = 1.8
+    - "// @input string goalCongratsLine = \"Woohoo! You did it! I'm so proud of you — your plant is fully grown!\" {\"hint\":\"Spoken when a bound goal is completed (walk distance or speech)\"}"
+    - '// @input bool enableFollowAfterOnboarding = true {"hint":"After onboarding, Buddy smoothly follows the camera"}'
+    - // @input float followDistanceCm = 55
+    - // @input float followSideOffsetCm = 18
+    - // @input float followHeightOffsetCm = -25
+    - // @input float followLerpSpeed = 3.5
+    - // @input float followMinMoveCm = 4
+    - "// @input string workspaceResetLine = \"Got it — let's set this space up again. I'll clear the anchors and walk you through onboarding.\" {\"hint\":\"Spoken when the user asks to reset anchors / restart setup\"}"

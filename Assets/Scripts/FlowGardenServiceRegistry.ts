@@ -13,6 +13,11 @@ let spacePanel: FlowGardenSpacePanel | null = null;
 let agentTts: FlowGardenTTS | null = null;
 let arvisAgentChat: ArvisAgentChat | null = null;
 let arvisGhostBlob: ArvisGhostBlob | null = null;
+let friendGrab: FriendGrabLike | null = null;
+
+export type FriendGrabLike = {
+  restartOnboardingTour?: (reason?: string) => boolean;
+};
 
 export function registerSpeechRecognition(instance: SpeechRecognition): void {
   speechRecognition = instance;
@@ -68,4 +73,12 @@ export function registerArvisGhostBlob(instance: ArvisGhostBlob): void {
 
 export function getSharedArvisGhostBlob(): ArvisGhostBlob | null {
   return arvisGhostBlob;
+}
+
+export function registerFriendGrab(instance: FriendGrabLike): void {
+  friendGrab = instance;
+}
+
+export function getSharedFriendGrab(): FriendGrabLike | null {
+  return friendGrab;
 }
