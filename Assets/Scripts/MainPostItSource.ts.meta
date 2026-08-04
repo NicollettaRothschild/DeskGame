@@ -29,11 +29,14 @@
     allowMultipleActiveNotes: false
     anchorController: false
     debugLogging: false
+    enforceLargeSourceGrabCollider: false
     fallbackRayDistance: false
     followInteractorWhileHeld: false
     forceLayeredStackVisual: false
     notePrefab: false
     postReleaseCaptureSec: false
+    sourceGrabColliderMinSize: false
+    sourceGrabColliderPaddingCm: false
     sourceInteractable: false
     spawnForwardOffset: false
     spawnParent: false
@@ -61,6 +64,9 @@
       debugLogging: false
       postReleaseCaptureSec: !<float> 6.000000
       forceLayeredStackVisual: true
+      enforceLargeSourceGrabCollider: true
+      sourceGrabColliderMinSize: !<Vec3> {x: 26.000000, y: 16.000000, z: 20.000000}
+      sourceGrabColliderPaddingCm: !<float> 4.000000
       stackLayerCount: 10
       stackLayerThickness: 0.035000
       stackLayerGap: 0.028000
@@ -80,6 +86,9 @@
     - // @input bool debugLogging
     - '// @input float postReleaseCaptureSec = 12 {"hint":"Keep transcript capture active briefly after release"}'
     - '// @input bool forceLayeredStackVisual = true {"hint":"Render source as layered sticky-note stack"}'
+    - '// @input bool enforceLargeSourceGrabCollider = true {"hint":"Enlarge stack collider for easier note grabbing"}'
+    - "// @input vec3 sourceGrabColliderMinSize = {26,16,20}"
+    - // @input float sourceGrabColliderPaddingCm = 4
     - // @input int stackLayerCount = 10
     - // @input float stackLayerThickness = 0.035
     - // @input float stackLayerGap = 0.028

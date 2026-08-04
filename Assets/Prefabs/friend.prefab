@@ -382,6 +382,7 @@
     onboardingGoalSeedLine: true
     onboardingGoalListenTimeoutSec: true
     onboardingGoalFallback: true
+    onboardingAutoGoalFallbackOnTimeout: true
     onboardingRequireGoalPotPractice: true
     grabSpeechTrack: true
     releaseSpeechTrack: true
@@ -392,6 +393,7 @@
     bubbleForwardOffset: true
     enableLookAt: true
     lookAtTurnSpeed: true
+    lookAtAlwaysWhileFollowing: true
     enableIdleBob: true
     idleBobAmplitudeCm: true
     idleBobSpeed: true
@@ -442,6 +444,7 @@
       onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
       onboardingGoalFallback: I want to run one kilometer
+      onboardingAutoGoalFallbackOnTimeout: false
       onboardingRequireGoalPotPractice: true
       agentTts: !<MappingBased.AssignableType> a1b2c3d4-e5f6-7890-abcd-ef1234567892
       grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -456,6 +459,7 @@
       lookAtDistanceMeters: 0.200000
       lookAtExitPaddingMeters: 0.050000
       lookAtTurnSpeed: !<float> 6.000000
+      lookAtAlwaysWhileFollowing: true
       enableIdleBob: true
       idleBobAmplitudeCm: 1.500000
       idleBobSpeed: 1.800000
