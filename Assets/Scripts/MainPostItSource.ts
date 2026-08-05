@@ -44,9 +44,9 @@ type InteractableLike = ScriptComponent & {
 type AnchorNoteSpawner = {
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
-  notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
   syncTrackedWrapperToContent?: (content: SceneObject) => void;
   placeTrackedContentAtWorld?: (content: SceneObject, worldPos: vec3, worldRot?: quat) => void;
+  getTrackedSpawnParent?: () => SceneObject;
 };
 
 type NoteTranscriptLike = {
@@ -289,7 +289,6 @@ export class MainPostItSource extends BaseScriptComponent {
       if (typeof spawner.setActiveManipulatedRoot === 'function') {
         spawner.setActiveManipulatedRoot(noteObject);
       }
-      this.notifyTrashSpawnGrace(noteObject, 5);
     }
     playInteractionSound((sounds) => sounds.playGrabObject());
     this.ensureUpdateLoop();
@@ -424,21 +423,20 @@ export class MainPostItSource extends BaseScriptComponent {
     return null;
   }
 
-  private notifyTrashSpawnGrace(root: SceneObject, graceSeconds: number): void {
-    const anchorSpawner = this.getAnchorNoteSpawner();
-    if (isNull(anchorSpawner)) {
-      return;
-    }
-
-    const spawner = anchorSpawner as AnchorNoteSpawner;
-    if (typeof spawner.notifyTrashSpawnGrace === 'function') {
-      spawner.notifyTrashSpawnGrace(root, graceSeconds);
-    }
-  }
-
   private getSpawnParent(): SceneObject {
     if (!isNull(this.spawnParent)) {
       return this.spawnParent;
+    }
+
+    const anchorSpawner = this.getAnchorNoteSpawner();
+    if (
+      !isNull(anchorSpawner) &&
+      typeof (anchorSpawner as AnchorNoteSpawner).getTrackedSpawnParent === 'function'
+    ) {
+      const trackedParent = (anchorSpawner as AnchorNoteSpawner).getTrackedSpawnParent!();
+      if (!isNull(trackedParent)) {
+        return trackedParent;
+      }
     }
 
     const parent = this.getSceneObject().getParent();
@@ -529,6 +527,7 @@ export class MainPostItSource extends BaseScriptComponent {
   private finalizeReleasedPull(releasedNote: SceneObject): void {
     this.deferEndNoteTranscriptCapture(releasedNote);
     this.abandonActivePull();
+    this.reparentNoteOutOfSourceContainer(releasedNote);
 
     const anchorSpawner = this.getAnchorNoteSpawner();
     if (!isNull(anchorSpawner)) {
@@ -542,11 +541,46 @@ export class MainPostItSource extends BaseScriptComponent {
       if (typeof spawner.setActiveManipulatedRoot === 'function') {
         spawner.setActiveManipulatedRoot(releasedNote);
       }
-      this.notifyTrashSpawnGrace(releasedNote, 5);
+      // Do not renew spawn grace here: saveObjectPosition immediately performs
+      // the intentional release-in-trash check for this note.
       if (typeof spawner.saveObjectPosition === 'function') {
         spawner.saveObjectPosition();
       }
     }
+  }
+
+  /**
+   * Notes still parented under the PostIt source are treated as source hierarchy
+   * by TrashBin and won't delete. Move released notes into the tracked spawn root.
+   */
+  private reparentNoteOutOfSourceContainer(note: SceneObject): void {
+    if (isNull(note)) {
+      return;
+    }
+    const sourceRoot = this.getSceneObject();
+    let current = note.getParent();
+    let insideSource = false;
+    while (!isNull(current)) {
+      if (current === sourceRoot) {
+        insideSource = true;
+        break;
+      }
+      current = current.getParent();
+    }
+    if (!insideSource) {
+      return;
+    }
+
+    const worldPos = note.getTransform().getWorldPosition();
+    const worldRot = note.getTransform().getWorldRotation();
+    const worldScale = note.getTransform().getWorldScale();
+    const targetParent = this.getSpawnParent();
+    if (!isNull(targetParent)) {
+      note.setParent(targetParent);
+    }
+    note.getTransform().setWorldPosition(worldPos);
+    note.getTransform().setWorldRotation(worldRot);
+    note.getTransform().setWorldScale(worldScale);
   }
 
   private beginNoteTranscriptCapture(noteObject: SceneObject): void {

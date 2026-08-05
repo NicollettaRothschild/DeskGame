@@ -6,7 +6,6 @@
     - !<own> 0005641c-028d-459a-0000-000000014b4d
     - !<own> e20f44f1-e6f3-4b7b-80be-af6e7ad66f85
     - !<own> 6fef169d-128d-4a95-9464-c9fa0c67699f
-    - !<own> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
     - !<own> c41a3ab5-4451-42ca-8332-990d76bcd69b
     - !<own> d334d6cb-199a-4750-8c76-963feb55c00d
     - !<own> 47017fe2-1eaa-495e-9d1c-dbefdc3951f6
@@ -1892,7 +1891,7 @@
       widgetParent: !<reference.SceneObject> c41a3ab5-4451-42ca-8332-990d76bcd69b
       berryPrefab: !<reference.ObjectPrefab> 1b4e65f7-89b6-4a66-8b40-734a318bfc98
       statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
-      spacePanel: !<reference.ScriptComponent> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
+      spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       apiBaseUrl: "https://arvis.space"
       pairPollSec: !<float> 4.000000
       taskPollSec: !<float> 45.000000
@@ -3124,7 +3123,7 @@
       idleBobSpeed: 1.800000
       goalCongratsLine: "Woohoo! You did it! I'm so proud of you — your plant is fully grown!"
       enableFollowAfterOnboarding: true
-      followDistanceCm: !<float> 55.000000
+      followDistanceCm: !<float> 45.000000
       followSideOffsetCm: !<float> 18.000000
       followHeightOffsetCm: !<float> -25.000000
       followLerpSpeed: 3.500000
@@ -3957,7 +3956,7 @@
       paletteRoot: !<reference.SceneObject> 9aa42fcc-a72f-4475-a934-1f79675ea728
       globeRoot: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
       clockRoot: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
-      spacePanel: !<reference.ScriptComponent> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
+      spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
       sackMaterial: !<reference.Material> ea3432dd-be57-41c3-a289-4c81ee0b0e0f
       sackTexture: !<reference.Texture> a7d396e2-eb3f-4f67-b8cf-2a4db49965bd
@@ -4740,7 +4739,7 @@
   ScriptInputs:
     "":
       debugLogging: false
-      colliderSize: !<Vec3> {x: 80.000000, y: 80.000000, z: 30.000000}
+      colliderSize: !<Vec3> {x: 210.000000, y: 210.000000, z: 95.000000}
       grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
       releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000
@@ -6414,7 +6413,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.580000, y: -0.040000, z: 0.580000}
+    Position: {x: 5.000000, y: 1.500000, z: 5.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 0.520000, y: 0.520000, z: 0.520000}
     HasSegmentScaleCompensation: false
@@ -6731,7 +6730,7 @@
       speechRecognition: !<MappingBased.AssignableType> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
       specsApi: !<MappingBased.AssignableType_1> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
       deviceRegistry: !<MappingBased.AssignableType_2> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
-      spacePanel: !<reference.ScriptComponent> b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e
+      spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       agentResponseText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       agentResponseText3D: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
       statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d

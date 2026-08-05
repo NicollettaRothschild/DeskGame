@@ -146,6 +146,7 @@ export class PaletteGrab extends BaseScriptComponent {
   private strokeRoot: SceneObject | null = null;
   private paletteMoveEnabled = true;
   private paintStrokeActive = false;
+  private cancelInteractionActive = false;
   private paintArmReadyAt = 0;
   private paintNeedsReleaseAfterPick = false;
   private colorBlobTargets: ColorBlobTarget[] = [];
@@ -364,7 +365,21 @@ export class PaletteGrab extends BaseScriptComponent {
     interactable.enableInstantDrag = false;
 
     const cancel = (): void => {
+      this.cancelInteractionActive = true;
       this.setPaintMode(false);
+      if (!isNull(this.grabManipulation)) {
+        (this.grabManipulation as ScriptComponent).enabled = false;
+      }
+    };
+    const releaseCancel = (): void => {
+      const releaseEvent = this.createEvent('DelayedCallbackEvent');
+      releaseEvent.bind(() => {
+        this.cancelInteractionActive = false;
+        if (!isNull(this.grabManipulation) && this.paletteMoveEnabled) {
+          (this.grabManipulation as ScriptComponent).enabled = true;
+        }
+      });
+      releaseEvent.reset(0.08);
     };
     if (interactable.onTriggerStart) {
       interactable.onTriggerStart.add(cancel);
@@ -375,11 +390,26 @@ export class PaletteGrab extends BaseScriptComponent {
     if (interactable.onDragStart) {
       interactable.onDragStart.add(cancel);
     }
+    if (interactable.onDragEnd) {
+      interactable.onDragEnd.add(releaseCancel);
+    }
+    if (interactable.onTriggerEnd) {
+      interactable.onTriggerEnd.add(releaseCancel);
+    }
+    if (interactable.onTriggerEndOutside) {
+      interactable.onTriggerEndOutside.add(releaseCancel);
+    }
+    if (interactable.onInteractorTriggerEnd) {
+      interactable.onInteractorTriggerEnd.add(releaseCancel);
+    }
+    if (interactable.onInteractorTriggerEndOutside) {
+      interactable.onInteractorTriggerEndOutside.add(releaseCancel);
+    }
 
     const textNode = global.scene.createSceneObject(PaletteGrab.CANCEL_BUTTON_TEXT_NAME);
     textNode.setParent(button);
     textNode.layer = root.layer;
-    textNode.getTransform().setLocalPosition(new vec3(0, 0.15, 0));
+    textNode.getTransform().setLocalPosition(new vec3(0, 0.8, 0));
     textNode.getTransform().setLocalRotation(quat.quatIdentity());
     textNode.getTransform().setLocalScale(new vec3(0.1, 0.1, 0.1));
 
@@ -458,19 +488,23 @@ export class PaletteGrab extends BaseScriptComponent {
     }
 
     const material = (isNull(template) ? fallback : template).clone();
-    const pass = material.mainPass;
-    if (typeof pass.depthWrite !== 'undefined') {
-      pass.depthWrite = false;
+    const pass = material.mainPass as unknown as Record<string, unknown>;
+    const blackTint = new vec4(0.05, 0.065, 0.085, 0.6);
+    if (typeof pass['depthWrite'] !== 'undefined') {
+      pass['depthWrite'] = false;
     }
-    if (typeof pass.depthTest !== 'undefined') {
-      pass.depthTest = true;
+    if (typeof pass['depthTest'] !== 'undefined') {
+      pass['depthTest'] = true;
     }
-    if (typeof pass.blendMode !== 'undefined') {
-      pass.blendMode = BlendMode.Normal;
+    if (typeof pass['blendMode'] !== 'undefined') {
+      pass['blendMode'] = BlendMode.Normal;
     }
-    if (typeof pass.baseColor !== 'undefined') {
-      // Soft smoky glass background; the X remains solid black.
-      pass.baseColor = new vec4(0.72, 0.75, 0.78, 0.38);
+    if (typeof pass['baseColor'] !== 'undefined') {
+      pass['baseColor'] = blackTint;
+    }
+    if (typeof pass['Tweak_N1'] !== 'undefined') {
+      // Some project variants still expose this tint key.
+      pass['Tweak_N1'] = blackTint;
     }
     this.cancelButtonBackgroundMaterial = material;
     return material;
@@ -488,16 +522,27 @@ export class PaletteGrab extends BaseScriptComponent {
       return null;
     }
 
-    const pass = material.mainPass as unknown as Record<string, vec4>;
-    const black = new vec4(0.02, 0.02, 0.025, 1);
+    const materialPass = material.mainPass;
+    if (typeof materialPass.depthWrite !== 'undefined') {
+      materialPass.depthWrite = false;
+    }
+    if (typeof materialPass.depthTest !== 'undefined') {
+      materialPass.depthTest = false;
+    }
+
+    const pass = materialPass as unknown as Record<string, vec4>;
+    const white = new vec4(0.96, 0.96, 0.98, 1);
     const colorKeys = [
       'frontCapStartingColor',
+      'backCapStartingColor',
       'outerEdgeStartingColor',
+      'outerEdgeEndingColor',
       'InnerEdgeStartingColor',
+      'InnerEdgeEndingColor',
     ];
     for (let i = 0; i < colorKeys.length; i++) {
       if (typeof pass[colorKeys[i]] !== 'undefined') {
-        pass[colorKeys[i]] = black;
+        pass[colorKeys[i]] = white;
       }
     }
     this.cancelButtonTextMaterial = material;
@@ -956,6 +1001,8 @@ export class PaletteGrab extends BaseScriptComponent {
       interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
     }
 
+    manipulation.enableTranslation = true;
+    manipulation.enableRotation = true;
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;
 
@@ -1012,6 +1059,9 @@ export class PaletteGrab extends BaseScriptComponent {
   }
 
   private onPaletteGrabStart(_event?: InteractorEventLike, allowWhilePainting: boolean = false): void {
+    if (this.cancelInteractionActive) {
+      return;
+    }
     if (this.paintModeActive && !allowWhilePainting) {
       return;
     }
@@ -1065,10 +1115,14 @@ export class PaletteGrab extends BaseScriptComponent {
       }
     };
 
-    // AnchorController supplies the same visible MoveHandle used by planter/seeds.
-    // Never create the old palette-only sphere when that controller is assigned.
+    // The palette is grabbed directly; remove any dedicated handle left by an
+    // older scene/runtime version.
     if (!isNull(this.anchorController)) {
       disableLegacyHandle();
+      const gardenHandle = this.findNamedChild(root, 'MoveHandle');
+      if (!isNull(gardenHandle)) {
+        gardenHandle.enabled = false;
+      }
       this.moveHandleObject = null;
       this.moveHandleInteractable = null;
       this.moveHandleManipulation = null;

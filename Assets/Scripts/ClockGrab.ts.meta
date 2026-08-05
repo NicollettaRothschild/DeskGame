@@ -56,7 +56,7 @@
       {}
   InputLines:
     - // @input bool debugLogging
-    - "// @input vec3 colliderSize = {140,140,55}"
+    - "// @input vec3 colliderSize = {210,210,95}"
     - // @input Asset.AudioTrackAsset grabSoundTrack
     - // @input Asset.AudioTrackAsset releaseSoundTrack
     - // @input float grabSoundVolume = 0.85

@@ -35,8 +35,8 @@ const TRASH_MOVE_HANDLE_REFERENCE_SOURCE = 'Planter';
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_OFFSETS: { [sourceName: string]: vec3 } = {
   'Water Source': new vec3(1.35, 0.08, 1.35),
   Seeds: new vec3(1.25, 0.08, 1.25),
-  // Post-it stack is wider after scaling; push handle to the front-right corner.
-  PostItNotes: new vec3(1.2, 0.2, 1.2),
+  // Keep the fallback pose fully outside the stack's large note-grab collider.
+  PostItNotes: new vec3(5, 1.5, 5),
 };
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_SCALES: { [sourceName: string]: vec3 } = {
   // Post-it pad is smaller than other sources; use a bigger handle for parity.
@@ -3770,7 +3770,7 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private wireGardenSourceMoveHandles(): void {
-    const handleNames = GARDEN_SPAWN_SOURCE_NAMES.concat(['palette']);
+    const handleNames = GARDEN_SPAWN_SOURCE_NAMES;
     const template = this.findMoveHandleTemplate();
     for (let i = 0; i < handleNames.length; i++) {
       const name = handleNames[i];
@@ -3799,6 +3799,9 @@ export class AnchorController extends BaseScriptComponent {
         if (!isNull(legacyHandle)) {
           legacyHandle.enabled = false;
         }
+      } else if (name === 'PostItNotes') {
+        this.applyGardenSourceMoveHandleLayout(name, handle);
+        this.applyPostItMoveHandleLayout(handle, source);
       } else {
         this.applyGardenSourceMoveHandleLayout(name, handle);
       }
@@ -3876,6 +3879,30 @@ export class AnchorController extends BaseScriptComponent {
         )
       );
     }
+  }
+
+  private applyPostItMoveHandleLayout(handle: SceneObject, source: SceneObject): void {
+    const bounds = this.measureSourceVisualBoundsExcludingHandle(source, handle);
+    if (isNull(bounds)) {
+      return;
+    }
+
+    const sourcePos = source.getTransform().getWorldPosition();
+    const colliderClearanceCm = 18;
+    const visualClearanceCm = 8;
+    handle.getTransform().setWorldPosition(
+      new vec3(
+        Math.max(
+          bounds.max.x + visualClearanceCm,
+          sourcePos.x + colliderClearanceCm
+        ),
+        bounds.max.y + 5,
+        Math.max(
+          bounds.max.z + visualClearanceCm,
+          sourcePos.z + colliderClearanceCm
+        )
+      )
+    );
   }
 
   private measureSourceVisualBoundsExcludingHandle(
