@@ -388,6 +388,13 @@ export class AnchorController extends BaseScriptComponent {
     this.setupInteractionSounds();
     armGardenSourceStartupSpawnBlock(3);
     print(`AnchorController ${ANCHOR_CONTROLLER_VERSION} starting`);
+    this.enforceNoLooseSeedTemplatesVisible('startup');
+    this.scheduleDelayed(() => {
+      this.enforceNoLooseSeedTemplatesVisible('post-load');
+    }, 0.5);
+    this.scheduleDelayed(() => {
+      this.enforceNoLooseSeedTemplatesVisible('post-restore');
+    }, 2.0);
     this.captureGardenSpawnSourceDefaults();
     this.captureTrashSceneDefault();
     this.applyTrashScaledWorldSize();
@@ -2731,6 +2738,7 @@ export class AnchorController extends BaseScriptComponent {
       }
     }
     this.destroyLoosePlantAndSeedSceneObjects();
+    this.enforceNoLooseSeedTemplatesVisible('onboarding-cleanup');
 
     const layoutNames = this.getAnchorLayoutSourceNames();
     for (let i = 0; i < layoutNames.length; i++) {
@@ -2785,6 +2793,64 @@ export class AnchorController extends BaseScriptComponent {
     if (destroyList.length > 0) {
       print(`Onboarding cleanup: destroyed ${destroyList.length} loose seed/plant object(s)`);
     }
+  }
+
+  private enforceNoLooseSeedTemplatesVisible(reason: string): void {
+    let disabledCount = 0;
+    const roots: SceneObject[] = [];
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      roots.push(global.scene.getRootObject(i));
+    }
+
+    while (roots.length > 0) {
+      const node = roots.pop();
+      if (!node || isNull(node)) {
+        continue;
+      }
+
+      if (
+        String(node.name || '') === 'Seed' &&
+        !this.isInsideTrackedPlantOrPot(node)
+      ) {
+        if (node.enabled) {
+          node.enabled = false;
+          disabledCount++;
+        }
+        // Parent disable is sufficient and avoids touching prefab child state.
+        continue;
+      }
+
+      for (let i = 0; i < node.getChildrenCount(); i++) {
+        roots.push(node.getChild(i));
+      }
+    }
+
+    if (disabledCount > 0) {
+      print(
+        `[AnchorController] ${reason}: disabled ${disabledCount} loose Seed template object(s)`
+      );
+    }
+  }
+
+  private isInsideTrackedPlantOrPot(candidate: SceneObject): boolean {
+    let current: SceneObject | null = candidate;
+    while (!isNull(current)) {
+      for (let i = 0; i < this.objs.length; i++) {
+        if (current === this.objs[i] || current === this.wrappers[i]) {
+          return true;
+        }
+      }
+      const name = String(current.name || '');
+      if (
+        name.indexOf('PlantContent_') === 0 ||
+        name.indexOf('PotContent_') === 0
+      ) {
+        return true;
+      }
+      current = current.getParent();
+    }
+    return false;
   }
 
   private collectLoosePlantAndSeedObjects(

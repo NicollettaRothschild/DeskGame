@@ -57,6 +57,7 @@
     soundDebugLogging: false
     soundVolume: false
     spacePanel: false
+    spawnMinSeparationCm: false
     spawnPotTrack: false
     spawnSeedTrack: false
     spawnWaterTrack: false
@@ -124,6 +125,7 @@
       distanceCullHideMeters: !<float> 20.000000
       distanceCullShowMeters: !<float> 18.000000
       distanceCullCheckIntervalSec: 0.350000
+      spawnMinSeparationCm: !<float> 18.000000
       distanceCullIncludeFriend: true
   ScriptTypes:
     -
@@ -172,4 +174,5 @@
     - '// @input float distanceCullHideMeters = 20 {"hint":"Hide objects when farther than this many meters from the camera"}'
     - '// @input float distanceCullShowMeters = 18 {"hint":"Show objects again when closer than this (keep below hide distance to avoid flicker)"}'
     - // @input float distanceCullCheckIntervalSec = 0.35
+    - '// @input float spawnMinSeparationCm = 18 {"label":"Spawn Minimum Separation (cm)", "hint":"Minimum horizontal spacing between newly spawned desk objects."}'
     - '// @input bool distanceCullIncludeFriend {"hint":"Also hide Friend when far away"}'

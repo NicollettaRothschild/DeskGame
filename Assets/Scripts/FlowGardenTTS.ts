@@ -206,7 +206,9 @@ export class FlowGardenTTS extends BaseScriptComponent {
       return;
     }
 
-    const voices = [this.voiceName, 'Sasha', 'Sam', 'Voice 1'].filter((name, index, all) => {
+    // Only retry known Specs voices. "Voice 1" is not a valid native voice
+    // and caused deterministic Bad Configuration errors after transient failures.
+    const voices = [this.voiceName, 'Sasha', 'Sam'].filter((name, index, all) => {
       return !!name && all.indexOf(name) === index;
     });
 
