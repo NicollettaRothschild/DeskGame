@@ -480,16 +480,11 @@ export class PaletteGrab extends BaseScriptComponent {
       return this.cancelButtonBackgroundMaterial as Material;
     }
 
-    let template: Material | null = null;
-    try {
-      template = requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material;
-    } catch (_error) {
-      template = fallback;
-    }
-
+    const template = this.resolveCompanionBodyMaterial() || fallback;
     const material = (isNull(template) ? fallback : template).clone();
     const pass = material.mainPass as unknown as Record<string, unknown>;
-    const blackTint = new vec4(0.05, 0.065, 0.085, 0.6);
+    const blackTint = new vec3(0.035, 0.05, 0.075);
+    const alpha = 0.62;
     if (typeof pass['depthWrite'] !== 'undefined') {
       pass['depthWrite'] = false;
     }
@@ -497,17 +492,88 @@ export class PaletteGrab extends BaseScriptComponent {
       pass['depthTest'] = true;
     }
     if (typeof pass['blendMode'] !== 'undefined') {
-      pass['blendMode'] = BlendMode.Normal;
+      pass['blendMode'] = BlendMode.PremultipliedAlphaAuto;
     }
+    // Match ArvisGhostBlob's live water-shader configuration, then apply a
+    // dark tint instead of the companion's phase color.
+    pass['Tweak_N171'] = 0.025 + alpha * 0.07;
+    pass['Tweak_N172'] = 0.012 + alpha * 0.035;
+    pass['Port_Input1_N016'] = 0.45 + alpha * 0.45;
+    pass['Port_Input1_N080'] = 0.55 + alpha * 0.35;
+    pass['Port_AO_N170'] = blackTint;
+    pass['Port_Emissive_N170'] = new vec3(0, 0, 0);
     if (typeof pass['baseColor'] !== 'undefined') {
-      pass['baseColor'] = blackTint;
-    }
-    if (typeof pass['Tweak_N1'] !== 'undefined') {
-      // Some project variants still expose this tint key.
-      pass['Tweak_N1'] = blackTint;
+      pass['baseColor'] = new vec4(
+        blackTint.x * alpha,
+        blackTint.y * alpha,
+        blackTint.z * alpha,
+        alpha
+      );
     }
     this.cancelButtonBackgroundMaterial = material;
     return material;
+  }
+
+  private resolveCompanionBodyMaterial(): Material | null {
+    const friend = this.findSceneObjectInScene('friend');
+    if (!isNull(friend)) {
+      const stack: SceneObject[] = [friend];
+      while (stack.length > 0) {
+        const current = stack.pop();
+        if (isNull(current)) {
+          continue;
+        }
+        const visuals = current.getComponents(
+          'Component.RenderMeshVisual'
+        ) as RenderMeshVisual[];
+        for (let i = 0; i < visuals.length; i++) {
+          const material = visuals[i].mainMaterial;
+          if (isNull(material)) {
+            continue;
+          }
+          const pass = material.mainPass as unknown as Record<string, unknown>;
+          if (pass['scrollSpeed'] !== undefined || pass['opacityTextureA'] !== undefined) {
+            return material;
+          }
+        }
+        for (let i = 0; i < current.getChildrenCount(); i++) {
+          stack.push(current.getChild(i));
+        }
+      }
+    }
+
+    try {
+      // This is the exact material asset used by ArvisGhostBlob.waterMaterialTemplate.
+      return requireAsset(
+        'Ocean Water Material.lspkg/Materials/WaterMaterial.mat'
+      ) as Material;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  private findSceneObjectInScene(name: string): SceneObject | null {
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const found = this.findSceneObjectRecursive(global.scene.getRootObject(i), name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findSceneObjectRecursive(root: SceneObject, name: string): SceneObject | null {
+    if (String(root.name || '') === name) {
+      return root;
+    }
+    for (let i = 0; i < root.getChildrenCount(); i++) {
+      const found = this.findSceneObjectRecursive(root.getChild(i), name);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
   }
 
   private createCancelButtonTextMaterial(): Material | null {

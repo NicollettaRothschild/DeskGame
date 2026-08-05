@@ -98,6 +98,8 @@
     onboardingTrashLine: false
     onboardingWelcomeLine: false
     petDialogueLines: false
+    petPokeColliderSize: false
+    petPokeLocalPosition: false
     petReactionCooldownSec: false
     petSoundTrack: false
     releaseBubbleText: false
@@ -126,6 +128,8 @@
       enablePetReaction: true
       petSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       petReactionCooldownSec: 2.500000
+      petPokeColliderSize: !<Vec3> {x: 3.400000, y: 4.200000, z: 3.400000}
+      petPokeLocalPosition: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.800000}
       petDialogueLines: !<string[]>
         - "Aww, thank you!"
         - That tickles!
@@ -215,6 +219,8 @@
     - // @input bool enablePetReaction = true
     - // @input Asset.AudioTrackAsset petSoundTrack
     - // @input float petReactionCooldownSec = 2.5
+    - '// @input vec3 petPokeColliderSize = {3.4,4.2,3.4} {"label":"Pet Poke Collider Size"}'
+    - '// @input vec3 petPokeLocalPosition = {0,0,0.8} {"label":"Pet Poke Local Position"}'
     - "// @input string[] petDialogueLines = {\"Aww, thank you!\",\"That tickles!\",\"Hehe, I like that!\",\"You're a good friend.\"}"
     - // @input bool enableSpeechBubble = true
     - // @input bool enableTts = true

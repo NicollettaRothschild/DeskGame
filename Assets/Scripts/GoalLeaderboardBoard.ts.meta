@@ -68,9 +68,9 @@
     - // @input float leaderboardTtlSec = 31536000
     - // @input int usersLimit = 5
     - // @input bool useGlobal = true
-    - // @input float refreshIntervalSec = 4
+    - // @input float refreshIntervalSec = 30
     - // @input bool showCurrentUserLine = true
-    - '// @input bool scoreIsCentimeters = true {"hint":"Interprets score as centimeters and displays meters (matches FriendGrab walk score submit)."}'
+    - '// @input bool scoreIsCentimeters = true {"hint":"Interprets score as centimeters and displays converted distance units."}'
     - '// @input bool showKilometers = true {"label":"Show Kilometers"}'
     - '// @input bool showMiles = true {"label":"Show Miles"}'
     - // @input Component.Text3D targetText

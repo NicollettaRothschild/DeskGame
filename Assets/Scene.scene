@@ -4739,7 +4739,7 @@
   ScriptInputs:
     "":
       debugLogging: false
-      colliderSize: !<Vec3> {x: 210.000000, y: 210.000000, z: 95.000000}
+      colliderSize: !<Vec3> {x: 420.000000, y: 420.000000, z: 220.000000}
       grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
       releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000

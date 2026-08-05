@@ -1,8 +1,18 @@
 import { PlantLifecycle } from './PlantLifecycle';
+import { BackPlate } from 'SpectaclesUIKit.lspkg/Scripts/BackPlate';
 
 type TextLike = {
   text: string;
 };
+
+type TextRole = 'Headline1' | 'Subheadline' | 'Body' | 'Caption';
+const TYPE_SCALE: Record<TextRole, number> = {
+  Headline1: 27,
+  Subheadline: 21,
+  Body: 20,
+  Caption: 18,
+};
+const PANEL_WIDTH_CM = 42;
 
 @component
 export class GoalLeaderboardBoard extends BaseScriptComponent {
@@ -23,7 +33,7 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
   useGlobal: boolean = true;
 
   @input('float')
-  refreshIntervalSec: number = 4;
+  refreshIntervalSec: number = 30;
 
   @input
   showCurrentUserLine: boolean = true;
@@ -52,8 +62,15 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
   private refreshCooldown = 0;
   private textTarget: TextLike | null = null;
   private missingModuleLogged = false;
+  private nativeUiBuilt = false;
+  private titleText: Text3D | null = null;
+  private statusText: Text3D | null = null;
+  private rowTexts: Text3D[] = [];
+  private currentUserText: Text3D | null = null;
+  private consecutiveFetchFailures = 0;
 
   onAwake(): void {
+    this.buildNativeLeaderboardUi();
     this.createEvent('OnStartEvent').bind(() => {
       this.resolveTextTarget();
       this.refreshLeaderboard();
@@ -68,6 +85,119 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
     });
   }
 
+  private buildNativeLeaderboardUi(): void {
+    if (this.nativeUiBuilt) {
+      return;
+    }
+    this.nativeUiBuilt = true;
+    const root = this.getSceneObject();
+    if (isNull(root.getComponent('Component.Canvas'))) {
+      root.createComponent('Component.Canvas');
+    }
+
+    let backPlate = root.getComponent(BackPlate.getTypeName()) as BackPlate;
+    if (isNull(backPlate)) {
+      backPlate = root.createComponent(BackPlate.getTypeName()) as BackPlate;
+    }
+    backPlate.style = 'default';
+    backPlate.size = new vec2(PANEL_WIDTH_CM, 31);
+
+    const content = global.scene.createSceneObject('LeaderboardContent');
+    content.setParent(root);
+    content.layer = root.layer;
+    content.getTransform().setLocalPosition(new vec3(0, 0, 0));
+
+    this.titleText = this.addNativeTextRow(
+      content,
+      'Distance Leaderboard',
+      'Headline1',
+      12.3,
+      4.2,
+      HorizontalAlignment.Center
+    );
+    this.addNativeTextRow(
+      content,
+      'GLOBAL  •  WALKING DISTANCE',
+      'Caption',
+      9.2,
+      2.4,
+      HorizontalAlignment.Center
+    );
+    this.addNativeTextRow(
+      content,
+      'RANK     PLAYER                         DISTANCE',
+      'Caption',
+      6.6,
+      2.4,
+      HorizontalAlignment.Left
+    );
+
+    const rowCount = Math.max(1, Math.min(5, Math.floor(this.usersLimit)));
+    for (let i = 0; i < rowCount; i++) {
+      this.rowTexts.push(
+        this.addNativeTextRow(
+          content,
+          `${i + 1}.       —`,
+          'Body',
+          3.6 - i * 3.3,
+          3.2,
+          HorizontalAlignment.Left
+        )
+      );
+    }
+
+    this.currentUserText = this.addNativeTextRow(
+      content,
+      'YOU     Complete a distance goal to join',
+      'Subheadline',
+      -9.9,
+      3.4,
+      HorizontalAlignment.Left
+    );
+    this.statusText = this.addNativeTextRow(
+      content,
+      'Loading leaderboard…',
+      'Caption',
+      -13,
+      2.6,
+      HorizontalAlignment.Center
+    );
+  }
+
+  private addNativeTextRow(
+    parent: SceneObject,
+    value: string,
+    role: TextRole,
+    localY: number,
+    height: number,
+    alignment: HorizontalAlignment
+  ): Text3D {
+    const row = global.scene.createSceneObject('LeaderboardRow');
+    row.setParent(parent);
+    row.layer = parent.layer;
+    row.getTransform().setLocalPosition(new vec3(0, localY, 0.7));
+    row.getTransform().setLocalRotation(quat.quatIdentity());
+    row.getTransform().setLocalScale(vec3.one());
+    const text = row.createComponent('Component.Text3D') as Text3D;
+    text.text = value;
+    text.size = TYPE_SCALE[role];
+    text.extrusionDepth = 0.03;
+    text.lineSpacing = 1;
+    text.horizontalAlignment = alignment;
+    text.verticalAlignment = VerticalAlignment.Center;
+    text.horizontalOverflow = HorizontalOverflow.Shrink;
+    text.verticalOverflow = VerticalOverflow.Overflow;
+    text.worldSpaceRect = Rect.create(
+      -(PANEL_WIDTH_CM - 3.2) * 0.5,
+      (PANEL_WIDTH_CM - 3.2) * 0.5,
+      -height * 0.5,
+      height * 0.5
+    );
+    text.mainMaterial = (requireAsset('Text3D.mat') as Material).clone();
+    text.renderOrder = 2;
+    return text;
+  }
+
   private refreshLeaderboardSoon(delaySec: number): void {
     const wait = this.createEvent('DelayedCallbackEvent');
     wait.bind(() => this.refreshLeaderboard());
@@ -78,7 +208,7 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
     this.refreshCooldown = Math.max(1.5, this.refreshIntervalSec);
     this.resolveLeaderboard((leaderboard) => {
       if (isNull(leaderboard)) {
-        this.writeText('Leaderboard unavailable');
+        this.setStatus('Leaderboard unavailable on this platform');
         return;
       }
       this.fetchAndRender(leaderboard);
@@ -150,15 +280,17 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
     leaderboard.getLeaderboardInfo(
       options,
       (othersInfo, currentUserInfo) => {
+        this.consecutiveFetchFailures = 0;
+        const records = othersInfo || [];
         const lines: string[] = [];
         lines.push('Distance Leaderboard');
         lines.push('---');
 
-        if (othersInfo.length === 0) {
+        if (records.length === 0) {
           lines.push('No scores yet');
         } else {
-          for (let i = 0; i < othersInfo.length; i++) {
-            const row = othersInfo[i];
+          for (let i = 0; i < records.length; i++) {
+            const row = records[i];
             lines.push(`${this.formatRank(row, i + 1)} ${this.formatName(row)} ${this.formatScore(row.score)}`);
           }
         }
@@ -168,12 +300,68 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
           lines.push(`You: ${this.formatRank(currentUserInfo, 0)} ${this.formatScore(currentUserInfo.score)}`);
         }
 
-        this.writeText(lines.join('\n'));
+        this.renderNativeRows(records, currentUserInfo);
+        this.writeLegacyText(lines.join('\n'));
       },
       (status) => {
-        this.writeText(`Leaderboard fetch failed (${status})`);
+        this.consecutiveFetchFailures += 1;
+        this.refreshCooldown = Math.min(
+          300,
+          Math.max(
+            this.refreshIntervalSec,
+            this.refreshIntervalSec * Math.pow(2, this.consecutiveFetchFailures)
+          )
+        );
+        this.clearNativeRows();
+        this.setStatus('Complete a distance goal to join • Snap sharing opt-in required');
+        print(`[GoalLeaderboardBoard] getLeaderboardInfo failed, status: ${status}`);
       }
     );
+  }
+
+  private renderNativeRows(
+    records: Leaderboard.UserRecord[],
+    currentUserInfo: Leaderboard.UserRecord | null
+  ): void {
+    for (let i = 0; i < this.rowTexts.length; i++) {
+      const text = this.rowTexts[i];
+      if (i >= records.length) {
+        text.text = i === 0 ? '—        No scores yet' : '';
+        continue;
+      }
+      const record = records[i];
+      text.text = `${this.formatRank(record, i + 1)}     ${this.formatName(
+        record
+      )}     ${this.formatScore(record.score)}`;
+    }
+
+    if (!isNull(this.currentUserText)) {
+      if (this.showCurrentUserLine && !isNull(currentUserInfo)) {
+        this.currentUserText.text = `YOU     ${this.formatRank(
+          currentUserInfo,
+          0
+        )}     ${this.formatScore(currentUserInfo.score)}`;
+      } else {
+        this.currentUserText.text = 'YOU     Complete a distance goal to join';
+      }
+    }
+    this.setStatus('Global scores • distance shown in km and miles');
+  }
+
+  private clearNativeRows(): void {
+    for (let i = 0; i < this.rowTexts.length; i++) {
+      this.rowTexts[i].text = i === 0 ? '—        Waiting for your first score' : '';
+    }
+    if (!isNull(this.currentUserText)) {
+      this.currentUserText.text = 'YOU     Complete a distance goal to join';
+    }
+  }
+
+  private setStatus(value: string): void {
+    if (!isNull(this.statusText)) {
+      this.statusText.text = value;
+    }
+    this.writeLegacyText(value);
   }
 
   private formatRank(row: Leaderboard.UserRecord, fallback: number): string {
@@ -222,7 +410,7 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
     return value.toFixed(2);
   }
 
-  private writeText(value: string): void {
+  private writeLegacyText(value: string): void {
     this.resolveTextTarget();
     if (isNull(this.textTarget) || this.textTarget.text === undefined) {
       if (this.debugLogging) {
@@ -236,6 +424,10 @@ export class GoalLeaderboardBoard extends BaseScriptComponent {
   private resolveTextTarget(): void {
     if (!isNull(this.targetText)) {
       this.textTarget = this.targetText;
+      return;
+    }
+    if (this.nativeUiBuilt) {
+      this.textTarget = null;
       return;
     }
 

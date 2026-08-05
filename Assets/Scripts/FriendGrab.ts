@@ -107,6 +107,14 @@ export class FriendGrab extends BaseScriptComponent {
   petReactionCooldownSec: number = 2.5;
 
   @input
+  @label('Pet Poke Collider Size')
+  petPokeColliderSize: vec3 = new vec3(3.4, 4.2, 3.4);
+
+  @input
+  @label('Pet Poke Local Position')
+  petPokeLocalPosition: vec3 = new vec3(0, 0, 0.8);
+
+  @input
   petDialogueLines: string[] = [
     'Aww, thank you!',
     'That tickles!',
@@ -436,6 +444,9 @@ export class FriendGrab extends BaseScriptComponent {
 
   private grabInteractable: InteractableLike | null = null;
   private grabManipulation: InteractableManipulationLike | null = null;
+  private petPokeTarget: SceneObject | null = null;
+  private petPokeInteractable: InteractableLike | null = null;
+  private petInteractionWired = false;
   private moveInteractionWired = false;
   private moveBindAttempts = 0;
   private moveActive = false;
@@ -454,7 +465,7 @@ export class FriendGrab extends BaseScriptComponent {
   private nextLookAtRetryAt = 0;
   private onboardingActive = false;
   private onboardingToken = 0;
-  private onboardingPracticeDone = false;
+  private onboardingStepRunId = 0;
   private onboardingGoalListening = false;
   private goalCompletionWired = false;
   private lastGoalCompleteUtterance = '';
@@ -474,6 +485,7 @@ export class FriendGrab extends BaseScriptComponent {
 
   onAwake(): void {
     this.ensureLeaderboardPanel();
+    this.ensurePetPokeTarget();
     this.createEvent('OnStartEvent').bind(() => {
       registerFriendGrab(this);
       this.captureIdleBasePosition();
@@ -481,6 +493,7 @@ export class FriendGrab extends BaseScriptComponent {
       this.ensureSpeechBubble();
       this.resolveTts();
       this.tryWireMoveInteraction();
+      this.wirePetPokeInteraction();
       this.ensureGoalCompletionListening();
       this.startFollowingUser('always-on');
       this.scheduleOnboarding();
@@ -560,14 +573,17 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private playPhraseFallback(track: AudioTrackAsset | null, label: string): void {
-    const resolved =
-      track ||
-      this.resolveSoundTrack(
-        null,
-        label.toLowerCase().indexOf('thank') >= 0
-          ? 'Audio/friend_thanks.wav'
-          : 'Audio/friend_whee.wav'
-      );
+    let resolved = track;
+    if (isNull(resolved)) {
+      try {
+        resolved =
+          label.toLowerCase().indexOf('thank') >= 0
+            ? (requireAsset('Audio/friend_thanks.wav') as AudioTrackAsset)
+            : (requireAsset('Audio/friend_whee.wav') as AudioTrackAsset);
+      } catch (_error) {
+        resolved = null;
+      }
+    }
     if (isNull(resolved)) {
       print(`[FriendGrab] no phrase clip for "${label}"`);
       return;
@@ -646,6 +662,76 @@ export class FriendGrab extends BaseScriptComponent {
     return null;
   }
 
+  private ensurePetPokeTarget(): void {
+    const friend = this.getSceneObject();
+    let target = this.findObjectByName(friend, 'FriendPetPokeTarget');
+    if (isNull(target) || target === friend) {
+      target = global.scene.createSceneObject('FriendPetPokeTarget');
+      target.setParent(friend);
+    }
+    target.layer = friend.layer;
+    target.enabled = this.enablePetReaction;
+    target.getTransform().setLocalPosition(this.petPokeLocalPosition);
+    target.getTransform().setLocalRotation(quat.quatIdentity());
+    target.getTransform().setLocalScale(vec3.one());
+
+    let collider = target.getComponent('Component.ColliderComponent') as ColliderComponent;
+    if (isNull(collider)) {
+      collider = target.createComponent('Component.ColliderComponent') as ColliderComponent;
+    }
+    const colliderLike = collider as unknown as {
+      enabled?: boolean;
+      intangible?: boolean;
+      fitVisual?: boolean;
+      debugDrawEnabled?: boolean;
+      shape?: { size?: vec3 };
+    };
+    colliderLike.enabled = this.enablePetReaction;
+    colliderLike.intangible = true;
+    colliderLike.fitVisual = false;
+    colliderLike.debugDrawEnabled = false;
+    const shape = Shape.createBoxShape();
+    shape.size = this.petPokeColliderSize;
+    colliderLike.shape = shape;
+
+    let interactable = target.getComponent(
+      Interactable.getTypeName()
+    ) as unknown as InteractableLike;
+    if (isNull(interactable)) {
+      interactable = target.createComponent(Interactable.getTypeName()) as InteractableLike;
+    }
+    // Direct-only keeps this as a physical poke target. It deliberately has no
+    // InteractableManipulation, so SIK does not disable poke targeting.
+    interactable.targetingMode = 1;
+    interactable.ignoreInteractionPlane = false;
+    interactable.keepHoverOnTrigger = false;
+    interactable.enableInstantDrag = false;
+    (interactable as ScriptComponent).enabled = this.enablePetReaction;
+
+    this.petPokeTarget = target;
+    this.petPokeInteractable = interactable;
+  }
+
+  private wirePetPokeInteraction(): void {
+    if (this.petInteractionWired || !this.enablePetReaction) {
+      return;
+    }
+    if (isNull(this.petPokeInteractable)) {
+      this.ensurePetPokeTarget();
+    }
+    const interactable = this.petPokeInteractable;
+    if (isNull(interactable) || !interactable.onTriggerStart) {
+      const retry = this.createEvent('DelayedCallbackEvent');
+      retry.bind(() => this.wirePetPokeInteraction());
+      retry.reset(0.1);
+      return;
+    }
+
+    interactable.onTriggerStart.add(() => this.onFriendPet());
+    this.petInteractionWired = true;
+    print('[FriendGrab] pet poke interaction wired');
+  }
+
   private tryWireMoveInteraction(): void {
     if (this.moveInteractionWired) {
       return;
@@ -701,22 +787,6 @@ export class FriendGrab extends BaseScriptComponent {
     if (interactable.onInteractorTriggerEndOutside) {
       interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
     }
-    if (interactable.onTriggerStart) {
-      interactable.onTriggerStart.add(() => this.onFriendPet());
-    }
-    if (interactable.onInteractorTriggerStart) {
-      interactable.onInteractorTriggerStart.add(() => this.onFriendPet());
-    }
-
-    if (this.debugLogging) {
-      if (interactable.onHoverEnter) {
-        interactable.onHoverEnter.add(() => print('[FriendGrab] hover enter'));
-      }
-      if (interactable.onInteractorHoverEnter) {
-        interactable.onInteractorHoverEnter.add(() => print('[FriendGrab] hover enter'));
-      }
-    }
-
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;
 
@@ -742,10 +812,15 @@ export class FriendGrab extends BaseScriptComponent {
         : 'Aww, thank you!';
     this.petDialogueIndex += 1;
 
-    const reactionTrack = this.resolveSoundTrack(
-      this.petSoundTrack,
-      'Audio/friend_whee.wav'
-    );
+    let reactionTrack = !isNull(this.petSoundTrack) ? this.petSoundTrack : null;
+    if (isNull(reactionTrack)) {
+      try {
+        // Keep this literal so Lens Studio includes the audio in the device bundle.
+        reactionTrack = requireAsset('Audio/friend_whee.wav') as AudioTrackAsset;
+      } catch (_e) {
+        reactionTrack = null;
+      }
+    }
     if (!isNull(reactionTrack)) {
       this.playFriendSound(reactionTrack, 0.65, 'pet');
     }
@@ -977,46 +1052,6 @@ export class FriendGrab extends BaseScriptComponent {
     );
     panel.getTransform().setWorldScale(vec3.one());
 
-    const backgroundObject = global.scene.createSceneObject('LeaderboardBackground');
-    backgroundObject.setParent(panel);
-    backgroundObject.layer = panel.layer;
-    backgroundObject.getTransform().setLocalPosition(new vec3(0, 0, -0.12));
-    backgroundObject.getTransform().setLocalRotation(quat.quatIdentity());
-    backgroundObject.getTransform().setLocalScale(new vec3(34, 25, 1.8));
-    const background = backgroundObject.createComponent(
-      'Component.RenderMeshVisual'
-    ) as RenderMeshVisual;
-    background.mesh = requireAsset('Meshes/StarCatchSphere.mesh') as RenderMesh;
-    const backgroundMaterial = (
-      requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material
-    ).clone();
-    const backgroundPass = backgroundMaterial.mainPass;
-    if (typeof backgroundPass.baseColor !== 'undefined') {
-      backgroundPass.baseColor = new vec4(0.035, 0.045, 0.065, 0.94);
-    }
-    background.mainMaterial = backgroundMaterial;
-    background.renderOrder = 8;
-
-    const textObject = global.scene.createSceneObject('LeaderboardText');
-    textObject.setParent(panel);
-    textObject.layer = panel.layer;
-    textObject.getTransform().setLocalPosition(new vec3(0, 0, 0.2));
-    textObject.getTransform().setLocalRotation(quat.quatIdentity());
-    textObject.getTransform().setLocalScale(vec3.one());
-    const text = textObject.createComponent('Component.Text3D') as Text3D;
-    text.enabled = true;
-    text.text = 'Distance Leaderboard\nLoading...';
-    text.size = 20;
-    text.extrusionDepth = 0.08;
-    text.lineSpacing = 1.08;
-    text.horizontalAlignment = HorizontalAlignment.Center;
-    text.verticalAlignment = VerticalAlignment.Center;
-    text.horizontalOverflow = HorizontalOverflow.Wrap;
-    text.verticalOverflow = VerticalOverflow.Overflow;
-    text.worldSpaceRect = Rect.create(-14.5, 14.5, -10.5, 10.5);
-    text.mainMaterial = (requireAsset('Text3D.mat') as Material).clone();
-    text.renderOrder = 9;
-
     const grab = panel.createComponent(
       LeaderboardGrab.getTypeName()
     ) as LeaderboardGrab;
@@ -1026,7 +1061,6 @@ export class FriendGrab extends BaseScriptComponent {
     const board = panel.createComponent(
       GoalLeaderboardBoard.getTypeName()
     ) as GoalLeaderboardBoard;
-    board.targetText = text;
     board.leaderboardName = this.goalLeaderboardName;
     board.leaderboardTtlSec = this.goalLeaderboardTtlSec;
     board.usersLimit = this.leaderboardUsersLimit;
@@ -1038,7 +1072,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.generatedLeaderboard = panel;
     this.onboardingLeaderboard = panel;
     this.placeObjectInFrontOfFriend(panel, 'leaderboard');
-    print('[FriendGrab] created placeable leaderboard panel');
+    print('[FriendGrab] created placeable UIKit leaderboard panel');
     return panel;
   }
 
@@ -1095,13 +1129,13 @@ export class FriendGrab extends BaseScriptComponent {
         key: 'postit',
         object: resolve(this.onboardingPostIt, 'PostItNotes'),
         line: this.onboardingPostItLine,
-        requirePractice: false,
+        requirePractice: true,
       },
       {
         key: 'trash',
         object: resolve(this.onboardingTrash, 'TrashBin'),
         line: this.onboardingTrashLine,
-        requirePractice: false,
+        requirePractice: true,
       },
       {
         key: 'leaderboard',
@@ -1231,12 +1265,10 @@ export class FriendGrab extends BaseScriptComponent {
       distance,
       height
     );
-    const present = this.findOpenOnboardingPresentationPosition(
-      basePresent,
-      obj,
-      dirX,
-      dirZ
-    );
+    // Every step reuses Buddy's presentation slot. The previous object must
+    // be moved clear before its step can complete, so overlap avoidance must
+    // never push a new object away from Buddy or outside the user's view.
+    const present = basePresent;
     obj.getTransform().setWorldPosition(present);
 
     if (this.debugLogging) {
@@ -1244,108 +1276,6 @@ export class FriendGrab extends BaseScriptComponent {
         `[FriendGrab] present ${key} at ${present.x.toFixed(1)}, ${present.y.toFixed(1)}, ${present.z.toFixed(1)}`
       );
     }
-  }
-
-  private findOpenOnboardingPresentationPosition(
-    requested: vec3,
-    currentObject: SceneObject,
-    forwardX: number,
-    forwardZ: number
-  ): vec3 {
-    const minimumSeparation = Math.max(8, this.onboardingObjectSpacingCm);
-    const occupied = this.collectOnboardingOccupiedPositions(currentObject);
-
-    const isOpen = (candidate: vec3): boolean => {
-      for (let i = 0; i < occupied.length; i++) {
-        const other = occupied[i];
-        if (Math.abs(candidate.y - other.y) > minimumSeparation * 1.25) {
-          continue;
-        }
-        const dx = candidate.x - other.x;
-        const dz = candidate.z - other.z;
-        if (Math.sqrt(dx * dx + dz * dz) < minimumSeparation) {
-          return false;
-        }
-      }
-      return true;
-    };
-
-    if (isOpen(requested)) {
-      return requested;
-    }
-
-    const safeForward = this.resolveSafeForwardXZ(forwardX, forwardZ);
-    const rightX = -safeForward.z;
-    const rightZ = safeForward.x;
-    const sideLanes = [0, -0.75, 0.75, -1.5, 1.5];
-    for (let ring = 1; ring <= 5; ring++) {
-      const forwardStep = minimumSeparation * ring;
-      for (let i = 0; i < sideLanes.length; i++) {
-        const side = sideLanes[i];
-        const sideStep = minimumSeparation * side;
-        const candidate = new vec3(
-          requested.x + safeForward.x * forwardStep + rightX * sideStep,
-          requested.y,
-          requested.z + safeForward.z * forwardStep + rightZ * sideStep
-        );
-        if (!isOpen(candidate)) {
-          continue;
-        }
-        print(
-          `[FriendGrab] shifted onboarding spawn to front lane (${candidate.toString()})`
-        );
-        return candidate;
-      }
-    }
-    return requested;
-  }
-
-  private collectOnboardingOccupiedPositions(currentObject: SceneObject): vec3[] {
-    const occupied: vec3[] = [];
-    const steps = this.getOnboardingTourSteps();
-    for (let i = 0; i < steps.length; i++) {
-      const other = steps[i].object;
-      if (isNull(other) || other === currentObject || !other.enabled) {
-        continue;
-      }
-      occupied.push(other.getTransform().getWorldPosition());
-    }
-
-    const planter = !isNull(this.onboardingPlanter)
-      ? this.onboardingPlanter
-      : this.findObjectByNameInScene('Planter');
-    if (!isNull(planter) && planter !== currentObject && planter.enabled) {
-      occupied.push(planter.getTransform().getWorldPosition());
-    }
-
-    const anchor = this.findAnchorController() as
-      | {
-          getTrackedContentRoots?: () => SceneObject[];
-        }
-      | null;
-    if (!isNull(anchor) && typeof anchor.getTrackedContentRoots === 'function') {
-      const tracked = anchor.getTrackedContentRoots();
-      for (let i = 0; i < tracked.length; i++) {
-        const root = tracked[i];
-        if (isNull(root) || root === currentObject || !root.enabled) {
-          continue;
-        }
-        occupied.push(root.getTransform().getWorldPosition());
-      }
-    }
-    return occupied;
-  }
-
-  private resolveSafeForwardXZ(forwardX: number, forwardZ: number): { x: number; z: number } {
-    let x = forwardX;
-    let z = forwardZ;
-    let len = Math.sqrt(x * x + z * z);
-    if (len < 0.001) {
-      x = 0;
-      z = -1;
-      len = 1;
-    }
-    return { x: x / len, z: z / len };
   }
 
   /** Rewire + force-show garden MoveHandle after onboarding re-enables a source. */
@@ -1523,6 +1453,8 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
 
+    this.onboardingStepRunId += 1;
+    const stepRunId = this.onboardingStepRunId;
     const steps = this.getOnboardingTourSteps();
     if (index < 0 || index >= steps.length) {
       this.runOnboardingGoalStep(token);
@@ -1542,29 +1474,44 @@ export class FriendGrab extends BaseScriptComponent {
     this.ensureOnboardingSourceHandle(step.object, step.key);
     print(`[FriendGrab] onboarding reveal ${step.key}`);
 
-    const needsPractice =
-      this.onboardingRequirePractice && step.requirePractice && !isNull(step.object);
+    // Every tour prop must be physically moved and released before the next
+    // one is revealed. This is intentionally not bypassed by the legacy toggle.
+    const needsPractice = step.requirePractice && !isNull(step.object);
 
     // Arm grab practice immediately so grabs during the spoken line still count.
     let speechDone = false;
     let practiceDone = !needsPractice;
+    let advanceScheduled = false;
     const tryAdvance = (): void => {
-      if (token !== this.onboardingToken || !speechDone || !practiceDone) {
+      if (
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId ||
+        advanceScheduled ||
+        !speechDone ||
+        !practiceDone
+      ) {
         return;
       }
+      advanceScheduled = true;
       this.delayOnboarding(token, () => this.runOnboardingStep(index + 1, token));
     };
 
     if (needsPractice) {
-      this.waitForOnboardingPractice(step.object as SceneObject, token, step.key, () => {
-        practiceDone = true;
-        tryAdvance();
-      });
+      this.waitForOnboardingPractice(
+        step.object as SceneObject,
+        token,
+        stepRunId,
+        step.key,
+        () => {
+          practiceDone = true;
+          tryAdvance();
+        }
+      );
     }
 
     const line = String(step.line || '').trim();
     const afterSpeech = (): void => {
-      if (token !== this.onboardingToken) {
+      if (token !== this.onboardingToken || stepRunId !== this.onboardingStepRunId) {
         return;
       }
       speechDone = true;
@@ -1618,10 +1565,16 @@ export class FriendGrab extends BaseScriptComponent {
           };
 
           if (!practiceDone && !isNull(pot)) {
-            this.waitForOnboardingPractice(pot as SceneObject, token, 'goal-pot', () => {
-              practiceDone = true;
-              tryFinish();
-            });
+            this.waitForOnboardingPractice(
+              pot as SceneObject,
+              token,
+              this.onboardingStepRunId,
+              'goal-pot',
+              () => {
+                practiceDone = true;
+                tryFinish();
+              }
+            );
           }
 
           const seedLine = this.resolveOnboardingGoalPotLine();
@@ -2421,7 +2374,9 @@ export class FriendGrab extends BaseScriptComponent {
         );
       },
       (status) => {
-        print(`[FriendGrab] leaderboard fetch failed status=${status}`);
+        print(
+          `[FriendGrab] leaderboard snapshot unavailable status=${status} (Snap privacy opt-in or network may be pending)`
+        );
       }
     );
   }
@@ -2515,48 +2470,60 @@ export class FriendGrab extends BaseScriptComponent {
   private waitForOnboardingPractice(
     target: SceneObject,
     token: number,
+    stepRunId: number,
     key: string,
     onDone: () => void
   ): void {
-    this.onboardingPracticeDone = false;
+    let settled = false;
     let grabbed = false;
     let listenersWired = false;
-    const presentPos = target.getTransform().getWorldPosition();
-
     const finish = (reason: string): void => {
-      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
-      this.onboardingPracticeDone = true;
-      print(`[FriendGrab] onboarding practice ${reason}`);
+      settled = true;
+      print(`[FriendGrab] onboarding practice ${key} ${reason}`);
       onDone();
     };
 
-    const hasMovedFromPresent = (): boolean => {
-      const pos = target.getTransform().getWorldPosition();
-      return pos.distance(presentPos) > 2.5;
-    };
-
     const onGrabStart = (): void => {
-      if (token !== this.onboardingToken || this.onboardingPracticeDone) {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
       grabbed = true;
     };
 
     const onGrabEnd = (): void => {
-      if (token !== this.onboardingToken || this.onboardingPracticeDone) {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
-      // Count release even if we armed mid-grab (missed the start event).
-      if (grabbed || hasMovedFromPresent()) {
+      // The step completes only after this object emits a matching grab start
+      // and release. There is deliberately no movement-distance threshold.
+      if (grabbed) {
         this.recoverOnboardingObjectIfOutOfView(target, key);
-        finish('grab-release');
+        finish('grabbed-and-released');
       }
     };
 
     const tryWireListeners = (): boolean => {
-      if (listenersWired || this.onboardingPracticeDone || token !== this.onboardingToken) {
+      if (
+        listenersWired ||
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return listenersWired;
       }
 
@@ -2625,7 +2592,11 @@ export class FriendGrab extends BaseScriptComponent {
 
     const reminder = this.createEvent('DelayedCallbackEvent');
     reminder.bind(() => {
-      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
       if (maxReminders > 0 && reminderCount >= maxReminders) {
@@ -2633,9 +2604,9 @@ export class FriendGrab extends BaseScriptComponent {
       }
       reminderCount += 1;
       print(
-        `[FriendGrab] onboarding practice waiting for grab-release (reminder ${reminderCount})`
+        `[FriendGrab] onboarding practice waiting for ${key} placement (reminder ${reminderCount})`
       );
-      this.showSpeech('Try grabbing it, then release.', true, null);
+      this.showSpeech('Move it where you want, then release.', true, null);
       if (maxReminders === 0 || reminderCount < maxReminders) {
         reminder.reset(repeatSec);
       }

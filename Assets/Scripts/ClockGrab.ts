@@ -36,7 +36,7 @@ export class ClockGrab extends BaseScriptComponent {
 
   /** Local-space box size. Clock root is scaled ~0.06 with mesh children at ~100. */
   @input
-  colliderSize: vec3 = new vec3(210, 210, 95);
+  colliderSize: vec3 = new vec3(420, 420, 220);
 
   @input
   @allowUndefined
@@ -69,7 +69,7 @@ export class ClockGrab extends BaseScriptComponent {
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
 
   private static readonly ANCHOR_SOURCE_NAME = 'Clock';
-  private static readonly MIN_COLLIDER_SIZE = new vec3(190, 190, 85);
+  private static readonly MIN_COLLIDER_SIZE = new vec3(400, 400, 200);
 
   private getAnchorHandler(): {
     persistGardenSourceTransform?: (sourceName: string) => void;

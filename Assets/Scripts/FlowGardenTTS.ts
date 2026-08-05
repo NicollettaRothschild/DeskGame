@@ -44,10 +44,21 @@ export class FlowGardenTTS extends BaseScriptComponent {
   @input
   debugLogging: boolean = true;
 
+  @input('float')
+  cloudTtsTimeoutSec: number = 8;
+
+  @input('float')
+  nativeVoiceTimeoutSec: number = 7;
+
+  @input('float')
+  speakingLockTimeoutSec: number = 24;
+
   private static readonly VOICE_COMMAND_SUPPRESS_SEC = 5;
 
   private audioPlayer: AudioComponent | null = null;
   private speaking = false;
+  private speakingStartedAt = -9999;
+  private speechRequestId = 0;
   private suppressVoiceCommandsUntil = 0;
 
   onAwake(): void {
@@ -73,6 +84,19 @@ export class FlowGardenTTS extends BaseScriptComponent {
     }
   }
 
+  private ensureAudioPlayer(): AudioComponent | null {
+    if (isNull(this.audioPlayer)) {
+      this.audioPlayer = this.getSceneObject().createComponent(
+        'Component.AudioComponent'
+      ) as AudioComponent;
+      this.configureAudioPlayer();
+    }
+    if (!isNull(this.audioPlayer)) {
+      this.audioPlayer.enabled = true;
+    }
+    return this.audioPlayer;
+  }
+
   public speak(text: string, onDone?: (ok: boolean) => void): void {
     const spokenText = this.cleanSpeechText(text);
     if (!spokenText) {
@@ -80,6 +104,15 @@ export class FlowGardenTTS extends BaseScriptComponent {
         onDone(false);
       }
       return;
+    }
+
+    if (
+      this.speaking &&
+      getTime() - this.speakingStartedAt > Math.max(8, this.speakingLockTimeoutSec)
+    ) {
+      print('[FlowGardenTTS] recovering stale speaking lock');
+      this.speaking = false;
+      this.speechRequestId += 1;
     }
 
     if (this.speaking) {
@@ -91,13 +124,23 @@ export class FlowGardenTTS extends BaseScriptComponent {
     }
 
     this.speaking = true;
+    this.speakingStartedAt = getTime();
+    const requestId = ++this.speechRequestId;
     this.beginVoiceCommandSuppression(spokenText);
     print('[FlowGardenTTS] Speaking: ' + spokenText.slice(0, 120));
 
+    let finished = false;
     const finish = (ok: boolean): void => {
+      if (finished || requestId !== this.speechRequestId) {
+        return;
+      }
+      finished = true;
       // Native/cloud play() returns immediately — wait out spoken duration before unblocking mic.
       const delay = this.createEvent('DelayedCallbackEvent');
       delay.bind(() => {
+        if (requestId !== this.speechRequestId) {
+          return;
+        }
         this.speaking = false;
         this.beginVoiceCommandSuppression(spokenText);
         const speech = getSharedSpeechRecognition();
@@ -108,7 +151,8 @@ export class FlowGardenTTS extends BaseScriptComponent {
           onDone(ok);
         }
       });
-      delay.reset(estimateSpeechDurationSec(spokenText));
+      // Failed synthesis produced no audio, so unlock immediately for fallback/retry.
+      delay.reset(ok ? estimateSpeechDurationSec(spokenText) : 0.1);
     };
 
     if (
@@ -162,25 +206,48 @@ export class FlowGardenTTS extends BaseScriptComponent {
       return;
     }
 
+    let settled = false;
+    const settle = (ok: boolean): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      onDone(ok);
+    };
+    const timeout = this.createEvent('DelayedCallbackEvent');
+    timeout.bind(() => {
+      if (this.debugLogging && !settled) {
+        print('[FlowGardenTTS] Arvis TTS timed out — falling back to native');
+      }
+      settle(false);
+    });
+    timeout.reset(Math.max(3, this.cloudTtsTimeoutSec));
+
     this.specsApi.speakAgent(
       this.deviceRegistry.getDeviceId(),
       this.deviceRegistry.getDeviceSecret(),
       text,
       this.agentName,
       (result, error) => {
+        if (settled) {
+          return;
+        }
         if (!result || !result.audioBase64) {
           if (this.debugLogging) {
             print('[FlowGardenTTS] Arvis TTS failed: ' + (error || 'no audio'));
           }
-          onDone(false);
+          settle(false);
           return;
         }
 
+        // The network request succeeded; allow a short second window for the
+        // RemoteMediaModule to decode and create the AudioTrackAsset.
+        timeout.reset(5);
         this.playBase64Audio(result.audioBase64, (played) => {
           if (this.debugLogging) {
             print('[FlowGardenTTS] Arvis voice played=' + played + ' voice=' + (result.voiceId || ''));
           }
-          onDone(played);
+          settle(played);
         });
       }
     );
@@ -212,6 +279,7 @@ export class FlowGardenTTS extends BaseScriptComponent {
       return !!name && all.indexOf(name) === index;
     });
 
+    let activeAttemptId = 0;
     const tryVoice = (voiceIndex: number): void => {
       if (voiceIndex >= voices.length) {
         if (onDone) {
@@ -220,6 +288,24 @@ export class FlowGardenTTS extends BaseScriptComponent {
         return;
       }
 
+      const attemptId = ++activeAttemptId;
+      let attemptSettled = false;
+      const failAttempt = (reason: string): void => {
+        if (attemptSettled || attemptId !== activeAttemptId) {
+          return;
+        }
+        attemptSettled = true;
+        if (this.debugLogging) {
+          print(
+            `[FlowGardenTTS] Native voice unavailable (${voices[voiceIndex]}): ${reason}`
+          );
+        }
+        tryVoice(voiceIndex + 1);
+      };
+      const timeout = this.createEvent('DelayedCallbackEvent');
+      timeout.bind(() => failAttempt('timeout'));
+      timeout.reset(Math.max(3, this.nativeVoiceTimeoutSec));
+
       try {
         const options = TextToSpeech.Options.create();
         options.voiceName = voices[voiceIndex];
@@ -227,14 +313,17 @@ export class FlowGardenTTS extends BaseScriptComponent {
           nativeText,
           options,
           (audioTrack) => {
-            if (isNull(this.audioPlayer)) {
-              if (onDone) {
-                onDone(false);
-              }
+            if (attemptSettled || attemptId !== activeAttemptId) {
               return;
             }
-            this.audioPlayer.audioTrack = audioTrack;
-            this.audioPlayer.play(1);
+            attemptSettled = true;
+            const player = this.ensureAudioPlayer();
+            if (isNull(player)) {
+              tryVoice(voiceIndex + 1);
+              return;
+            }
+            player.audioTrack = audioTrack;
+            player.play(1);
             if (this.debugLogging) {
               print('[FlowGardenTTS] Native voice played voice=' + voices[voiceIndex]);
             }
@@ -243,15 +332,11 @@ export class FlowGardenTTS extends BaseScriptComponent {
             }
           },
           (error, description) => {
-            print(
-              `[FlowGardenTTS] Native TTS error ${error}: ${description} (voice=${voices[voiceIndex]})`
-            );
-            tryVoice(voiceIndex + 1);
+            failAttempt(`${error}: ${description}`);
           }
         );
       } catch (e) {
-        print('[FlowGardenTTS] Native TTS threw: ' + e);
-        tryVoice(voiceIndex + 1);
+        failAttempt('threw: ' + e);
       }
     };
 
@@ -261,7 +346,8 @@ export class FlowGardenTTS extends BaseScriptComponent {
   private playBase64Audio(base64: string, onDone: (ok: boolean) => void): void {
     const internetModule = this.resolveInternetModule();
     const remoteMediaModule = this.resolveRemoteMediaModule();
-    if (isNull(internetModule) || isNull(remoteMediaModule) || isNull(this.audioPlayer)) {
+    const audioPlayer = this.ensureAudioPlayer();
+    if (isNull(internetModule) || isNull(remoteMediaModule) || isNull(audioPlayer)) {
       onDone(false);
       return;
     }
@@ -285,12 +371,13 @@ export class FlowGardenTTS extends BaseScriptComponent {
       remoteMediaModule.loadResourceAsAudioTrackAsset(
         blob,
         (audioTrack) => {
-          if (isNull(this.audioPlayer)) {
+          const player = this.ensureAudioPlayer();
+          if (isNull(player)) {
             onDone(false);
             return;
           }
-          this.audioPlayer.audioTrack = audioTrack;
-          this.audioPlayer.play(1);
+          player.audioTrack = audioTrack;
+          player.play(1);
           onDone(true);
         },
         (errorMessage) => {
