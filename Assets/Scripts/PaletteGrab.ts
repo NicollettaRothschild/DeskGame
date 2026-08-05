@@ -131,6 +131,7 @@ export class PaletteGrab extends BaseScriptComponent {
   private paintUpdateEvent: UpdateEvent | null = null;
   private cancelButton: SceneObject | null = null;
   private cancelButtonFollowEvent: UpdateEvent | null = null;
+  private moveHandleFollowEvent: UpdateEvent | null = null;
   private strokeRoot: SceneObject | null = null;
   private paletteMoveEnabled = true;
   private paintStrokeActive = false;
@@ -862,13 +863,12 @@ export class PaletteGrab extends BaseScriptComponent {
     let handle = this.findNamedChild(root, PaletteGrab.MOVE_HANDLE_NAME);
     if (isNull(handle)) {
       handle = global.scene.createSceneObject(PaletteGrab.MOVE_HANDLE_NAME);
-      handle.setParent(root);
-      handle.layer = root.layer;
     }
-    handle.getTransform().setLocalPosition(this.moveHandleLocalPosition);
-    handle.getTransform().setLocalRotation(quat.quatIdentity());
-    const handleScale = Math.max(0.6, this.moveHandleRadiusCm);
-    handle.getTransform().setLocalScale(new vec3(handleScale, handleScale, handleScale));
+    const parent = root.hasParent() ? root.getParent() : root;
+    if (handle.getParent() !== parent) {
+      handle.setParent(parent);
+    }
+    this.applyMoveHandlePose(handle, root);
     this.moveHandleObject = handle;
 
     const existingVisual = handle.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
@@ -925,6 +925,39 @@ export class PaletteGrab extends BaseScriptComponent {
 
     this.moveHandleInteractable = interactable;
     this.moveHandleManipulation = manipulation;
+    this.ensureMoveHandleFollowLoop();
+  }
+
+  private ensureMoveHandleFollowLoop(): void {
+    if (isNull(this.moveHandleFollowEvent)) {
+      this.moveHandleFollowEvent = this.createEvent('UpdateEvent');
+      this.moveHandleFollowEvent.bind(() => {
+        const handle = this.moveHandleObject;
+        if (isNull(handle)) {
+          return;
+        }
+        this.applyMoveHandlePose(handle as SceneObject, this.getSceneObject());
+      });
+    }
+    this.moveHandleFollowEvent.enabled = true;
+  }
+
+  private applyMoveHandlePose(handle: SceneObject, root: SceneObject): void {
+    const rootTransform = root.getTransform();
+    const rootPos = rootTransform.getWorldPosition();
+    const right = rootTransform.right;
+    const up = rootTransform.up;
+    const fwd = rootTransform.forward;
+    const local = this.moveHandleLocalPosition;
+    const worldPos = rootPos
+      .add(right.uniformScale(local.x))
+      .add(up.uniformScale(local.y))
+      .add(fwd.uniformScale(local.z));
+    handle.getTransform().setWorldPosition(worldPos);
+    handle.getTransform().setWorldRotation(quat.quatIdentity());
+    const handleScale = Math.max(2.2, this.moveHandleRadiusCm);
+    handle.getTransform().setWorldScale(new vec3(handleScale, handleScale, handleScale));
+    handle.layer = root.layer;
   }
 
   private onPaintDragStart(event?: InteractorEventLike): void {

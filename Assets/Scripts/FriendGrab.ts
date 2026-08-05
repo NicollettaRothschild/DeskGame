@@ -128,8 +128,18 @@ export class FriendGrab extends BaseScriptComponent {
 
   @input('float')
   @label('Practice Timeout (sec)')
-  @hint('Auto-advance if the player does not grab/release in time')
+  @hint('Minimum seconds before repeating onboarding practice reminders')
   onboardingPracticeTimeoutSec: number = 14;
+
+  @input('float')
+  @label('Practice First Reminder (sec)')
+  @hint('Delay before the first "grab then release" reminder during a practice step')
+  onboardingPracticeFirstReminderSec: number = 7.5;
+
+  @input('int')
+  @label('Practice Reminder Max Count')
+  @hint('Maximum reminder lines spoken per practice step (0 = unlimited)')
+  onboardingPracticeReminderMaxCount: number = 2;
 
   @input
   @label('Require Grab Practice')
@@ -1940,27 +1950,32 @@ export class FriendGrab extends BaseScriptComponent {
       }
     }
 
-    const timeoutSec = Math.max(3, this.onboardingPracticeTimeoutSec);
-    const timeout = this.createEvent('DelayedCallbackEvent');
-    timeout.bind(() => {
-      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
-        return;
-      }
-      print('[FriendGrab] onboarding practice waiting for grab-release');
-      this.showSpeech('Try grabbing it, then release.', true, null);
-      timeout.reset(timeoutSec);
-    });
-    timeout.reset(timeoutSec);
+    const repeatSec = Math.max(6, this.onboardingPracticeTimeoutSec);
+    const firstReminderSec = Math.max(
+      4,
+      Math.min(repeatSec, this.onboardingPracticeFirstReminderSec)
+    );
+    const maxReminders = Math.max(0, Math.floor(this.onboardingPracticeReminderMaxCount));
+    let reminderCount = 0;
 
-    // Nudge only if they still haven't practiced (don't nag after a mid-speech grab).
-    const tip = this.createEvent('DelayedCallbackEvent');
-    tip.bind(() => {
+    const reminder = this.createEvent('DelayedCallbackEvent');
+    reminder.bind(() => {
       if (this.onboardingPracticeDone || token !== this.onboardingToken) {
         return;
       }
+      if (maxReminders > 0 && reminderCount >= maxReminders) {
+        return;
+      }
+      reminderCount += 1;
+      print(
+        `[FriendGrab] onboarding practice waiting for grab-release (reminder ${reminderCount})`
+      );
       this.showSpeech('Try grabbing it, then release.', true, null);
+      if (maxReminders === 0 || reminderCount < maxReminders) {
+        reminder.reset(repeatSec);
+      }
     });
-    tip.reset(Math.min(8, Math.max(5.5, timeoutSec * 0.45)));
+    reminder.reset(firstReminderSec);
   }
 
   private findInteractableInTree(root: SceneObject): InteractableLike | null {
