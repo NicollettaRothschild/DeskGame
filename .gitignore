@@ -34,3 +34,7 @@ Workspaces/**
 
 # Local Memtrace database/cache (not part of project source)
 .memdb/**
+
+# Local MCP credentials (never commit)
+.mcp.json
+.cursor/mcp.json

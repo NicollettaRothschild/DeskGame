@@ -39,6 +39,7 @@
     growthCompleteTrack: false
     growthStartTrack: false
     hoverTrack: false
+    leaderboardRoot: false
     menuRoot: false
     moveHandleGlowMaterial: false
     moveHandleMaterial: false
@@ -112,6 +113,7 @@
       paletteRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       globeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       clockRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      leaderboardRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
@@ -159,6 +161,7 @@
     - // @input SceneObject paletteRoot
     - // @input SceneObject globeRoot
     - // @input SceneObject clockRoot
+    - // @input SceneObject leaderboardRoot
     - // @input Component.ScriptComponent spacePanel
     - // @input AssignableType_3 specsApi
     - // @input Asset.Material sackMaterial

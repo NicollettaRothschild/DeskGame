@@ -93,6 +93,6 @@
     - // @input float colorBlobProxyRadiusCm = 2.6
     - // @input float cancelButtonRadiusCm = 3.2
     - '// @input bool useStablePaintDotMesh = true {"hint":"Use a stable mesh for paint dots instead of color-blob meshes"}'
-    - // @input bool enablePaletteMoveHandle = true
+    - '// @input bool enablePaletteMoveHandle {"hint":"Legacy fallback handle. AnchorController now supplies the standard garden MoveHandle."}'
     - "// @input vec3 moveHandleLocalPosition = {0,9,0}"
     - // @input float moveHandleRadiusCm = 4.2

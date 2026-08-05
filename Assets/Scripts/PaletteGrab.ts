@@ -14,6 +14,14 @@ type InteractorEventLike = {
   interactor?: InteractorLike | null;
 };
 
+type ColorBlobTarget = {
+  center: vec3;
+  extent: vec3;
+  rotation: quat;
+  material: Material;
+  mesh: RenderMesh;
+};
+
 type InteractableLike = ScriptComponent & {
   targetingMode?: number;
   ignoreInteractionPlane?: boolean;
@@ -102,7 +110,8 @@ export class PaletteGrab extends BaseScriptComponent {
   useStablePaintDotMesh: boolean = true;
 
   @input
-  enablePaletteMoveHandle: boolean = true;
+  @hint('Legacy fallback handle. AnchorController now supplies the standard garden MoveHandle.')
+  enablePaletteMoveHandle: boolean = false;
 
   @input
   moveHandleLocalPosition: vec3 = new vec3(0, 9, 0);
@@ -130,6 +139,8 @@ export class PaletteGrab extends BaseScriptComponent {
   private lastPaintPoint: vec3 | null = null;
   private paintUpdateEvent: UpdateEvent | null = null;
   private cancelButton: SceneObject | null = null;
+  private cancelButtonBackgroundMaterial: Material | null = null;
+  private cancelButtonTextMaterial: Material | null = null;
   private cancelButtonFollowEvent: UpdateEvent | null = null;
   private moveHandleFollowEvent: UpdateEvent | null = null;
   private strokeRoot: SceneObject | null = null;
@@ -137,6 +148,9 @@ export class PaletteGrab extends BaseScriptComponent {
   private paintStrokeActive = false;
   private paintArmReadyAt = 0;
   private paintNeedsReleaseAfterPick = false;
+  private colorBlobTargets: ColorBlobTarget[] = [];
+  private lastColorPickIndex = -1;
+  private lastColorPickAt = -9999;
 
   private static readonly ANCHOR_SOURCE_NAME = 'palette';
   private static readonly COLORS_NODE_NAME = 'Colors';
@@ -202,6 +216,7 @@ export class PaletteGrab extends BaseScriptComponent {
     }
 
     const visuals = colorsNode.getComponents('Component.RenderMeshVisual') as RenderMeshVisual[];
+    this.colorBlobTargets = [];
     for (let i = 0; i < visuals.length; i++) {
       const visual = visuals[i];
       if (isNull(visual) || isNull(visual.mesh) || visual.mainMaterial === null) {
@@ -220,14 +235,38 @@ export class PaletteGrab extends BaseScriptComponent {
         Math.abs(worldMax.y - worldMin.y),
         Math.abs(worldMax.z - worldMin.z)
       );
-      const radius = Math.max(
-        this.colorBlobProxyRadiusCm,
-        Math.max(extent.x, Math.max(extent.y, extent.z)) * 0.45
-      );
+      this.colorBlobTargets.push({
+        center,
+        extent,
+        rotation: colorsNode.getTransform().getWorldRotation(),
+        material: visual.mainMaterial as Material,
+        mesh: visual.mesh as RenderMesh,
+      });
+    }
 
+    for (let i = 0; i < this.colorBlobTargets.length; i++) {
+      const target = this.colorBlobTargets[i];
+      let nearestOtherDistance = Number.MAX_VALUE;
+      for (let j = 0; j < this.colorBlobTargets.length; j++) {
+        if (i === j) {
+          continue;
+        }
+        nearestOtherDistance = Math.min(
+          nearestOtherDistance,
+          target.center.distance(this.colorBlobTargets[j].center)
+        );
+      }
+      const visualRadius =
+        Math.max(target.extent.x, Math.max(target.extent.y, target.extent.z)) * 0.42;
+      const separationRadius =
+        nearestOtherDistance < Number.MAX_VALUE ? nearestOtherDistance * 0.38 : visualRadius;
+      const radius = Math.max(
+        0.65,
+        Math.min(this.colorBlobProxyRadiusCm, visualRadius, separationRadius)
+      );
       const proxy = global.scene.createSceneObject(`PaletteColorBlob_${i}`);
       proxy.setParent(this.getSceneObject());
-      proxy.getTransform().setWorldPosition(center);
+      proxy.getTransform().setWorldPosition(target.center);
       proxy.getTransform().setWorldRotation(quat.quatIdentity());
       proxy.getTransform().setWorldScale(vec3.one());
       proxy.layer = this.getSceneObject().layer;
@@ -245,7 +284,16 @@ export class PaletteGrab extends BaseScriptComponent {
       interactable.enableInstantDrag = true;
 
       const onPick = (event: InteractorEventLike): void => {
-        this.enterPaintMode(visual.mainMaterial, visual.mesh, event?.interactor || null);
+        if (!this.isClosestColorBlob(i, event)) {
+          return;
+        }
+        const now = getTime();
+        if (this.lastColorPickIndex === i && now - this.lastColorPickAt < 0.15) {
+          return;
+        }
+        this.lastColorPickIndex = i;
+        this.lastColorPickAt = now;
+        this.enterPaintMode(target.material, target.mesh, event?.interactor || null);
       };
       if (interactable.onTriggerStart) {
         interactable.onTriggerStart.add(onPick);
@@ -259,6 +307,28 @@ export class PaletteGrab extends BaseScriptComponent {
     }
   }
 
+  private isClosestColorBlob(index: number, event: InteractorEventLike): boolean {
+    const interactor = event?.interactor || null;
+    if (isNull(interactor)) {
+      return true;
+    }
+    const point = interactor.targetHitPosition || interactor.startPoint || null;
+    if (isNull(point)) {
+      return true;
+    }
+
+    let closestIndex = -1;
+    let closestDistance = Number.MAX_VALUE;
+    for (let i = 0; i < this.colorBlobTargets.length; i++) {
+      const distance = this.colorBlobTargets[i].center.distance(point as vec3);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = i;
+      }
+    }
+    return closestIndex === index;
+  }
+
   private ensureCancelPaintButton(): void {
     if (!isNull(this.cancelButton)) {
       this.ensureCancelButtonFollowLoop();
@@ -269,10 +339,14 @@ export class PaletteGrab extends BaseScriptComponent {
     const button = global.scene.createSceneObject(PaletteGrab.CANCEL_BUTTON_NAME);
     const parent = root.hasParent() ? root.getParent() : root;
     button.setParent(parent);
-    button.getTransform().setWorldPosition(root.getTransform().getWorldPosition());
-    button.getTransform().setWorldRotation(quat.quatIdentity());
+    const buttonPosition = root
+      .getTransform()
+      .getWorldPosition()
+      .add(root.getTransform().up.uniformScale(1.2));
+    button.getTransform().setWorldPosition(buttonPosition);
+    button.getTransform().setWorldRotation(root.getTransform().getWorldRotation());
     const visualRadius = Math.max(2.2, this.cancelButtonRadiusCm * 1.15);
-    button.getTransform().setWorldScale(new vec3(visualRadius, visualRadius, visualRadius));
+    button.getTransform().setWorldScale(vec3.one());
     button.layer = root.layer;
 
     const collider = button.createComponent('Component.ColliderComponent') as ColliderComponent;
@@ -281,13 +355,7 @@ export class PaletteGrab extends BaseScriptComponent {
     (collider as unknown as { shape?: unknown; intangible?: boolean }).shape = shape;
     (collider as unknown as { intangible?: boolean }).intangible = false;
 
-    const buttonVisual = button.createComponent('Component.RenderMeshVisual') as RenderMeshVisual;
-    const visualTemplate = this.findFirstRenderable(root);
-    if (!isNull(visualTemplate) && !isNull(visualTemplate.mesh) && !isNull(visualTemplate.mainMaterial)) {
-      buttonVisual.mesh = visualTemplate.mesh as RenderMesh;
-      buttonVisual.mainMaterial = visualTemplate.mainMaterial as Material;
-    }
-    buttonVisual.renderOrder = 12;
+    this.createCancelButtonVisual(button, buttonPosition, visualRadius);
 
     const interactable = button.createComponent(Interactable.getTypeName()) as InteractableLike;
     interactable.targetingMode = 7;
@@ -311,9 +379,9 @@ export class PaletteGrab extends BaseScriptComponent {
     const textNode = global.scene.createSceneObject(PaletteGrab.CANCEL_BUTTON_TEXT_NAME);
     textNode.setParent(button);
     textNode.layer = root.layer;
-    textNode.getTransform().setLocalPosition(new vec3(0, 0, 0));
+    textNode.getTransform().setLocalPosition(new vec3(0, 0.15, 0));
     textNode.getTransform().setLocalRotation(quat.quatIdentity());
-    textNode.getTransform().setLocalScale(vec3.one());
+    textNode.getTransform().setLocalScale(new vec3(0.1, 0.1, 0.1));
 
     const text = textNode.createComponent('Component.Text3D') as Text3D;
     text.text = 'X';
@@ -321,9 +389,139 @@ export class PaletteGrab extends BaseScriptComponent {
     text.horizontalAlignment = HorizontalAlignment.Center;
     text.verticalAlignment = VerticalAlignment.Center;
     text.renderOrder = 13;
+    const textMaterial = this.createCancelButtonTextMaterial();
+    if (!isNull(textMaterial)) {
+      text.mainMaterial = textMaterial as Material;
+    }
 
     this.cancelButton = button;
     this.ensureCancelButtonFollowLoop();
+  }
+
+  private createCancelButtonVisual(
+    button: SceneObject,
+    buttonPosition: vec3,
+    visualRadius: number
+  ): void {
+    if (this.colorBlobTargets.length === 0) {
+      print('[PaletteGrab] cancel button visual skipped: no valid color material');
+      return;
+    }
+
+    const target = this.findReddestColorTarget();
+    const visualNode = global.scene.createSceneObject('CancelButtonBackground');
+    visualNode.setParent(button);
+    visualNode.layer = button.layer;
+    visualNode.getTransform().setWorldPosition(buttonPosition);
+    visualNode.getTransform().setWorldRotation(target.rotation);
+    visualNode.getTransform().setWorldScale(vec3.one());
+
+    const visual = visualNode.createComponent(
+      'Component.RenderMeshVisual'
+    ) as RenderMeshVisual;
+    visual.mesh = target.mesh;
+    visual.mainMaterial = this.createCancelButtonBackgroundMaterial(target.material);
+    visual.renderOrder = 12;
+
+    const worldMin = visual.worldAabbMin();
+    const worldMax = visual.worldAabbMax();
+    const meshCenter = new vec3(
+      (worldMin.x + worldMax.x) * 0.5,
+      (worldMin.y + worldMax.y) * 0.5,
+      (worldMin.z + worldMax.z) * 0.5
+    );
+    const maxExtent = Math.max(
+      Math.abs(worldMax.x - worldMin.x),
+      Math.max(
+        Math.abs(worldMax.y - worldMin.y),
+        Math.abs(worldMax.z - worldMin.z)
+      )
+    );
+    const scale = (visualRadius * 2) / Math.max(0.001, maxExtent);
+    const authoredOffset = meshCenter.sub(buttonPosition);
+    visualNode
+      .getTransform()
+      .setWorldPosition(buttonPosition.sub(authoredOffset.uniformScale(scale)));
+    visualNode.getTransform().setWorldScale(new vec3(scale, scale, scale));
+  }
+
+  private createCancelButtonBackgroundMaterial(fallback: Material): Material {
+    if (!isNull(this.cancelButtonBackgroundMaterial)) {
+      return this.cancelButtonBackgroundMaterial as Material;
+    }
+
+    let template: Material | null = null;
+    try {
+      template = requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material;
+    } catch (_error) {
+      template = fallback;
+    }
+
+    const material = (isNull(template) ? fallback : template).clone();
+    const pass = material.mainPass;
+    if (typeof pass.depthWrite !== 'undefined') {
+      pass.depthWrite = false;
+    }
+    if (typeof pass.depthTest !== 'undefined') {
+      pass.depthTest = true;
+    }
+    if (typeof pass.blendMode !== 'undefined') {
+      pass.blendMode = BlendMode.Normal;
+    }
+    if (typeof pass.baseColor !== 'undefined') {
+      // Soft smoky glass background; the X remains solid black.
+      pass.baseColor = new vec4(0.72, 0.75, 0.78, 0.38);
+    }
+    this.cancelButtonBackgroundMaterial = material;
+    return material;
+  }
+
+  private createCancelButtonTextMaterial(): Material | null {
+    if (!isNull(this.cancelButtonTextMaterial)) {
+      return this.cancelButtonTextMaterial;
+    }
+
+    let material: Material | null = null;
+    try {
+      material = (requireAsset('Text3D.mat') as Material).clone();
+    } catch (_error) {
+      return null;
+    }
+
+    const pass = material.mainPass as unknown as Record<string, vec4>;
+    const black = new vec4(0.02, 0.02, 0.025, 1);
+    const colorKeys = [
+      'frontCapStartingColor',
+      'outerEdgeStartingColor',
+      'InnerEdgeStartingColor',
+    ];
+    for (let i = 0; i < colorKeys.length; i++) {
+      if (typeof pass[colorKeys[i]] !== 'undefined') {
+        pass[colorKeys[i]] = black;
+      }
+    }
+    this.cancelButtonTextMaterial = material;
+    return material;
+  }
+
+  private findReddestColorTarget(): ColorBlobTarget {
+    let best = this.colorBlobTargets[0];
+    let bestScore = -Number.MAX_VALUE;
+    for (let i = 0; i < this.colorBlobTargets.length; i++) {
+      const candidate = this.colorBlobTargets[i];
+      const pass = candidate.material.mainPass as unknown as {
+        baseColor?: vec4;
+      };
+      const color = pass.baseColor;
+      const score = isNull(color)
+        ? -i
+        : color.x * 2 - color.y - color.z;
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    return best;
   }
 
   private enterPaintMode(
@@ -608,9 +806,12 @@ export class PaletteGrab extends BaseScriptComponent {
           return;
         }
         const root = this.getSceneObject();
-        (this.cancelButton as SceneObject)
-          .getTransform()
-          .setWorldPosition(root.getTransform().getWorldPosition());
+        const rootTransform = root.getTransform();
+        const buttonTransform = (this.cancelButton as SceneObject).getTransform();
+        buttonTransform.setWorldPosition(
+          rootTransform.getWorldPosition().add(rootTransform.up.uniformScale(1.2))
+        );
+        buttonTransform.setWorldRotation(rootTransform.getWorldRotation());
         (this.cancelButton as SceneObject).layer = root.layer;
       });
     }
@@ -852,14 +1053,45 @@ export class PaletteGrab extends BaseScriptComponent {
   }
 
   private ensurePaletteMoveHandleComponents(): void {
-    if (!this.enablePaletteMoveHandle) {
+    const root = this.getSceneObject();
+    const handleSearchRoot = root.hasParent() ? root.getParent() : root;
+    const disableLegacyHandle = (): void => {
+      const legacyHandle = this.findNamedChild(
+        handleSearchRoot,
+        PaletteGrab.MOVE_HANDLE_NAME
+      );
+      if (!isNull(legacyHandle)) {
+        legacyHandle.enabled = false;
+      }
+    };
+
+    // AnchorController supplies the same visible MoveHandle used by planter/seeds.
+    // Never create the old palette-only sphere when that controller is assigned.
+    if (!isNull(this.anchorController)) {
+      disableLegacyHandle();
       this.moveHandleObject = null;
       this.moveHandleInteractable = null;
       this.moveHandleManipulation = null;
       return;
     }
 
-    const root = this.getSceneObject();
+    const gardenHandle = this.findNamedChild(root, 'MoveHandle');
+    if (!isNull(gardenHandle)) {
+      disableLegacyHandle();
+      this.moveHandleObject = null;
+      this.moveHandleInteractable = null;
+      this.moveHandleManipulation = null;
+      return;
+    }
+
+    if (!this.enablePaletteMoveHandle) {
+      disableLegacyHandle();
+      this.moveHandleObject = null;
+      this.moveHandleInteractable = null;
+      this.moveHandleManipulation = null;
+      return;
+    }
+
     let handle = this.findNamedChild(root, PaletteGrab.MOVE_HANDLE_NAME);
     if (isNull(handle)) {
       handle = global.scene.createSceneObject(PaletteGrab.MOVE_HANDLE_NAME);

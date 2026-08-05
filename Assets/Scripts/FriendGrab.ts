@@ -156,10 +156,14 @@ export class FriendGrab extends BaseScriptComponent {
   @label('Present Height Offset (cm)')
   onboardingPresentHeightCm: number = 0;
 
+  @input('float')
+  @label('Onboarding Object Spacing (cm)')
+  onboardingObjectSpacingCm: number = 18;
+
   @input
   @label('Welcome Line')
   onboardingWelcomeLine: string =
-    "Hi! I'm your buddy. I'll show you things one piece at a time.";
+    "Hey there! I'm your companion, and I've got some objects for you that you can add to your space one by one.";
 
   @input
   @label('Closing Line')
@@ -324,6 +328,52 @@ export class FriendGrab extends BaseScriptComponent {
     "Woohoo! You did it! I'm so proud of you — your plant is fully grown!";
 
   @input
+  @label('Enable Goal Leaderboard')
+  @hint('Submits completed goals to Snap Leaderboard API (requires a LeaderboardModule asset).')
+  enableGoalLeaderboard: boolean = true;
+
+  @input
+  @allowUndefined
+  @label('Goal Leaderboard Module')
+  goalLeaderboardModule!: LeaderboardModule;
+
+  @input
+  @label('Goal Leaderboard Name')
+  goalLeaderboardName: string = 'DeskGameDistance';
+
+  @input('float')
+  @label('Goal Leaderboard TTL (sec)')
+  goalLeaderboardTtlSec: number = 31536000;
+
+  @input('int')
+  @label('Non-distance Goal Score')
+  @hint('Score submitted when a completed goal is not a walk/run distance goal.')
+  nonDistanceGoalScore: number = 100;
+
+  @input
+  @label('Distance Goals Only')
+  @hint('Only walk/run distance goals are submitted to the distance leaderboard.')
+  leaderboardDistanceGoalsOnly: boolean = true;
+
+  @input
+  @label('Fetch Leaderboard After Submit')
+  fetchLeaderboardAfterSubmit: boolean = true;
+
+  @input('int')
+  @label('Leaderboard Users Limit')
+  leaderboardUsersLimit: number = 5;
+
+  @input
+  @label('Leaderboard Use Global')
+  @hint('When off, fetches friends leaderboard instead of global.')
+  leaderboardUseGlobal: boolean = true;
+
+  @input
+  @label('Announce Leaderboard Rank')
+  @hint('Speak the user rank after a successful score submit.')
+  announceLeaderboardRank: boolean = false;
+
+  @input
   @hint('Buddy follows the camera in all sessions (paused only while grabbed)')
   enableFollowAfterOnboarding: boolean = true;
 
@@ -380,6 +430,10 @@ export class FriendGrab extends BaseScriptComponent {
   private followActive = false;
   private followLoggedStart = false;
   private workspaceResetAt = 0;
+  private goalLeaderboard: Leaderboard | null = null;
+  private resolvingGoalLeaderboard = false;
+  private goalLeaderboardWaiters: Array<(leaderboard: Leaderboard | null) => void> = [];
+  private leaderboardModuleMissingLogged = false;
   private static readonly MIN_COLLIDER_SIZE = new vec3(2.1, 2.8, 2.1);
 
   onAwake(): void {
@@ -951,7 +1005,19 @@ export class FriendGrab extends BaseScriptComponent {
       height = height + 2;
     }
 
-    const present = this.resolveOnboardingSpawnPosition(friendPos, dirX, dirZ, distance, height);
+    const basePresent = this.resolveOnboardingSpawnPosition(
+      friendPos,
+      dirX,
+      dirZ,
+      distance,
+      height
+    );
+    const present = this.findOpenOnboardingPresentationPosition(
+      basePresent,
+      obj,
+      dirX,
+      dirZ
+    );
     obj.getTransform().setWorldPosition(present);
 
     if (this.debugLogging) {
@@ -959,6 +1025,91 @@ export class FriendGrab extends BaseScriptComponent {
         `[FriendGrab] present ${key} at ${present.x.toFixed(1)}, ${present.y.toFixed(1)}, ${present.z.toFixed(1)}`
       );
     }
+  }
+
+  private findOpenOnboardingPresentationPosition(
+    requested: vec3,
+    currentObject: SceneObject,
+    forwardX: number,
+    forwardZ: number
+  ): vec3 {
+    const minimumSeparation = Math.max(8, this.onboardingObjectSpacingCm);
+    const occupied: vec3[] = [];
+    const steps = this.getOnboardingTourSteps();
+    for (let i = 0; i < steps.length; i++) {
+      const other = steps[i].object;
+      if (isNull(other) || other === currentObject || !other.enabled) {
+        continue;
+      }
+      occupied.push(other.getTransform().getWorldPosition());
+    }
+
+    const planter = !isNull(this.onboardingPlanter)
+      ? this.onboardingPlanter
+      : this.findObjectByNameInScene('Planter');
+    if (!isNull(planter) && planter !== currentObject && planter.enabled) {
+      occupied.push(planter.getTransform().getWorldPosition());
+    }
+
+    const isOpen = (candidate: vec3): boolean => {
+      for (let i = 0; i < occupied.length; i++) {
+        const other = occupied[i];
+        if (Math.abs(candidate.y - other.y) > minimumSeparation * 1.25) {
+          continue;
+        }
+        const dx = candidate.x - other.x;
+        const dz = candidate.z - other.z;
+        if (Math.sqrt(dx * dx + dz * dz) < minimumSeparation) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    if (isOpen(requested)) {
+      return requested;
+    }
+
+    let rightX = -forwardZ;
+    let rightZ = forwardX;
+    const rightLength = Math.sqrt(rightX * rightX + rightZ * rightZ);
+    if (rightLength > 0.001) {
+      rightX /= rightLength;
+      rightZ /= rightLength;
+    } else {
+      rightX = 1;
+      rightZ = 0;
+    }
+
+    for (let ring = 1; ring <= 4; ring++) {
+      const sideDistance = minimumSeparation * ring;
+      const candidates = [
+        new vec3(
+          requested.x + rightX * sideDistance,
+          requested.y,
+          requested.z + rightZ * sideDistance
+        ),
+        new vec3(
+          requested.x - rightX * sideDistance,
+          requested.y,
+          requested.z - rightZ * sideDistance
+        ),
+        new vec3(
+          requested.x + forwardX * sideDistance,
+          requested.y,
+          requested.z + forwardZ * sideDistance
+        ),
+      ];
+      for (let i = 0; i < candidates.length; i++) {
+        if (isOpen(candidates[i])) {
+          print(
+            `[FriendGrab] shifted onboarding spawn to avoid overlap (${candidates[i].toString()})`
+          );
+          return candidates[i];
+        }
+      }
+    }
+    return requested;
   }
 
   /** Rewire + force-show garden MoveHandle after onboarding re-enables a source. */
@@ -1114,12 +1265,17 @@ export class FriendGrab extends BaseScriptComponent {
 
   /** Prefer live script default; rewrite legacy Inspector "desk buddy" copy. */
   private resolveOnboardingWelcomeLine(): string {
-    const preferred = "Hi! I'm your buddy. I'll show you things one piece at a time.";
+    const preferred =
+      "Hey there! I'm your companion, and I've got some objects for you that you can add to your space one by one.";
     const raw = String(this.onboardingWelcomeLine || '').trim();
     if (!raw) {
       return preferred;
     }
-    if (/desk\s+buddy/i.test(raw) || /\bthe desk\b/i.test(raw)) {
+    if (
+      /desk\s+buddy/i.test(raw) ||
+      /\bthe desk\b/i.test(raw) ||
+      (/i'?m your buddy/i.test(raw) && /one piece at a time/i.test(raw))
+    ) {
       return preferred;
     }
     return raw;
@@ -1587,6 +1743,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.goalCompletionWired = true;
 
     PlantLifecycle.addGoalCompleteListener((plant) => {
+      this.submitGoalToLeaderboard(plant);
       this.congratulateGoalComplete(plant);
     });
 
@@ -1759,6 +1916,164 @@ export class FriendGrab extends BaseScriptComponent {
 
     print(`[FriendGrab] congratulating goal complete: ${goal}`);
     this.showSpeech(line, true, null);
+  }
+
+  private submitGoalToLeaderboard(plant: PlantLifecycle | null): void {
+    if (!this.enableGoalLeaderboard || isNull(plant)) {
+      return;
+    }
+    const leaderboardModule = this.resolveGoalLeaderboardModule();
+    if (isNull(leaderboardModule)) {
+      if (!this.leaderboardModuleMissingLogged) {
+        this.leaderboardModuleMissingLogged = true;
+        print('[FriendGrab] goal leaderboard module unavailable');
+      }
+      return;
+    }
+
+    const score = this.computeLeaderboardScore(plant);
+    if (isNull(score)) {
+      print('[FriendGrab] leaderboard skipped: completed goal has no distance');
+      return;
+    }
+    this.resolveGoalLeaderboard((leaderboard) => {
+      if (isNull(leaderboard)) {
+        return;
+      }
+      leaderboard.submitScore(
+        score,
+        (record) => {
+          const rank =
+            !isNull(record) && record.globalExactRank !== undefined ? record.globalExactRank : null;
+          print(
+            `[FriendGrab] leaderboard score submitted=${score}${!isNull(rank) ? ` rank=${rank}` : ''}`
+          );
+          if (this.announceLeaderboardRank && !isNull(rank)) {
+            this.showSpeech(`Leaderboard updated. You're now rank ${rank}.`, true, null);
+          }
+          if (this.fetchLeaderboardAfterSubmit) {
+            this.fetchLeaderboardSnapshot(leaderboard as Leaderboard);
+          }
+        },
+        (status) => {
+          print(`[FriendGrab] leaderboard submit failed status=${status}`);
+        }
+      );
+    });
+  }
+
+  private computeLeaderboardScore(plant: PlantLifecycle): number | null {
+    const goalMeters = Math.max(0, plant.getWalkGoalMeters());
+    const walkedMeters = Math.max(0, plant.getWalkedMeters());
+    const distanceMeters = Math.max(goalMeters, walkedMeters);
+    if (distanceMeters > 0) {
+      // Submit in centimeters to preserve precision while keeping integer score.
+      return Math.max(1, Math.round(distanceMeters * 100));
+    }
+    if (this.leaderboardDistanceGoalsOnly) {
+      return null;
+    }
+    return Math.max(1, Math.floor(this.nonDistanceGoalScore));
+  }
+
+  private resolveGoalLeaderboard(onResolved: (leaderboard: Leaderboard | null) => void): void {
+    if (!isNull(this.goalLeaderboard)) {
+      onResolved(this.goalLeaderboard as Leaderboard);
+      return;
+    }
+
+    this.goalLeaderboardWaiters.push(onResolved);
+    if (this.resolvingGoalLeaderboard) {
+      return;
+    }
+    this.resolvingGoalLeaderboard = true;
+
+    const options = Leaderboard.CreateOptions.create();
+    const configuredName = String(this.goalLeaderboardName || '').trim();
+    options.name = configuredName.length > 0 ? configuredName : 'DeskGameDistance';
+    options.orderingType = Leaderboard.OrderingType.Descending;
+    options.ttlSeconds = Math.max(0, Math.floor(this.goalLeaderboardTtlSec));
+
+    const leaderboardModule = this.resolveGoalLeaderboardModule();
+    if (isNull(leaderboardModule)) {
+      this.resolvingGoalLeaderboard = false;
+      const waiters = this.goalLeaderboardWaiters.slice();
+      this.goalLeaderboardWaiters = [];
+      for (let i = 0; i < waiters.length; i++) {
+        waiters[i](null);
+      }
+      return;
+    }
+
+    leaderboardModule.getLeaderboard(
+      options,
+      (leaderboard) => {
+        this.goalLeaderboard = leaderboard;
+        this.resolvingGoalLeaderboard = false;
+        const waiters = this.goalLeaderboardWaiters.slice();
+        this.goalLeaderboardWaiters = [];
+        for (let i = 0; i < waiters.length; i++) {
+          waiters[i](leaderboard);
+        }
+      },
+      (message) => {
+        print(`[FriendGrab] leaderboard get failed: ${String(message || 'unknown')}`);
+        this.resolvingGoalLeaderboard = false;
+        const waiters = this.goalLeaderboardWaiters.slice();
+        this.goalLeaderboardWaiters = [];
+        for (let i = 0; i < waiters.length; i++) {
+          waiters[i](null);
+        }
+      }
+    );
+  }
+
+  private resolveGoalLeaderboardModule(): LeaderboardModule | null {
+    if (!isNull(this.goalLeaderboardModule)) {
+      return this.goalLeaderboardModule;
+    }
+    try {
+      this.goalLeaderboardModule = require(
+        'LensStudio:LeaderboardModule'
+      ) as LeaderboardModule;
+      return this.goalLeaderboardModule;
+    } catch (error) {
+      if (!this.leaderboardModuleMissingLogged) {
+        this.leaderboardModuleMissingLogged = true;
+        print(`[FriendGrab] LeaderboardModule unavailable: ${error}`);
+      }
+      return null;
+    }
+  }
+
+  private fetchLeaderboardSnapshot(leaderboard: Leaderboard): void {
+    const options = Leaderboard.RetrievalOptions.create();
+    options.usersLimit = Math.max(1, Math.min(20, Math.floor(this.leaderboardUsersLimit)));
+    options.usersType = this.leaderboardUseGlobal
+      ? Leaderboard.UsersType.Global
+      : Leaderboard.UsersType.Friends;
+
+    leaderboard.getLeaderboardInfo(
+      options,
+      (othersInfo, currentUserInfo) => {
+        let currentPart = 'current=unknown';
+        if (!isNull(currentUserInfo)) {
+          const rank =
+            currentUserInfo.globalExactRank !== undefined
+              ? String(currentUserInfo.globalExactRank)
+              : '?';
+          currentPart = `current=rank${rank} score=${currentUserInfo.score}`;
+        }
+        print(
+          `[FriendGrab] leaderboard snapshot users=${othersInfo.length} ${currentPart} scope=${
+            this.leaderboardUseGlobal ? 'global' : 'friends'
+          }`
+        );
+      },
+      (status) => {
+        print(`[FriendGrab] leaderboard fetch failed status=${status}`);
+      }
+    );
   }
 
   private tryCompleteGoalFromSpeech(text: string): void {
