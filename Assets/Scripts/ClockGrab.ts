@@ -8,8 +8,10 @@ type InteractableLike = ScriptComponent & {
   enableInstantDrag?: boolean;
   onDragStart?: { add: (cb: () => void) => void };
   onDragEnd?: { add: (cb: () => void) => void };
+  onTriggerStart?: { add: (cb: () => void) => void };
   onTriggerEnd?: { add: (cb: () => void) => void };
   onTriggerEndOutside?: { add: (cb: () => void) => void };
+  onInteractorTriggerStart?: { add: (cb: () => void) => void };
   onInteractorTriggerEnd?: { add: (cb: () => void) => void };
   onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
 };
@@ -34,7 +36,7 @@ export class ClockGrab extends BaseScriptComponent {
 
   /** Local-space box size. Clock root is scaled ~0.06 with mesh children at ~100. */
   @input
-  colliderSize: vec3 = new vec3(140, 140, 55);
+  colliderSize: vec3 = new vec3(420, 420, 220);
 
   @input
   @allowUndefined
@@ -67,7 +69,7 @@ export class ClockGrab extends BaseScriptComponent {
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
 
   private static readonly ANCHOR_SOURCE_NAME = 'Clock';
-  private static readonly MIN_COLLIDER_SIZE = new vec3(140, 140, 55);
+  private static readonly MIN_COLLIDER_SIZE = new vec3(400, 400, 200);
 
   private getAnchorHandler(): {
     persistGardenSourceTransform?: (sourceName: string) => void;
@@ -205,6 +207,12 @@ export class ClockGrab extends BaseScriptComponent {
     }
     if (interactable.onDragStart) {
       interactable.onDragStart.add(onGrabStart);
+    }
+    if (interactable.onTriggerStart) {
+      interactable.onTriggerStart.add(onGrabStart);
+    }
+    if (interactable.onInteractorTriggerStart) {
+      interactable.onInteractorTriggerStart.add(onGrabStart);
     }
     if (interactable.onDragEnd) {
       interactable.onDragEnd.add(onGrabRelease);
@@ -392,15 +400,13 @@ export class ClockGrab extends BaseScriptComponent {
   }
 
   private ensureAnchorGrabCollider(anchor: SceneObject): ColliderComponent | null {
-    let collider = anchor.getComponent('Physics.ColliderComponent') as ColliderComponent;
+    // Prefer the standard Component collider path used by SIK targeting.
+    let collider = anchor.getComponent('Component.ColliderComponent') as ColliderComponent;
     if (isNull(collider)) {
-      collider = anchor.getComponent('Component.ColliderComponent') as ColliderComponent;
+      collider = anchor.createComponent('Component.ColliderComponent') as ColliderComponent;
     }
     if (isNull(collider)) {
       collider = anchor.createComponent('Physics.ColliderComponent') as ColliderComponent;
-    }
-    if (isNull(collider)) {
-      collider = anchor.createComponent('Component.ColliderComponent') as ColliderComponent;
     }
 
     const colliderLike = collider as unknown as {

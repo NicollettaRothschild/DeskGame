@@ -1,0 +1,77 @@
+- !<AssetImportMetadata/798fea76-01ea-43dd-9846-7c6ab44f0460>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> e6f951f2-06e5-4453-813d-a99ff317c76b
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> e6f951f2-06e5-4453-813d-a99ff317c76b
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> dcb24575-5a53-4a92-bf21-b99299e1fbe8
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/dcb24575-5a53-4a92-bf21-b99299e1fbe8>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: f66930ae-1181-4977-afa0-c9358748ea7c
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    debugLogging: false
+    leaderboardModule: false
+    leaderboardName: false
+    leaderboardTtlSec: false
+    refreshIntervalSec: false
+    scoreIsCentimeters: false
+    showCurrentUserLine: false
+    showKilometers: false
+    showMiles: false
+    targetText: false
+    useGlobal: false
+    usersLimit: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - leaderboardModule: !<reference.LeaderboardModule> 00000000-0000-0000-0000-000000000000
+      leaderboardName: DeskGameGoals
+      leaderboardTtlSec: !<float> 31536000.000000
+      usersLimit: 5
+      useGlobal: true
+      refreshIntervalSec: !<float> 4.000000
+      showCurrentUserLine: true
+      scoreIsCentimeters: true
+      showKilometers: true
+      showMiles: true
+      targetText: !<reference.Text3D> 00000000-0000-0000-0000-000000000000
+      debugLogging: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input Asset.LeaderboardModule leaderboardModule
+    - '// @input string leaderboardName = "DeskGameDistance"'
+    - // @input float leaderboardTtlSec = 31536000
+    - // @input int usersLimit = 5
+    - // @input bool useGlobal = true
+    - // @input float refreshIntervalSec = 30
+    - // @input bool showCurrentUserLine = true
+    - '// @input bool scoreIsCentimeters = true {"hint":"Interprets score as centimeters and displays converted distance units."}'
+    - '// @input bool showKilometers = true {"label":"Show Kilometers"}'
+    - '// @input bool showMiles = true {"label":"Show Miles"}'
+    - // @input Component.Text3D targetText
+    - // @input bool debugLogging

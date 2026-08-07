@@ -26,7 +26,7 @@ const PALETTE_EXTRA_SCALE_MULTIPLIER = 1.5;
 const TRASH_BIN_SCALE_MULTIPLIER = 2.0;
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 /** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
-const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock'];
+const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock', 'Leaderboard'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
 const TRASH_BIN_SOURCE_NAME = 'TrashBin';
 const GARDEN_MOVE_HANDLE_REFERENCE_SOURCE = 'Water Source';
@@ -35,8 +35,8 @@ const TRASH_MOVE_HANDLE_REFERENCE_SOURCE = 'Planter';
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_OFFSETS: { [sourceName: string]: vec3 } = {
   'Water Source': new vec3(1.35, 0.08, 1.35),
   Seeds: new vec3(1.25, 0.08, 1.25),
-  // Post-it stack is wider after scaling; push handle to the front-right corner.
-  PostItNotes: new vec3(1.2, 0.2, 1.2),
+  // Keep the fallback pose fully outside the stack's large note-grab collider.
+  PostItNotes: new vec3(5, 1.5, 5),
 };
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_SCALES: { [sourceName: string]: vec3 } = {
   // Post-it pad is smaller than other sources; use a bigger handle for parity.
@@ -217,6 +217,10 @@ export class AnchorController extends BaseScriptComponent {
 
   @input
   @allowUndefined
+  leaderboardRoot!: SceneObject;
+
+  @input
+  @allowUndefined
   spacePanel!: ScriptComponent;
 
   @input
@@ -253,6 +257,11 @@ export class AnchorController extends BaseScriptComponent {
 
   @input('float')
   distanceCullCheckIntervalSec: number = 0.35;
+
+  @input('float')
+  @label('Spawn Minimum Separation (cm)')
+  @hint('Minimum horizontal spacing between newly spawned desk objects.')
+  spawnMinSeparationCm: number = 18;
 
   @input
   @hint('Also hide Friend when far away')
@@ -379,6 +388,13 @@ export class AnchorController extends BaseScriptComponent {
     this.setupInteractionSounds();
     armGardenSourceStartupSpawnBlock(3);
     print(`AnchorController ${ANCHOR_CONTROLLER_VERSION} starting`);
+    this.enforceNoLooseSeedTemplatesVisible('startup');
+    this.scheduleDelayed(() => {
+      this.enforceNoLooseSeedTemplatesVisible('post-load');
+    }, 0.5);
+    this.scheduleDelayed(() => {
+      this.enforceNoLooseSeedTemplatesVisible('post-restore');
+    }, 2.0);
     this.captureGardenSpawnSourceDefaults();
     this.captureTrashSceneDefault();
     this.applyTrashScaledWorldSize();
@@ -846,11 +862,86 @@ export class AnchorController extends BaseScriptComponent {
     const menuRight = menuTransform.getWorldRotation().multiplyVec3(new vec3(1, 0, 0));
     const stagger = ((index % 3) - 1) * 4;
 
-    return new vec3(
+    return this.findOpenTrackedSpawnPosition(new vec3(
       menuWorld.x + towardUser.x * towardUserDistance + menuRight.x * stagger,
       menuWorld.y - downDistance,
       menuWorld.z + towardUser.z * towardUserDistance + menuRight.z * stagger
+    ));
+  }
+
+  private findOpenTrackedSpawnPosition(requested: vec3): vec3 {
+    const minimumSeparation = Math.max(6, this.spawnMinSeparationCm);
+    const occupied: vec3[] = [];
+
+    for (let i = 0; i < this.objs.length; i++) {
+      const obj = this.objs[i];
+      if (!isNull(obj)) {
+        occupied.push(obj.getTransform().getWorldPosition());
+      }
+    }
+
+    const layoutNames = this.getAnchorLayoutSourceNames();
+    for (let i = 0; i < layoutNames.length; i++) {
+      const source = this.findGardenSpawnSource(layoutNames[i]);
+      if (!isNull(source)) {
+        occupied.push(source.getTransform().getWorldPosition());
+      }
+    }
+    const trash = this.getTrashSceneObject();
+    if (!isNull(trash)) {
+      occupied.push(trash.getTransform().getWorldPosition());
+    }
+
+    const isOpen = (candidate: vec3): boolean => {
+      for (let i = 0; i < occupied.length; i++) {
+        const other = occupied[i];
+        if (Math.abs(candidate.y - other.y) > minimumSeparation * 1.25) {
+          continue;
+        }
+        const dx = candidate.x - other.x;
+        const dz = candidate.z - other.z;
+        if (Math.sqrt(dx * dx + dz * dz) < minimumSeparation) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    if (isOpen(requested)) {
+      return requested;
+    }
+
+    // Search concentric rings, nearest slots first. Eight directions per ring
+    // prevent the old three-position stagger from wrapping onto occupied spots.
+    const slotsPerRing = 8;
+    for (let ring = 1; ring <= 6; ring++) {
+      const radius = minimumSeparation * ring;
+      for (let slot = 0; slot < slotsPerRing; slot++) {
+        const angle = (Math.PI * 2 * slot) / slotsPerRing + (ring % 2) * (Math.PI / 8);
+        const candidate = new vec3(
+          requested.x + Math.cos(angle) * radius,
+          requested.y,
+          requested.z + Math.sin(angle) * radius
+        );
+        if (isOpen(candidate)) {
+          print(
+            `[AnchorController] shifted overlapping spawn ${requested.toString()} -> ${candidate.toString()}`
+          );
+          return candidate;
+        }
+      }
+    }
+
+    // Extremely crowded fallback: deterministic outer slot rather than overlap.
+    const fallback = new vec3(
+      requested.x + minimumSeparation * 7,
+      requested.y,
+      requested.z
     );
+    print(
+      `[AnchorController] crowded spawn fallback ${requested.toString()} -> ${fallback.toString()}`
+    );
+    return fallback;
   }
 
   private capturePlantWorldTransforms(): { pos: vec3; rot: quat }[] {
@@ -1192,8 +1283,12 @@ export class AnchorController extends BaseScriptComponent {
   public createPotAtWorldPosition(
     potPrefab: ObjectPrefab,
     potPrefabIndex: number,
-    worldPos: vec3
+    worldPos: vec3,
+    avoidOverlap: boolean = true
   ): SceneObject | null {
+    const resolvedWorldPos = avoidOverlap
+      ? this.findOpenTrackedSpawnPosition(worldPos)
+      : worldPos;
     const obj = this.spawnTrackedObject(
       potPrefab,
       OBJECT_KIND_POT,
@@ -1205,7 +1300,7 @@ export class AnchorController extends BaseScriptComponent {
       return null;
     }
 
-    this.placeTrackedContentAtWorld(obj, worldPos);
+    this.placeTrackedContentAtWorld(obj, resolvedWorldPos);
     this.wirePotPersistence(obj);
     this.persistPlantTransforms();
     playInteractionSound((sounds) => sounds.playSpawnPot());
@@ -1253,7 +1348,13 @@ export class AnchorController extends BaseScriptComponent {
     );
   }
 
-  public createSeedAtWorldPosition(worldPos: vec3): SceneObject | null {
+  public createSeedAtWorldPosition(
+    worldPos: vec3,
+    avoidOverlap: boolean = true
+  ): SceneObject | null {
+    const resolvedWorldPos = avoidOverlap
+      ? this.findOpenTrackedSpawnPosition(worldPos)
+      : worldPos;
     const config = this.getNextPlantConfig();
     const obj = this.spawnTrackedObject(
       this.plantPrefab,
@@ -1266,7 +1367,7 @@ export class AnchorController extends BaseScriptComponent {
       return null;
     }
 
-    this.placeTrackedContentAtWorld(obj, worldPos);
+    this.placeTrackedContentAtWorld(obj, resolvedWorldPos);
     this.applyPlantConfig(obj, config);
     this.persistPlantTransforms();
     return obj;
@@ -1299,12 +1400,19 @@ export class AnchorController extends BaseScriptComponent {
       return null;
     }
 
-    const pot = this.createPotAtWorldPosition(potPrefab, potPrefabIndex, worldPos);
+    const goalWorldPos = this.findOpenTrackedSpawnPosition(worldPos);
+    const pot = this.createPotAtWorldPosition(
+      potPrefab,
+      potPrefabIndex,
+      goalWorldPos,
+      false
+    );
     if (isNull(pot)) {
       return null;
     }
 
-    const seed = this.createSeedAtWorldPosition(worldPos);
+    // Intentional overlap: this seed is immediately attached inside this pot.
+    const seed = this.createSeedAtWorldPosition(goalWorldPos, false);
     if (isNull(seed)) {
       print('createGoalPlantedPotAtWorldPosition: seed spawn failed');
       return pot;
@@ -1324,7 +1432,7 @@ export class AnchorController extends BaseScriptComponent {
     this.wirePotPersistence(pot);
     this.persistPlantTransforms();
     print(
-      `Created goal planted pot at ${worldPos.toString()} goal="${String(goalText || '').trim()}"`
+      `Created goal planted pot at ${goalWorldPos.toString()} goal="${String(goalText || '').trim()}"`
     );
     return pot;
   }
@@ -2074,6 +2182,7 @@ export class AnchorController extends BaseScriptComponent {
       this.paletteRoot,
       this.globeRoot,
       this.clockRoot,
+      this.leaderboardRoot,
       this.getTrashSceneObject(),
       this.getSceneObject(),
     ];
@@ -2145,6 +2254,9 @@ export class AnchorController extends BaseScriptComponent {
     }
     if (name === 'Clock' && !isNull(this.clockRoot)) {
       return this.clockRoot;
+    }
+    if (name === 'Leaderboard' && !isNull(this.leaderboardRoot)) {
+      return this.leaderboardRoot;
     }
     const searchRoots = this.getSceneSearchRoots();
     for (let i = 0; i < searchRoots.length; i++) {
@@ -2626,6 +2738,7 @@ export class AnchorController extends BaseScriptComponent {
       }
     }
     this.destroyLoosePlantAndSeedSceneObjects();
+    this.enforceNoLooseSeedTemplatesVisible('onboarding-cleanup');
 
     const layoutNames = this.getAnchorLayoutSourceNames();
     for (let i = 0; i < layoutNames.length; i++) {
@@ -2680,6 +2793,64 @@ export class AnchorController extends BaseScriptComponent {
     if (destroyList.length > 0) {
       print(`Onboarding cleanup: destroyed ${destroyList.length} loose seed/plant object(s)`);
     }
+  }
+
+  private enforceNoLooseSeedTemplatesVisible(reason: string): void {
+    let disabledCount = 0;
+    const roots: SceneObject[] = [];
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      roots.push(global.scene.getRootObject(i));
+    }
+
+    while (roots.length > 0) {
+      const node = roots.pop();
+      if (!node || isNull(node)) {
+        continue;
+      }
+
+      if (
+        String(node.name || '') === 'Seed' &&
+        !this.isInsideTrackedPlantOrPot(node)
+      ) {
+        if (node.enabled) {
+          node.enabled = false;
+          disabledCount++;
+        }
+        // Parent disable is sufficient and avoids touching prefab child state.
+        continue;
+      }
+
+      for (let i = 0; i < node.getChildrenCount(); i++) {
+        roots.push(node.getChild(i));
+      }
+    }
+
+    if (disabledCount > 0) {
+      print(
+        `[AnchorController] ${reason}: disabled ${disabledCount} loose Seed template object(s)`
+      );
+    }
+  }
+
+  private isInsideTrackedPlantOrPot(candidate: SceneObject): boolean {
+    let current: SceneObject | null = candidate;
+    while (!isNull(current)) {
+      for (let i = 0; i < this.objs.length; i++) {
+        if (current === this.objs[i] || current === this.wrappers[i]) {
+          return true;
+        }
+      }
+      const name = String(current.name || '');
+      if (
+        name.indexOf('PlantContent_') === 0 ||
+        name.indexOf('PotContent_') === 0
+      ) {
+        return true;
+      }
+      current = current.getParent();
+    }
+    return false;
   }
 
   private collectLoosePlantAndSeedObjects(
@@ -3599,8 +3770,10 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private wireGardenSourceMoveHandles(): void {
-    for (let i = 0; i < GARDEN_SPAWN_SOURCE_NAMES.length; i++) {
-      const name = GARDEN_SPAWN_SOURCE_NAMES[i];
+    const handleNames = GARDEN_SPAWN_SOURCE_NAMES;
+    const template = this.findMoveHandleTemplate();
+    for (let i = 0; i < handleNames.length; i++) {
+      const name = handleNames[i];
       const source = this.findGardenSpawnSource(name);
       // Still wire while temporarily disabled (e.g. Friend onboarding hide) so
       // the handle is ready the moment the source is revealed again.
@@ -3608,13 +3781,30 @@ export class AnchorController extends BaseScriptComponent {
         continue;
       }
 
-      const handle = this.findNamedChild(source, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+      let handle = this.findNamedChild(source, GARDEN_SOURCE_MOVE_HANDLE_NAME);
+      if (name === 'palette' && isNull(handle) && !isNull(template)) {
+        handle = this.createMoveHandleFromTemplate(source, template as SceneObject);
+      }
       if (isNull(handle)) {
+        if (name === 'palette') {
+          print('palette move handle skipped: no garden source MoveHandle template found');
+        }
         continue;
       }
 
       handle.enabled = true;
-      this.applyGardenSourceMoveHandleLayout(name, handle);
+      if (name === 'palette' && !isNull(template)) {
+        this.applyCopiedMoveHandleLayout(handle, source, template as SceneObject);
+        const legacyHandle = this.findNamedChild(source, 'PaletteMoveHandle');
+        if (!isNull(legacyHandle)) {
+          legacyHandle.enabled = false;
+        }
+      } else if (name === 'PostItNotes') {
+        this.applyGardenSourceMoveHandleLayout(name, handle);
+        this.applyPostItMoveHandleLayout(handle, source);
+      } else {
+        this.applyGardenSourceMoveHandleLayout(name, handle);
+      }
       this.applyGardenSourceMoveHandleVisual(handle);
       this.applyGardenSourceMoveHandleGlow(handle);
       this.ensureGardenSourceSpawnInteractable(source);
@@ -3634,8 +3824,142 @@ export class AnchorController extends BaseScriptComponent {
           script.glowMaterial = this.moveHandleGlowMaterial;
         }
         script.wireMoveInteraction();
+        if (typeof script.refreshManipulationRootBinding === 'function') {
+          script.refreshManipulationRootBinding();
+        }
+        if (typeof script.refreshHandlePresentation === 'function') {
+          script.refreshHandlePresentation();
+        }
       }
     }
+  }
+
+  private applyCopiedMoveHandleLayout(
+    handle: SceneObject,
+    source: SceneObject,
+    template: SceneObject
+  ): void {
+    const templateParent = template.getParent();
+    const referenceScale = isNull(templateParent)
+      ? new vec3(1, 1, 1)
+      : templateParent.getTransform().getWorldScale();
+    const sourceScale = source.getTransform().getWorldScale();
+    const templateTransform = template.getTransform();
+    const templateLocalPos = templateTransform.getLocalPosition();
+    const templateLocalScale = templateTransform.getLocalScale();
+
+    handle.getTransform().setLocalPosition(
+      new vec3(
+        (templateLocalPos.x * referenceScale.x) / Math.max(Math.abs(sourceScale.x), 0.001),
+        (templateLocalPos.y * referenceScale.y) / Math.max(Math.abs(sourceScale.y), 0.001),
+        (templateLocalPos.z * referenceScale.z) / Math.max(Math.abs(sourceScale.z), 0.001)
+      )
+    );
+    handle.getTransform().setLocalScale(
+      new vec3(
+        (templateLocalScale.x * referenceScale.x) / Math.max(Math.abs(sourceScale.x), 0.001),
+        (templateLocalScale.y * referenceScale.y) / Math.max(Math.abs(sourceScale.y), 0.001),
+        (templateLocalScale.z * referenceScale.z) / Math.max(Math.abs(sourceScale.z), 0.001)
+      )
+    );
+
+    // Palette's imported mesh is rotated differently from planter/seeds, so a
+    // copied local offset can land beneath it. Place the handle from measured
+    // world bounds instead: just outside the front-right edge and above the top.
+    const bounds = this.measureSourceVisualBoundsExcludingHandle(source, handle);
+    if (!isNull(bounds)) {
+      const width = Math.max(1, bounds.max.x - bounds.min.x);
+      const depth = Math.max(1, bounds.max.z - bounds.min.z);
+      const edgePadding = Math.max(2.5, Math.min(6, Math.max(width, depth) * 0.08));
+      handle.getTransform().setWorldPosition(
+        new vec3(
+          bounds.max.x + edgePadding,
+          bounds.max.y + Math.max(2.5, edgePadding * 0.65),
+          bounds.max.z + edgePadding
+        )
+      );
+    }
+  }
+
+  private applyPostItMoveHandleLayout(handle: SceneObject, source: SceneObject): void {
+    const bounds = this.measureSourceVisualBoundsExcludingHandle(source, handle);
+    if (isNull(bounds)) {
+      return;
+    }
+
+    const sourcePos = source.getTransform().getWorldPosition();
+    const colliderClearanceCm = 18;
+    const visualClearanceCm = 8;
+    handle.getTransform().setWorldPosition(
+      new vec3(
+        Math.max(
+          bounds.max.x + visualClearanceCm,
+          sourcePos.x + colliderClearanceCm
+        ),
+        bounds.max.y + 5,
+        Math.max(
+          bounds.max.z + visualClearanceCm,
+          sourcePos.z + colliderClearanceCm
+        )
+      )
+    );
+  }
+
+  private measureSourceVisualBoundsExcludingHandle(
+    source: SceneObject,
+    excludedHandle: SceneObject
+  ): { min: vec3; max: vec3 } | null {
+    let min: vec3 | null = null;
+    let max: vec3 | null = null;
+    const stack: SceneObject[] = [source];
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || isNull(current) || current === excludedHandle) {
+        continue;
+      }
+      const name = String(current.name || '');
+      if (
+        name === GARDEN_SOURCE_MOVE_HANDLE_NAME ||
+        name === 'PaletteMoveHandle' ||
+        name === 'PalettePaintCancel' ||
+        name === 'PalettePaintStrokes'
+      ) {
+        continue;
+      }
+
+      const visuals = current.getComponents(
+        'Component.RenderMeshVisual'
+      ) as RenderMeshVisual[];
+      for (let i = 0; i < visuals.length; i++) {
+        const visual = visuals[i];
+        if (isNull(visual) || !visual.enabled || isNull(visual.mesh)) {
+          continue;
+        }
+        const visualMin = visual.worldAabbMin();
+        const visualMax = visual.worldAabbMax();
+        min = isNull(min)
+          ? visualMin
+          : new vec3(
+              Math.min(min.x, visualMin.x),
+              Math.min(min.y, visualMin.y),
+              Math.min(min.z, visualMin.z)
+            );
+        max = isNull(max)
+          ? visualMax
+          : new vec3(
+              Math.max(max.x, visualMax.x),
+              Math.max(max.y, visualMax.y),
+              Math.max(max.z, visualMax.z)
+            );
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return isNull(min) || isNull(max) ? null : { min, max };
   }
 
   private ensureGardenSourceSpawnInteractable(source: SceneObject): void {

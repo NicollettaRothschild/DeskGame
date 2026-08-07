@@ -14,6 +14,8 @@ import {
   markFriendOnboardingCompletedInStorage,
   shouldRunFriendOnboardingTour,
 } from './FriendOnboardingStorage';
+import { GoalLeaderboardBoard } from './GoalLeaderboardBoard';
+import { LeaderboardGrab } from './LeaderboardGrab';
 
 /** Voice phrases to wipe anchors and redo Friend onboarding (new workspace, etc.). */
 export function looksLikeWorkspaceResetCommand(text: string): boolean {
@@ -43,6 +45,8 @@ type InteractableLike = ScriptComponent & {
   ignoreInteractionPlane?: boolean;
   keepHoverOnTrigger?: boolean;
   enableInstantDrag?: boolean;
+  onTriggerStart?: { add: (cb: () => void) => void };
+  onInteractorTriggerStart?: { add: (cb: () => void) => void };
   onDragStart?: { add: (cb: () => void) => void };
   onDragEnd?: { add: (cb: () => void) => void };
   onTriggerEnd?: { add: (cb: () => void) => void };
@@ -93,6 +97,32 @@ export class FriendGrab extends BaseScriptComponent {
   enableGrabSounds: boolean = true;
 
   @input
+  enablePetReaction: boolean = true;
+
+  @input
+  @allowUndefined
+  petSoundTrack!: AudioTrackAsset;
+
+  @input('float')
+  petReactionCooldownSec: number = 2.5;
+
+  @input
+  @label('Pet Poke Collider Size')
+  petPokeColliderSize: vec3 = new vec3(3.4, 4.2, 3.4);
+
+  @input
+  @label('Pet Poke Local Position')
+  petPokeLocalPosition: vec3 = new vec3(0, 0, 0.8);
+
+  @input
+  petDialogueLines: string[] = [
+    'Aww, thank you!',
+    'That tickles!',
+    'Hehe, I like that!',
+    "You're a good friend.",
+  ];
+
+  @input
   enableSpeechBubble: boolean = true;
 
   @input
@@ -128,8 +158,18 @@ export class FriendGrab extends BaseScriptComponent {
 
   @input('float')
   @label('Practice Timeout (sec)')
-  @hint('Auto-advance if the player does not grab/release in time')
+  @hint('Minimum seconds before repeating onboarding practice reminders')
   onboardingPracticeTimeoutSec: number = 14;
+
+  @input('float')
+  @label('Practice First Reminder (sec)')
+  @hint('Delay before the first "grab then release" reminder during a practice step')
+  onboardingPracticeFirstReminderSec: number = 7.5;
+
+  @input('int')
+  @label('Practice Reminder Max Count')
+  @hint('Maximum reminder lines spoken per practice step (0 = unlimited)')
+  onboardingPracticeReminderMaxCount: number = 2;
 
   @input
   @label('Require Grab Practice')
@@ -146,10 +186,14 @@ export class FriendGrab extends BaseScriptComponent {
   @label('Present Height Offset (cm)')
   onboardingPresentHeightCm: number = 0;
 
+  @input('float')
+  @label('Onboarding Object Spacing (cm)')
+  onboardingObjectSpacingCm: number = 18;
+
   @input
   @label('Welcome Line')
   onboardingWelcomeLine: string =
-    "Hi! I'm your buddy. I'll show you things one piece at a time.";
+    "Hey there! I'm your companion, and I've got some objects for you that you can add to your space one by one.";
 
   @input
   @label('Closing Line')
@@ -215,6 +259,16 @@ export class FriendGrab extends BaseScriptComponent {
   @label('Trash Line')
   onboardingTrashLine: string =
     "Here's the trash. Drop things into it to clean up.";
+
+  @input
+  @allowUndefined
+  @label('Tour Leaderboard')
+  onboardingLeaderboard!: SceneObject;
+
+  @input
+  @label('Leaderboard Line')
+  onboardingLeaderboardLine: string =
+    "And here's your distance leaderboard. Grab it to place it anywhere in your space.";
 
   @input
   @label('Goal Prompt Line')
@@ -314,12 +368,58 @@ export class FriendGrab extends BaseScriptComponent {
     "Woohoo! You did it! I'm so proud of you — your plant is fully grown!";
 
   @input
+  @label('Enable Goal Leaderboard')
+  @hint('Submits completed goals to Snap Leaderboard API (requires a LeaderboardModule asset).')
+  enableGoalLeaderboard: boolean = true;
+
+  @input
+  @allowUndefined
+  @label('Goal Leaderboard Module')
+  goalLeaderboardModule!: LeaderboardModule;
+
+  @input
+  @label('Goal Leaderboard Name')
+  goalLeaderboardName: string = 'DeskGameDistance';
+
+  @input('float')
+  @label('Goal Leaderboard TTL (sec)')
+  goalLeaderboardTtlSec: number = 31536000;
+
+  @input('int')
+  @label('Non-distance Goal Score')
+  @hint('Score submitted when a completed goal is not a walk/run distance goal.')
+  nonDistanceGoalScore: number = 100;
+
+  @input
+  @label('Distance Goals Only')
+  @hint('Only walk/run distance goals are submitted to the distance leaderboard.')
+  leaderboardDistanceGoalsOnly: boolean = true;
+
+  @input
+  @label('Fetch Leaderboard After Submit')
+  fetchLeaderboardAfterSubmit: boolean = true;
+
+  @input('int')
+  @label('Leaderboard Users Limit')
+  leaderboardUsersLimit: number = 5;
+
+  @input
+  @label('Leaderboard Use Global')
+  @hint('When off, fetches friends leaderboard instead of global.')
+  leaderboardUseGlobal: boolean = true;
+
+  @input
+  @label('Announce Leaderboard Rank')
+  @hint('Speak the user rank after a successful score submit.')
+  announceLeaderboardRank: boolean = false;
+
+  @input
   @hint('Buddy follows the camera in all sessions (paused only while grabbed)')
   enableFollowAfterOnboarding: boolean = true;
 
   /** How far ahead of the user Buddy stays (cm, along look direction). */
   @input('float')
-  followDistanceCm: number = 26;
+  followDistanceCm: number = 45;
 
   /** Side offset from camera forward (cm). Positive = right. */
   @input('float')
@@ -344,6 +444,9 @@ export class FriendGrab extends BaseScriptComponent {
 
   private grabInteractable: InteractableLike | null = null;
   private grabManipulation: InteractableManipulationLike | null = null;
+  private petPokeTarget: SceneObject | null = null;
+  private petPokeInteractable: InteractableLike | null = null;
+  private petInteractionWired = false;
   private moveInteractionWired = false;
   private moveBindAttempts = 0;
   private moveActive = false;
@@ -362,7 +465,7 @@ export class FriendGrab extends BaseScriptComponent {
   private nextLookAtRetryAt = 0;
   private onboardingActive = false;
   private onboardingToken = 0;
-  private onboardingPracticeDone = false;
+  private onboardingStepRunId = 0;
   private onboardingGoalListening = false;
   private goalCompletionWired = false;
   private lastGoalCompleteUtterance = '';
@@ -370,9 +473,19 @@ export class FriendGrab extends BaseScriptComponent {
   private followActive = false;
   private followLoggedStart = false;
   private workspaceResetAt = 0;
+  private goalLeaderboard: Leaderboard | null = null;
+  private resolvingGoalLeaderboard = false;
+  private goalLeaderboardWaiters: Array<(leaderboard: Leaderboard | null) => void> = [];
+  private leaderboardModuleMissingLogged = false;
+  private generatedLeaderboard: SceneObject | null = null;
+  private nextPetReactionAt = 0;
+  private petDialogueIndex = 0;
+  private followPausedByVoice = false;
   private static readonly MIN_COLLIDER_SIZE = new vec3(2.1, 2.8, 2.1);
 
   onAwake(): void {
+    this.ensureLeaderboardPanel();
+    this.ensurePetPokeTarget();
     this.createEvent('OnStartEvent').bind(() => {
       registerFriendGrab(this);
       this.captureIdleBasePosition();
@@ -380,6 +493,7 @@ export class FriendGrab extends BaseScriptComponent {
       this.ensureSpeechBubble();
       this.resolveTts();
       this.tryWireMoveInteraction();
+      this.wirePetPokeInteraction();
       this.ensureGoalCompletionListening();
       this.startFollowingUser('always-on');
       this.scheduleOnboarding();
@@ -459,14 +573,17 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private playPhraseFallback(track: AudioTrackAsset | null, label: string): void {
-    const resolved =
-      track ||
-      this.resolveSoundTrack(
-        null,
-        label.toLowerCase().indexOf('thank') >= 0
-          ? 'Audio/friend_thanks.wav'
-          : 'Audio/friend_whee.wav'
-      );
+    let resolved = track;
+    if (isNull(resolved)) {
+      try {
+        resolved =
+          label.toLowerCase().indexOf('thank') >= 0
+            ? (requireAsset('Audio/friend_thanks.wav') as AudioTrackAsset)
+            : (requireAsset('Audio/friend_whee.wav') as AudioTrackAsset);
+      } catch (_error) {
+        resolved = null;
+      }
+    }
     if (isNull(resolved)) {
       print(`[FriendGrab] no phrase clip for "${label}"`);
       return;
@@ -545,6 +662,76 @@ export class FriendGrab extends BaseScriptComponent {
     return null;
   }
 
+  private ensurePetPokeTarget(): void {
+    const friend = this.getSceneObject();
+    let target = this.findObjectByName(friend, 'FriendPetPokeTarget');
+    if (isNull(target) || target === friend) {
+      target = global.scene.createSceneObject('FriendPetPokeTarget');
+      target.setParent(friend);
+    }
+    target.layer = friend.layer;
+    target.enabled = this.enablePetReaction;
+    target.getTransform().setLocalPosition(this.petPokeLocalPosition);
+    target.getTransform().setLocalRotation(quat.quatIdentity());
+    target.getTransform().setLocalScale(vec3.one());
+
+    let collider = target.getComponent('Component.ColliderComponent') as ColliderComponent;
+    if (isNull(collider)) {
+      collider = target.createComponent('Component.ColliderComponent') as ColliderComponent;
+    }
+    const colliderLike = collider as unknown as {
+      enabled?: boolean;
+      intangible?: boolean;
+      fitVisual?: boolean;
+      debugDrawEnabled?: boolean;
+      shape?: { size?: vec3 };
+    };
+    colliderLike.enabled = this.enablePetReaction;
+    colliderLike.intangible = true;
+    colliderLike.fitVisual = false;
+    colliderLike.debugDrawEnabled = false;
+    const shape = Shape.createBoxShape();
+    shape.size = this.petPokeColliderSize;
+    colliderLike.shape = shape;
+
+    let interactable = target.getComponent(
+      Interactable.getTypeName()
+    ) as unknown as InteractableLike;
+    if (isNull(interactable)) {
+      interactable = target.createComponent(Interactable.getTypeName()) as InteractableLike;
+    }
+    // Direct-only keeps this as a physical poke target. It deliberately has no
+    // InteractableManipulation, so SIK does not disable poke targeting.
+    interactable.targetingMode = 1;
+    interactable.ignoreInteractionPlane = false;
+    interactable.keepHoverOnTrigger = false;
+    interactable.enableInstantDrag = false;
+    (interactable as ScriptComponent).enabled = this.enablePetReaction;
+
+    this.petPokeTarget = target;
+    this.petPokeInteractable = interactable;
+  }
+
+  private wirePetPokeInteraction(): void {
+    if (this.petInteractionWired || !this.enablePetReaction) {
+      return;
+    }
+    if (isNull(this.petPokeInteractable)) {
+      this.ensurePetPokeTarget();
+    }
+    const interactable = this.petPokeInteractable;
+    if (isNull(interactable) || !interactable.onTriggerStart) {
+      const retry = this.createEvent('DelayedCallbackEvent');
+      retry.bind(() => this.wirePetPokeInteraction());
+      retry.reset(0.1);
+      return;
+    }
+
+    interactable.onTriggerStart.add(() => this.onFriendPet());
+    this.petInteractionWired = true;
+    print('[FriendGrab] pet poke interaction wired');
+  }
+
   private tryWireMoveInteraction(): void {
     if (this.moveInteractionWired) {
       return;
@@ -600,21 +787,47 @@ export class FriendGrab extends BaseScriptComponent {
     if (interactable.onInteractorTriggerEndOutside) {
       interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
     }
-
-    if (this.debugLogging) {
-      if (interactable.onHoverEnter) {
-        interactable.onHoverEnter.add(() => print('[FriendGrab] hover enter'));
-      }
-      if (interactable.onInteractorHoverEnter) {
-        interactable.onInteractorHoverEnter.add(() => print('[FriendGrab] hover enter'));
-      }
-    }
-
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;
 
     this.moveInteractionWired = true;
     print('[FriendGrab] grab interaction wired');
+  }
+
+  private onFriendPet(): void {
+    if (!this.enablePetReaction) {
+      return;
+    }
+
+    const now = getTime();
+    if (now < this.nextPetReactionAt) {
+      return;
+    }
+    this.nextPetReactionAt = now + Math.max(0.5, this.petReactionCooldownSec);
+
+    const configuredLines = this.petDialogueLines || [];
+    const line =
+      configuredLines.length > 0
+        ? String(configuredLines[this.petDialogueIndex % configuredLines.length] || '').trim()
+        : 'Aww, thank you!';
+    this.petDialogueIndex += 1;
+
+    let reactionTrack = !isNull(this.petSoundTrack) ? this.petSoundTrack : null;
+    if (isNull(reactionTrack)) {
+      try {
+        // Keep this literal so Lens Studio includes the audio in the device bundle.
+        reactionTrack = requireAsset('Audio/friend_whee.wav') as AudioTrackAsset;
+      } catch (_e) {
+        reactionTrack = null;
+      }
+    }
+    if (!isNull(reactionTrack)) {
+      this.playFriendSound(reactionTrack, 0.65, 'pet');
+    }
+    this.showSpeech(line || 'Aww, thank you!', true, null);
+    if (this.debugLogging) {
+      print(`[FriendGrab] pet reaction: ${line}`);
+    }
   }
 
   private onFriendGrabStart(): void {
@@ -743,7 +956,7 @@ export class FriendGrab extends BaseScriptComponent {
   private playFriendSound(
     track: AudioTrackAsset | null,
     volume: number,
-    label: 'grab' | 'release'
+    label: 'grab' | 'release' | 'pet'
   ): void {
     if (!this.enableGrabSounds || isNull(track)) {
       return;
@@ -797,6 +1010,86 @@ export class FriendGrab extends BaseScriptComponent {
     });
   }
 
+  private ensureLeaderboardPanel(): SceneObject | null {
+    if (!isNull(this.onboardingLeaderboard)) {
+      (this.onboardingLeaderboard as SceneObject).enabled = true;
+      return this.onboardingLeaderboard;
+    }
+    if (!isNull(this.generatedLeaderboard)) {
+      (this.generatedLeaderboard as SceneObject).enabled = true;
+      return this.generatedLeaderboard;
+    }
+
+    const existing = this.findObjectByNameInScene('Leaderboard');
+    if (!isNull(existing)) {
+      const shouldReposition = this.shouldRepositionLeaderboard(existing);
+      existing.enabled = true;
+      this.generatedLeaderboard = existing;
+      this.onboardingLeaderboard = existing;
+      if (shouldReposition) {
+        this.placeObjectInFrontOfFriend(existing, 'leaderboard');
+      }
+      if (this.debugLogging) {
+        print('[FriendGrab] reusing existing leaderboard panel');
+      }
+      return existing;
+    }
+
+    const anchor = this.findAnchorController() as
+      | (ScriptComponent & {
+          widgetParent?: SceneObject;
+          leaderboardRoot?: SceneObject;
+        })
+      | null;
+    const panel = global.scene.createSceneObject('Leaderboard');
+    panel.enabled = true;
+    panel.layer = this.getSceneObject().layer;
+    if (!isNull(anchor) && !isNull(anchor.widgetParent)) {
+      panel.setParent(anchor.widgetParent as SceneObject);
+    }
+    panel.getTransform().setWorldRotation(
+      this.getSceneObject().getTransform().getWorldRotation()
+    );
+    panel.getTransform().setWorldScale(vec3.one());
+
+    const grab = panel.createComponent(
+      LeaderboardGrab.getTypeName()
+    ) as LeaderboardGrab;
+    grab.anchorController = anchor as ScriptComponent;
+    grab.colliderSize = new vec3(72, 56, 14);
+
+    const board = panel.createComponent(
+      GoalLeaderboardBoard.getTypeName()
+    ) as GoalLeaderboardBoard;
+    board.leaderboardName = this.goalLeaderboardName;
+    board.leaderboardTtlSec = this.goalLeaderboardTtlSec;
+    board.usersLimit = this.leaderboardUsersLimit;
+    board.useGlobal = this.leaderboardUseGlobal;
+
+    if (!isNull(anchor)) {
+      anchor.leaderboardRoot = panel;
+    }
+    this.generatedLeaderboard = panel;
+    this.onboardingLeaderboard = panel;
+    this.placeObjectInFrontOfFriend(panel, 'leaderboard');
+    print('[FriendGrab] created placeable UIKit leaderboard panel');
+    return panel;
+  }
+
+  private shouldRepositionLeaderboard(panel: SceneObject): boolean {
+    if (isNull(panel)) {
+      return false;
+    }
+    const friendPos = this.getSceneObject().getTransform().getWorldPosition();
+    const panelPos = panel.getTransform().getWorldPosition();
+    const dx = panelPos.x - friendPos.x;
+    const dz = panelPos.z - friendPos.z;
+    const horizontal = Math.sqrt(dx * dx + dz * dz);
+    const vertical = Math.abs(panelPos.y - friendPos.y);
+    // Recover leaderboard if it drifted far away, got restored at origin, or ended up too high/low.
+    return horizontal > 220 || horizontal < 4 || vertical > 130;
+  }
+
   private getOnboardingTourSteps(): Array<{
     key: string;
     object: SceneObject | null;
@@ -836,13 +1129,21 @@ export class FriendGrab extends BaseScriptComponent {
         key: 'postit',
         object: resolve(this.onboardingPostIt, 'PostItNotes'),
         line: this.onboardingPostItLine,
-        requirePractice: false,
+        requirePractice: true,
       },
       {
         key: 'trash',
         object: resolve(this.onboardingTrash, 'TrashBin'),
         line: this.onboardingTrashLine,
-        requirePractice: false,
+        requirePractice: true,
+      },
+      {
+        key: 'leaderboard',
+        object:
+          resolve(this.onboardingLeaderboard, 'Leaderboard') ||
+          this.ensureLeaderboardPanel(),
+        line: this.onboardingLeaderboardLine,
+        requirePractice: true,
       },
       // Planter stack is skipped — a planted goal pot is gifted after the goal prompt.
     ];
@@ -912,6 +1213,19 @@ export class FriendGrab extends BaseScriptComponent {
       if (len > 0.5) {
         dirX = dx / len;
         dirZ = dz / len;
+      } else {
+        try {
+          const forward = friendTransform.forward;
+          if (!isNull(forward)) {
+            const forwardLen = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
+            if (forwardLen > 0.001) {
+              dirX = forward.x / forwardLen;
+              dirZ = forward.z / forwardLen;
+            }
+          }
+        } catch (_e) {
+          // keep default -Z
+        }
       }
     } else {
       // Friend LookAt uses +Z toward the user when active.
@@ -935,13 +1249,26 @@ export class FriendGrab extends BaseScriptComponent {
     if (key === 'planter' || key === 'trash') {
       distance = Math.max(distance, 32);
       height = height - 4;
+    } else if (key === 'leaderboard') {
+      distance = Math.max(distance, 30);
+      height = height - 2;
     } else if (key === 'palette') {
       height = height - 2;
     } else if (key === 'globe') {
       height = height + 2;
     }
 
-    const present = this.resolveOnboardingSpawnPosition(friendPos, dirX, dirZ, distance, height);
+    const basePresent = this.resolveOnboardingSpawnPosition(
+      friendPos,
+      dirX,
+      dirZ,
+      distance,
+      height
+    );
+    // Every step reuses Buddy's presentation slot. The previous object must
+    // be moved clear before its step can complete, so overlap avoidance must
+    // never push a new object away from Buddy or outside the user's view.
+    const present = basePresent;
     obj.getTransform().setWorldPosition(present);
 
     if (this.debugLogging) {
@@ -1104,12 +1431,17 @@ export class FriendGrab extends BaseScriptComponent {
 
   /** Prefer live script default; rewrite legacy Inspector "desk buddy" copy. */
   private resolveOnboardingWelcomeLine(): string {
-    const preferred = "Hi! I'm your buddy. I'll show you things one piece at a time.";
+    const preferred =
+      "Hey there! I'm your companion, and I've got some objects for you that you can add to your space one by one.";
     const raw = String(this.onboardingWelcomeLine || '').trim();
     if (!raw) {
       return preferred;
     }
-    if (/desk\s+buddy/i.test(raw) || /\bthe desk\b/i.test(raw)) {
+    if (
+      /desk\s+buddy/i.test(raw) ||
+      /\bthe desk\b/i.test(raw) ||
+      (/i'?m your buddy/i.test(raw) && /one piece at a time/i.test(raw))
+    ) {
       return preferred;
     }
     return raw;
@@ -1121,6 +1453,8 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
 
+    this.onboardingStepRunId += 1;
+    const stepRunId = this.onboardingStepRunId;
     const steps = this.getOnboardingTourSteps();
     if (index < 0 || index >= steps.length) {
       this.runOnboardingGoalStep(token);
@@ -1140,29 +1474,44 @@ export class FriendGrab extends BaseScriptComponent {
     this.ensureOnboardingSourceHandle(step.object, step.key);
     print(`[FriendGrab] onboarding reveal ${step.key}`);
 
-    const needsPractice =
-      this.onboardingRequirePractice && step.requirePractice && !isNull(step.object);
+    // Every tour prop must be physically moved and released before the next
+    // one is revealed. This is intentionally not bypassed by the legacy toggle.
+    const needsPractice = step.requirePractice && !isNull(step.object);
 
     // Arm grab practice immediately so grabs during the spoken line still count.
     let speechDone = false;
     let practiceDone = !needsPractice;
+    let advanceScheduled = false;
     const tryAdvance = (): void => {
-      if (token !== this.onboardingToken || !speechDone || !practiceDone) {
+      if (
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId ||
+        advanceScheduled ||
+        !speechDone ||
+        !practiceDone
+      ) {
         return;
       }
+      advanceScheduled = true;
       this.delayOnboarding(token, () => this.runOnboardingStep(index + 1, token));
     };
 
     if (needsPractice) {
-      this.waitForOnboardingPractice(step.object as SceneObject, token, step.key, () => {
-        practiceDone = true;
-        tryAdvance();
-      });
+      this.waitForOnboardingPractice(
+        step.object as SceneObject,
+        token,
+        stepRunId,
+        step.key,
+        () => {
+          practiceDone = true;
+          tryAdvance();
+        }
+      );
     }
 
     const line = String(step.line || '').trim();
     const afterSpeech = (): void => {
-      if (token !== this.onboardingToken) {
+      if (token !== this.onboardingToken || stepRunId !== this.onboardingStepRunId) {
         return;
       }
       speechDone = true;
@@ -1216,10 +1565,16 @@ export class FriendGrab extends BaseScriptComponent {
           };
 
           if (!practiceDone && !isNull(pot)) {
-            this.waitForOnboardingPractice(pot as SceneObject, token, 'goal-pot', () => {
-              practiceDone = true;
-              tryFinish();
-            });
+            this.waitForOnboardingPractice(
+              pot as SceneObject,
+              token,
+              this.onboardingStepRunId,
+              'goal-pot',
+              () => {
+                practiceDone = true;
+                tryFinish();
+              }
+            );
           }
 
           const seedLine = this.resolveOnboardingGoalPotLine();
@@ -1440,7 +1795,7 @@ export class FriendGrab extends BaseScriptComponent {
     heightOffsetCm: number
   ): vec3 {
     // Keep onboarding props comfortably below Buddy (not face-level).
-    const underBuddyDistance = Math.max(10, Math.min(22, distanceCm * 0.55));
+    const underBuddyDistance = Math.max(16, Math.min(30, distanceCm));
     const underBuddyDropCm = 18;
     const spawn = new vec3(
       friendPos.x + dirX * underBuddyDistance,
@@ -1577,6 +1932,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.goalCompletionWired = true;
 
     PlantLifecycle.addGoalCompleteListener((plant) => {
+      this.submitGoalToLeaderboard(plant);
       this.congratulateGoalComplete(plant);
     });
 
@@ -1590,6 +1946,10 @@ export class FriendGrab extends BaseScriptComponent {
         return;
       }
       if (this.onboardingGoalListening) {
+        return;
+      }
+      const normalized = this.normalizeGoalUtterance(text);
+      if (this.tryHandleFollowVoiceCommands(normalized)) {
         return;
       }
       if (this.tryWorkspaceResetFromSpeech(text)) {
@@ -1662,6 +2022,116 @@ export class FriendGrab extends BaseScriptComponent {
     this.lastGoalCompleteUtterance = cleaned;
     this.lastGoalCompleteAt = now;
     return this.restartOnboardingTour('speech');
+  }
+
+  private tryHandleFollowVoiceCommands(text: string): boolean {
+    const cleaned = String(text || '')
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!cleaned) {
+      return false;
+    }
+
+    if (this.isStopFollowingCommand(cleaned)) {
+      this.pauseFollowingByVoice();
+      return true;
+    }
+
+    if (this.followPausedByVoice && this.isHeyFriendWakeCommand(cleaned)) {
+      this.resumeFollowingByVoice();
+      return true;
+    }
+
+    return false;
+  }
+
+  private isStopFollowingCommand(cleanedLower: string): boolean {
+    if (cleanedLower.indexOf('hey friend') < 0) {
+      return false;
+    }
+    const asksStop =
+      cleanedLower.indexOf('stop following') >= 0 ||
+      cleanedLower.indexOf('dont follow') >= 0 ||
+      cleanedLower.indexOf("don't follow") >= 0 ||
+      cleanedLower.indexOf('pause following') >= 0;
+    const targetMe =
+      cleanedLower.indexOf('me') >= 0 ||
+      cleanedLower.indexOf('us') >= 0 ||
+      cleanedLower.indexOf('my') >= 0;
+    return asksStop && targetMe;
+  }
+
+  private isHeyFriendWakeCommand(cleanedLower: string): boolean {
+    return /^hey friend(?:\b.*)?$/.test(cleanedLower);
+  }
+
+  private pauseFollowingByVoice(): void {
+    if (this.followPausedByVoice) {
+      return;
+    }
+    this.followPausedByVoice = true;
+    this.followActive = false;
+    this.setLookAtActive(false);
+    if (!isNull(this.lookAt)) {
+      this.lookAt.enabled = false;
+    }
+    this.setFriendVisualState(false);
+    this.hideSpeechBubble();
+    print('[FriendGrab] follow paused by voice');
+  }
+
+  private resumeFollowingByVoice(): void {
+    this.followPausedByVoice = false;
+    this.setFriendVisualState(true);
+    this.startFollowingUser('voice-resume');
+    this.followActive = true;
+    this.lookAtCamera = this.findCameraObject();
+    this.showSpeech("I'm back.", true, null);
+    print('[FriendGrab] follow resumed by voice');
+  }
+
+  private setFriendVisualState(visible: boolean): void {
+    const root = this.getSceneObject();
+    if (isNull(root)) {
+      return;
+    }
+    root.enabled = true;
+
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (isNull(node)) {
+        continue;
+      }
+
+      const visuals = node.getComponents('Component.RenderMeshVisual') as RenderMeshVisual[];
+      for (let i = 0; i < visuals.length; i++) {
+        const visual = visuals[i];
+        if (!isNull(visual)) {
+          visual.enabled = visible;
+        }
+      }
+      const texts = node.getComponents('Component.Text3D') as Text3D[];
+      for (let i = 0; i < texts.length; i++) {
+        const text = texts[i];
+        if (!isNull(text)) {
+          text.enabled = visible;
+        }
+      }
+      const colliders = node.getComponents('Component.ColliderComponent') as ColliderComponent[];
+      for (let i = 0; i < colliders.length; i++) {
+        const collider = colliders[i];
+        if (!isNull(collider)) {
+          collider.enabled = visible;
+        }
+      }
+
+      for (let i = 0; i < node.getChildrenCount(); i++) {
+        stack.push(node.getChild(i));
+      }
+    }
   }
 
   private scheduleOnboardingRestartSoon(): void {
@@ -1749,6 +2219,166 @@ export class FriendGrab extends BaseScriptComponent {
 
     print(`[FriendGrab] congratulating goal complete: ${goal}`);
     this.showSpeech(line, true, null);
+  }
+
+  private submitGoalToLeaderboard(plant: PlantLifecycle | null): void {
+    if (!this.enableGoalLeaderboard || isNull(plant)) {
+      return;
+    }
+    const leaderboardModule = this.resolveGoalLeaderboardModule();
+    if (isNull(leaderboardModule)) {
+      if (!this.leaderboardModuleMissingLogged) {
+        this.leaderboardModuleMissingLogged = true;
+        print('[FriendGrab] goal leaderboard module unavailable');
+      }
+      return;
+    }
+
+    const score = this.computeLeaderboardScore(plant);
+    if (isNull(score)) {
+      print('[FriendGrab] leaderboard skipped: completed goal has no distance');
+      return;
+    }
+    this.resolveGoalLeaderboard((leaderboard) => {
+      if (isNull(leaderboard)) {
+        return;
+      }
+      leaderboard.submitScore(
+        score,
+        (record) => {
+          const rank =
+            !isNull(record) && record.globalExactRank !== undefined ? record.globalExactRank : null;
+          print(
+            `[FriendGrab] leaderboard score submitted=${score}${!isNull(rank) ? ` rank=${rank}` : ''}`
+          );
+          if (this.announceLeaderboardRank && !isNull(rank)) {
+            this.showSpeech(`Leaderboard updated. You're now rank ${rank}.`, true, null);
+          }
+          if (this.fetchLeaderboardAfterSubmit) {
+            this.fetchLeaderboardSnapshot(leaderboard as Leaderboard);
+          }
+        },
+        (status) => {
+          print(`[FriendGrab] leaderboard submit failed status=${status}`);
+        }
+      );
+    });
+  }
+
+  private computeLeaderboardScore(plant: PlantLifecycle): number | null {
+    const goalMeters = Math.max(0, plant.getWalkGoalMeters());
+    const walkedMeters = Math.max(0, plant.getWalkedMeters());
+    const distanceMeters = Math.max(goalMeters, walkedMeters);
+    if (distanceMeters > 0) {
+      // Submit in centimeters to preserve precision while keeping integer score.
+      return Math.max(1, Math.round(distanceMeters * 100));
+    }
+    if (this.leaderboardDistanceGoalsOnly) {
+      return null;
+    }
+    return Math.max(1, Math.floor(this.nonDistanceGoalScore));
+  }
+
+  private resolveGoalLeaderboard(onResolved: (leaderboard: Leaderboard | null) => void): void {
+    if (!isNull(this.goalLeaderboard)) {
+      onResolved(this.goalLeaderboard as Leaderboard);
+      return;
+    }
+
+    this.goalLeaderboardWaiters.push(onResolved);
+    if (this.resolvingGoalLeaderboard) {
+      return;
+    }
+    this.resolvingGoalLeaderboard = true;
+
+    const options = Leaderboard.CreateOptions.create();
+    const configuredName = String(this.goalLeaderboardName || '').trim();
+    options.name = configuredName.length > 0 ? configuredName : 'DeskGameDistance';
+    options.orderingType = Leaderboard.OrderingType.Descending;
+    options.ttlSeconds = Math.max(0, Math.floor(this.goalLeaderboardTtlSec));
+
+    const leaderboardModule = this.resolveGoalLeaderboardModule();
+    if (isNull(leaderboardModule)) {
+      this.resolvingGoalLeaderboard = false;
+      const waiters = this.goalLeaderboardWaiters.slice();
+      this.goalLeaderboardWaiters = [];
+      for (let i = 0; i < waiters.length; i++) {
+        waiters[i](null);
+      }
+      return;
+    }
+
+    leaderboardModule.getLeaderboard(
+      options,
+      (leaderboard) => {
+        this.goalLeaderboard = leaderboard;
+        this.resolvingGoalLeaderboard = false;
+        const waiters = this.goalLeaderboardWaiters.slice();
+        this.goalLeaderboardWaiters = [];
+        for (let i = 0; i < waiters.length; i++) {
+          waiters[i](leaderboard);
+        }
+      },
+      (message) => {
+        print(`[FriendGrab] leaderboard get failed: ${String(message || 'unknown')}`);
+        this.resolvingGoalLeaderboard = false;
+        const waiters = this.goalLeaderboardWaiters.slice();
+        this.goalLeaderboardWaiters = [];
+        for (let i = 0; i < waiters.length; i++) {
+          waiters[i](null);
+        }
+      }
+    );
+  }
+
+  private resolveGoalLeaderboardModule(): LeaderboardModule | null {
+    if (!isNull(this.goalLeaderboardModule)) {
+      return this.goalLeaderboardModule;
+    }
+    try {
+      this.goalLeaderboardModule = require(
+        'LensStudio:LeaderboardModule'
+      ) as LeaderboardModule;
+      return this.goalLeaderboardModule;
+    } catch (error) {
+      if (!this.leaderboardModuleMissingLogged) {
+        this.leaderboardModuleMissingLogged = true;
+        print(`[FriendGrab] LeaderboardModule unavailable: ${error}`);
+      }
+      return null;
+    }
+  }
+
+  private fetchLeaderboardSnapshot(leaderboard: Leaderboard): void {
+    const options = Leaderboard.RetrievalOptions.create();
+    options.usersLimit = Math.max(1, Math.min(20, Math.floor(this.leaderboardUsersLimit)));
+    options.usersType = this.leaderboardUseGlobal
+      ? Leaderboard.UsersType.Global
+      : Leaderboard.UsersType.Friends;
+
+    leaderboard.getLeaderboardInfo(
+      options,
+      (othersInfo, currentUserInfo) => {
+        let currentPart = 'current=unknown';
+        if (!isNull(currentUserInfo)) {
+          const rank =
+            currentUserInfo.globalExactRank !== undefined
+              ? String(currentUserInfo.globalExactRank)
+              : '?';
+          currentPart = `current=rank${rank} score=${currentUserInfo.score}`;
+        }
+        print(
+          `[FriendGrab] leaderboard snapshot users=${othersInfo.length} ${currentPart} scope=${
+            this.leaderboardUseGlobal ? 'global' : 'friends'
+          }`
+        );
+      },
+      (status) => {
+        print(
+          `[FriendGrab] leaderboard snapshot unavailable status=${status} (Snap privacy opt-in or network may be pending)`
+        );
+      }
+    );
   }
 
   private tryCompleteGoalFromSpeech(text: string): void {
@@ -1840,48 +2470,60 @@ export class FriendGrab extends BaseScriptComponent {
   private waitForOnboardingPractice(
     target: SceneObject,
     token: number,
+    stepRunId: number,
     key: string,
     onDone: () => void
   ): void {
-    this.onboardingPracticeDone = false;
+    let settled = false;
     let grabbed = false;
     let listenersWired = false;
-    const presentPos = target.getTransform().getWorldPosition();
-
     const finish = (reason: string): void => {
-      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
-      this.onboardingPracticeDone = true;
-      print(`[FriendGrab] onboarding practice ${reason}`);
+      settled = true;
+      print(`[FriendGrab] onboarding practice ${key} ${reason}`);
       onDone();
     };
 
-    const hasMovedFromPresent = (): boolean => {
-      const pos = target.getTransform().getWorldPosition();
-      return pos.distance(presentPos) > 2.5;
-    };
-
     const onGrabStart = (): void => {
-      if (token !== this.onboardingToken || this.onboardingPracticeDone) {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
       grabbed = true;
     };
 
     const onGrabEnd = (): void => {
-      if (token !== this.onboardingToken || this.onboardingPracticeDone) {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
-      // Count release even if we armed mid-grab (missed the start event).
-      if (grabbed || hasMovedFromPresent()) {
+      // The step completes only after this object emits a matching grab start
+      // and release. There is deliberately no movement-distance threshold.
+      if (grabbed) {
         this.recoverOnboardingObjectIfOutOfView(target, key);
-        finish('grab-release');
+        finish('grabbed-and-released');
       }
     };
 
     const tryWireListeners = (): boolean => {
-      if (listenersWired || this.onboardingPracticeDone || token !== this.onboardingToken) {
+      if (
+        listenersWired ||
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return listenersWired;
       }
 
@@ -1940,27 +2582,36 @@ export class FriendGrab extends BaseScriptComponent {
       }
     }
 
-    const timeoutSec = Math.max(3, this.onboardingPracticeTimeoutSec);
-    const timeout = this.createEvent('DelayedCallbackEvent');
-    timeout.bind(() => {
-      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
-        return;
-      }
-      print('[FriendGrab] onboarding practice waiting for grab-release');
-      this.showSpeech('Try grabbing it, then release.', true, null);
-      timeout.reset(timeoutSec);
-    });
-    timeout.reset(timeoutSec);
+    const repeatSec = Math.max(6, this.onboardingPracticeTimeoutSec);
+    const firstReminderSec = Math.max(
+      4,
+      Math.min(repeatSec, this.onboardingPracticeFirstReminderSec)
+    );
+    const maxReminders = Math.max(0, Math.floor(this.onboardingPracticeReminderMaxCount));
+    let reminderCount = 0;
 
-    // Nudge only if they still haven't practiced (don't nag after a mid-speech grab).
-    const tip = this.createEvent('DelayedCallbackEvent');
-    tip.bind(() => {
-      if (this.onboardingPracticeDone || token !== this.onboardingToken) {
+    const reminder = this.createEvent('DelayedCallbackEvent');
+    reminder.bind(() => {
+      if (
+        settled ||
+        token !== this.onboardingToken ||
+        stepRunId !== this.onboardingStepRunId
+      ) {
         return;
       }
-      this.showSpeech('Try grabbing it, then release.', true, null);
+      if (maxReminders > 0 && reminderCount >= maxReminders) {
+        return;
+      }
+      reminderCount += 1;
+      print(
+        `[FriendGrab] onboarding practice waiting for ${key} placement (reminder ${reminderCount})`
+      );
+      this.showSpeech('Move it where you want, then release.', true, null);
+      if (maxReminders === 0 || reminderCount < maxReminders) {
+        reminder.reset(repeatSec);
+      }
     });
-    tip.reset(Math.min(8, Math.max(5.5, timeoutSec * 0.45)));
+    reminder.reset(firstReminderSec);
   }
 
   private findInteractableInTree(root: SceneObject): InteractableLike | null {
@@ -2067,7 +2718,7 @@ export class FriendGrab extends BaseScriptComponent {
 
     // Spectacles comfort bounds: keep Buddy centered and inside forward FOV
     // even if inspector values were previously tuned too far to the right/far.
-    const dist = Math.max(18, Math.min(30, this.followDistanceCm));
+    const dist = Math.max(18, Math.min(45, this.followDistanceCm));
     const side = Math.max(-2, Math.min(2, this.followSideOffsetCm));
     const height = this.followHeightOffsetCm;
     const target = new vec3(

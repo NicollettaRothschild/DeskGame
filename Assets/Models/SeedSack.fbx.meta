@@ -40,27 +40,7 @@
       mesh: None Compression
     Overrides:
       {}
-- !<ObjectPrefabAssetData/60f5c997-4489-4cca-8b45-7f84fd69f814>
-  Prototype: !<ObjectOwner/ef7713f3-f3f0-4c9a-a8a7-0abdd87de06d>
-    PackagePath: ""
-    objects:
-      - !<own> 665aae6b-3a44-415d-557f-49dcfdaf9c96
-- !<SceneObject/665aae6b-3a44-415d-557f-49dcfdaf9c96>
-  PrefabRemaps:
-    []
-  Name: SeedSack
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> ad32a1b2-0f0b-48da-61b6-3c27e9d41c10
-  Components:
-    []
-- !<SceneObject/ad32a1b2-0f0b-48da-61b6-3c27e9d41c10>
+- !<SceneObject/3d45a072-30f8-4e8c-4e0b-7a4ad8e9371e>
   PrefabRemaps:
     []
   Name: sack
@@ -74,8 +54,28 @@
   Children:
     []
   Components:
-    - !<own> eddfccb8-4bbf-4d1f-747e-10f90b6025e2
-- !<RenderMeshVisual/eddfccb8-4bbf-4d1f-747e-10f90b6025e2>
+    - !<own> ce3c84fe-342b-4c96-4bef-7ed81b82b185
+- !<SceneObject/502db6b8-25d7-4bc4-586e-67724350935f>
+  PrefabRemaps:
+    []
+  Name: SeedSack
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 3d45a072-30f8-4e8c-4e0b-7a4ad8e9371e
+  Components:
+    []
+- !<ObjectPrefabAssetData/60f5c997-4489-4cca-8b45-7f84fd69f814>
+  Prototype: !<ObjectOwner/ef7713f3-f3f0-4c9a-a8a7-0abdd87de06d>
+    PackagePath: ""
+    objects:
+      - !<own> 502db6b8-25d7-4bc4-586e-67724350935f
+- !<RenderMeshVisual/ce3c84fe-342b-4c96-4bef-7ed81b82b185>
   PrefabRemaps:
     []
   Name: component_0

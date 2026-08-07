@@ -39,6 +39,7 @@
     growthCompleteTrack: false
     growthStartTrack: false
     hoverTrack: false
+    leaderboardRoot: false
     menuRoot: false
     moveHandleGlowMaterial: false
     moveHandleMaterial: false
@@ -56,6 +57,7 @@
     soundDebugLogging: false
     soundVolume: false
     spacePanel: false
+    spawnMinSeparationCm: false
     spawnPotTrack: false
     spawnSeedTrack: false
     spawnWaterTrack: false
@@ -112,6 +114,7 @@
       paletteRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       globeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       clockRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      leaderboardRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
@@ -122,6 +125,7 @@
       distanceCullHideMeters: !<float> 20.000000
       distanceCullShowMeters: !<float> 18.000000
       distanceCullCheckIntervalSec: 0.350000
+      spawnMinSeparationCm: !<float> 18.000000
       distanceCullIncludeFriend: true
   ScriptTypes:
     -
@@ -159,6 +163,7 @@
     - // @input SceneObject paletteRoot
     - // @input SceneObject globeRoot
     - // @input SceneObject clockRoot
+    - // @input SceneObject leaderboardRoot
     - // @input Component.ScriptComponent spacePanel
     - // @input AssignableType_3 specsApi
     - // @input Asset.Material sackMaterial
@@ -169,4 +174,5 @@
     - '// @input float distanceCullHideMeters = 20 {"hint":"Hide objects when farther than this many meters from the camera"}'
     - '// @input float distanceCullShowMeters = 18 {"hint":"Show objects again when closer than this (keep below hide distance to avoid flicker)"}'
     - // @input float distanceCullCheckIntervalSec = 0.35
+    - '// @input float spawnMinSeparationCm = 18 {"label":"Spawn Minimum Separation (cm)", "hint":"Minimum horizontal spacing between newly spawned desk objects."}'
     - '// @input bool distanceCullIncludeFriend {"hint":"Also hide Friend when far away"}'

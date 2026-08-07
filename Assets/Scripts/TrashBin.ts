@@ -780,11 +780,6 @@ export class TrashBin extends BaseScriptComponent {
       return false;
     }
 
-    const now = getTime();
-    if (this.isInSpawnGraceAt(trackedRoot, now) || this.isInSpawnGraceAt(destroyRoot, now)) {
-      return false;
-    }
-
     if (!this.isTrackedRootInTrashVolume(trackedRoot)) {
       if (this.debugLogging) {
         const distance = this.getDistanceToTrash(trackedRoot);
@@ -795,6 +790,7 @@ export class TrashBin extends BaseScriptComponent {
       return false;
     }
 
+    const now = getTime();
     this.tryDestroyRoot(destroyRoot, now, true);
     return this.wasRecentlyDestroyed(destroyRoot, now);
   }
