@@ -450,7 +450,14 @@ export class PaletteGrab extends BaseScriptComponent {
       'Component.RenderMeshVisual'
     ) as RenderMeshVisual;
     visual.mesh = target.mesh;
-    visual.mainMaterial = this.createCancelButtonBackgroundMaterial(target.material);
+    const backgroundMaterial = this.createCancelButtonBackgroundMaterial(
+      !isNull(target.material) ? (target.material as Material) : null
+    );
+    if (!isNull(backgroundMaterial)) {
+      visual.mainMaterial = backgroundMaterial as Material;
+    } else if (!isNull(target.material)) {
+      visual.mainMaterial = target.material as Material;
+    }
     visual.renderOrder = 12;
 
     const worldMin = visual.worldAabbMin();
@@ -475,43 +482,74 @@ export class PaletteGrab extends BaseScriptComponent {
     visualNode.getTransform().setWorldScale(new vec3(scale, scale, scale));
   }
 
-  private createCancelButtonBackgroundMaterial(fallback: Material): Material {
+  private createCancelButtonBackgroundMaterial(fallback: Material | null): Material | null {
     if (!isNull(this.cancelButtonBackgroundMaterial)) {
       return this.cancelButtonBackgroundMaterial as Material;
     }
 
-    const template = this.resolveCompanionBodyMaterial() || fallback;
-    const material = (isNull(template) ? fallback : template).clone();
+    const template = this.resolveCompanionBodyMaterial();
+    const material =
+      this.tryCloneMaterial(template) ||
+      this.tryCloneMaterial(fallback) ||
+      this.tryCloneMaterial(this.resolveLegacyCancelTemplateMaterial());
+    if (isNull(material)) {
+      return null;
+    }
+
     const pass = material.mainPass as unknown as Record<string, unknown>;
     const blackTint = new vec3(0.035, 0.05, 0.075);
     const alpha = 0.62;
-    if (typeof pass['depthWrite'] !== 'undefined') {
-      pass['depthWrite'] = false;
-    }
-    if (typeof pass['depthTest'] !== 'undefined') {
-      pass['depthTest'] = true;
-    }
-    if (typeof pass['blendMode'] !== 'undefined') {
-      pass['blendMode'] = BlendMode.PremultipliedAlphaAuto;
-    }
+
+    this.trySetPassValue(pass, 'depthWrite', false);
+    this.trySetPassValue(pass, 'depthTest', true);
+    this.trySetPassValue(pass, 'blendMode', BlendMode.PremultipliedAlphaAuto);
     // Match ArvisGhostBlob's live water-shader configuration, then apply a
     // dark tint instead of the companion's phase color.
-    pass['Tweak_N171'] = 0.025 + alpha * 0.07;
-    pass['Tweak_N172'] = 0.012 + alpha * 0.035;
-    pass['Port_Input1_N016'] = 0.45 + alpha * 0.45;
-    pass['Port_Input1_N080'] = 0.55 + alpha * 0.35;
-    pass['Port_AO_N170'] = blackTint;
-    pass['Port_Emissive_N170'] = new vec3(0, 0, 0);
-    if (typeof pass['baseColor'] !== 'undefined') {
-      pass['baseColor'] = new vec4(
-        blackTint.x * alpha,
-        blackTint.y * alpha,
-        blackTint.z * alpha,
-        alpha
-      );
-    }
+    this.trySetPassValue(pass, 'Tweak_N171', 0.025 + alpha * 0.07);
+    this.trySetPassValue(pass, 'Tweak_N172', 0.012 + alpha * 0.035);
+    this.trySetPassValue(pass, 'Port_Input1_N016', 0.45 + alpha * 0.45);
+    this.trySetPassValue(pass, 'Port_Input1_N080', 0.55 + alpha * 0.35);
+    this.trySetPassValue(pass, 'Port_AO_N170', blackTint);
+    this.trySetPassValue(pass, 'Port_Emissive_N170', new vec3(0, 0, 0));
+    this.trySetPassValue(
+      pass,
+      'baseColor',
+      new vec4(blackTint.x * alpha, blackTint.y * alpha, blackTint.z * alpha, alpha)
+    );
+
     this.cancelButtonBackgroundMaterial = material;
     return material;
+  }
+
+  private trySetPassValue(
+    pass: Record<string, unknown>,
+    key: string,
+    value: unknown
+  ): void {
+    try {
+      (pass as Record<string, unknown>)[key] = value;
+    } catch (_error) {
+      // Some platforms/material passes expose a restricted property set.
+    }
+  }
+
+  private tryCloneMaterial(source: Material | null): Material | null {
+    if (isNull(source)) {
+      return null;
+    }
+    try {
+      return (source as Material).clone();
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  private resolveLegacyCancelTemplateMaterial(): Material | null {
+    try {
+      return requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material;
+    } catch (_error) {
+      return null;
+    }
   }
 
   private resolveCompanionBodyMaterial(): Material | null {
@@ -527,11 +565,24 @@ export class PaletteGrab extends BaseScriptComponent {
           'Component.RenderMeshVisual'
         ) as RenderMeshVisual[];
         for (let i = 0; i < visuals.length; i++) {
-          const material = visuals[i].mainMaterial;
+          let material: Material | null = null;
+          try {
+            material = visuals[i].mainMaterial;
+          } catch (_error) {
+            material = null;
+          }
           if (isNull(material)) {
             continue;
           }
-          const pass = material.mainPass as unknown as Record<string, unknown>;
+          let pass: Record<string, unknown> | null = null;
+          try {
+            pass = material.mainPass as unknown as Record<string, unknown>;
+          } catch (_error) {
+            pass = null;
+          }
+          if (isNull(pass)) {
+            continue;
+          }
           if (pass['scrollSpeed'] !== undefined || pass['opacityTextureA'] !== undefined) {
             return material;
           }

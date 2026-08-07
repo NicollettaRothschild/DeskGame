@@ -652,26 +652,6 @@
     CapitalizationOverride: None
   DepthTest: false
   TwoSided: false
-- !<RenderMeshVisual/0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f>
-  PrefabRemaps:
-    []
-  Name: Render Mesh Visual
-  Enabled: true
-  RenderOrder: 0
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> 55afd613-54c4-4571-9bf1-7994d5a8378f
-  Mesh: !<reference> 3799b093-633d-48bc-842e-fc20750539b9
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
 - !<SceneObject/0c384a6b-e0e5-473f-9eeb-b74a88ed647f>
   PrefabRemaps:
     []
@@ -1291,42 +1271,6 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<Text3D/1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a>
-  PrefabRemaps:
-    []
-  Name: Text3D
-  Enabled: true
-  RenderOrder: 1
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> 1c799e17-6e27-46dd-a915-f43c1635c47c
-  Text: ARVIS Space
-  Editable: false
-  ShowEditingPreview: true
-  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
-  SizeToFit: false
-  FontSize: 40
-  ExtrusionDepth: 0.450000
-  ExtrudeDirection: Both
-  Font: !<reference> e46c0d03-1d80-497d-aedb-7ad89ee27e57
-  LayoutRect:
-    left: -4.000000
-    bottom: -2.200000
-    right: 4.000000
-    top: 2.200000
-  OverflowVertical: Overflow
-  OverflowHorizontal: Wrap
-  AdvancedLayout: !<TextAdvancedLayout>
-    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
-    LetterSpacing: 0.000000
-    LineSpacing: 1.100000
-    CapitalizationOverride: None
-  EnableBatching: false
 - !<SceneObject/1dafc380-a186-4838-8fc3-5736c218fbd0>
   PrefabRemaps:
     []
@@ -1876,6 +1820,7 @@
   Enabled: true
   ScriptAsset: !<reference> 8f1e933e-b14e-4e42-ad12-3d136deefba5
   ScriptInputsDefault:
+    spacePanel: true
     apiBaseUrl: true
     pairPollSec: true
     taskPollSec: true
@@ -1951,42 +1896,6 @@
     - !<own> 1c697101-4099-4b9f-8433-be87b548041a
     - !<own> f6cd0957-c7fc-4a78-939b-5a4865b8e2cf
     - !<own> b83b93fb-fd2c-45d2-9cd4-719cab65d4fa
-- !<Text3D/2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b>
-  PrefabRemaps:
-    []
-  Name: Text3D
-  Enabled: true
-  RenderOrder: 2
-  StretchMode: Stretch
-  VerticalAlignment: Top
-  HorizontalAlignment: Left
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> 1c799e17-6e27-46dd-a915-f43c1635c47c
-  Text: Pair at arvis.space/specs to load your writing board.
-  Editable: false
-  ShowEditingPreview: true
-  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
-  SizeToFit: false
-  FontSize: 34
-  ExtrusionDepth: 0.350000
-  ExtrudeDirection: Both
-  Font: !<reference> e46c0d03-1d80-497d-aedb-7ad89ee27e57
-  LayoutRect:
-    left: -4.800000
-    bottom: -5.500000
-    right: 4.800000
-    top: 4.500000
-  OverflowVertical: Overflow
-  OverflowHorizontal: Wrap
-  AdvancedLayout: !<TextAdvancedLayout>
-    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
-    LetterSpacing: 0.000000
-    LineSpacing: 1.150000
-    CapitalizationOverride: None
-  EnableBatching: false
 - !<ScriptComponent/2f1d5633-3cd9-4bab-9a55-14f6f152b6b8>
   PrefabRemaps:
     []
@@ -2492,26 +2401,6 @@
     - !<reference> 51459ddc-287f-4bb8-8795-742a2b43f684
   Mesh: !<reference> ca686132-f3bd-4697-bc03-b8760b683704
   Skin: !<reference> eb681460-c41a-4fda-b80e-1f5dbab9c110
-  BlendShapesEnabled: true
-  BlendNormals: false
-  BlendShapes:
-    {}
-- !<RenderMeshVisual/3f4a5b6c-7d8e-9f0a-1b2c-3d4e5f6a7b8c>
-  PrefabRemaps:
-    []
-  Name: Render Mesh Visual
-  Enabled: true
-  RenderOrder: 3
-  StretchMode: Stretch
-  VerticalAlignment: Center
-  HorizontalAlignment: Center
-  MeshShadowMode: None
-  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
-  ShadowDensity: 1.000000
-  Materials:
-    - !<reference> c35011d8-594a-4df0-93b8-a8c8461f7666
-  Mesh: !<reference> 3799b093-633d-48bc-842e-fc20750539b9
-  Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
   BlendNormals: false
   BlendShapes:
@@ -3024,14 +2913,23 @@
     grabSoundVolume: true
     releaseSoundVolume: true
     enableGrabSounds: true
+    enablePetReaction: true
+    petSoundTrack: true
+    petReactionCooldownSec: true
+    petPokeColliderSize: true
+    petPokeLocalPosition: true
+    petDialogueLines: true
     enableSpeechBubble: true
     enableTts: true
     onboardingStartDelaySec: true
     onboardingGapSec: true
     onboardingPracticeTimeoutSec: true
+    onboardingPracticeFirstReminderSec: true
+    onboardingPracticeReminderMaxCount: true
     onboardingRequirePractice: true
     onboardingPresentDistanceCm: true
     onboardingPresentHeightCm: true
+    onboardingObjectSpacingCm: true
     onboardingWelcomeLine: true
     onboardingGlobeLine: true
     onboardingClockLine: true
@@ -3039,6 +2937,8 @@
     onboardingPlanterLine: true
     onboardingPostItLine: true
     onboardingTrashLine: true
+    onboardingLeaderboard: true
+    onboardingLeaderboardLine: true
     onboardingGoalListenTimeoutSec: true
     onboardingAutoGoalFallbackOnTimeout: true
     onboardingRequireGoalPotPractice: true
@@ -3056,6 +2956,16 @@
     idleBobAmplitudeCm: true
     idleBobSpeed: true
     goalCongratsLine: true
+    enableGoalLeaderboard: true
+    goalLeaderboardModule: true
+    goalLeaderboardName: true
+    goalLeaderboardTtlSec: true
+    nonDistanceGoalScore: true
+    leaderboardDistanceGoalsOnly: true
+    fetchLeaderboardAfterSubmit: true
+    leaderboardUsersLimit: true
+    leaderboardUseGlobal: true
+    announceLeaderboardRank: true
     enableFollowAfterOnboarding: true
     followDistanceCm: true
     followSideOffsetCm: true
@@ -3074,6 +2984,16 @@
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
+      enablePetReaction: true
+      petSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      petReactionCooldownSec: 2.500000
+      petPokeColliderSize: !<Vec3> {x: 3.400000, y: 4.200000, z: 3.400000}
+      petPokeLocalPosition: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.800000}
+      petDialogueLines: !<string[]>
+        - "Aww, thank you!"
+        - That tickles!
+        - "Hehe, I like that!"
+        - "You're a good friend."
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: true
@@ -3081,9 +3001,12 @@
       onboardingStartDelaySec: 2.500000
       onboardingGapSec: 0.500000
       onboardingPracticeTimeoutSec: !<float> 14.000000
+      onboardingPracticeFirstReminderSec: 7.500000
+      onboardingPracticeReminderMaxCount: 2
       onboardingRequirePractice: true
       onboardingPresentDistanceCm: !<float> 22.000000
       onboardingPresentHeightCm: !<float> 0.000000
+      onboardingObjectSpacingCm: !<float> 18.000000
       onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
       onboardingClosingLine: "You're all set! I'll tag along from here. Say hey friend if you want to talk again. When you finish your goal — or walk the distance — I'll congratulate you and your plant will fully grow. Have fun!"
       onboardingGlobe: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
@@ -3098,6 +3021,8 @@
       onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
       onboardingTrash: !<reference.SceneObject> f293204d-edc4-4b3a-8a09-4c89c40d6fa2
       onboardingTrashLine: "Here's the trash. Drop things into it to clean up."
+      onboardingLeaderboard: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to walk 20 meters."
       onboardingGoalSeedLine: "Here's your goal planter — the seed is already planted. Grab it, place it where you like, then water it. Walk goals grow automatically when you finish the distance. Or tell me when you're done!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
@@ -3122,8 +3047,18 @@
       idleBobAmplitudeCm: 1.500000
       idleBobSpeed: 1.800000
       goalCongratsLine: "Woohoo! You did it! I'm so proud of you — your plant is fully grown!"
+      enableGoalLeaderboard: true
+      goalLeaderboardModule: !<reference.LeaderboardModule> 00000000-0000-0000-0000-000000000000
+      goalLeaderboardName: DeskGameGoals
+      goalLeaderboardTtlSec: !<float> 31536000.000000
+      nonDistanceGoalScore: 100
+      leaderboardDistanceGoalsOnly: true
+      fetchLeaderboardAfterSubmit: true
+      leaderboardUsersLimit: 5
+      leaderboardUseGlobal: true
+      announceLeaderboardRank: false
       enableFollowAfterOnboarding: true
-      followDistanceCm: !<float> 45.000000
+      followDistanceCm: !<float> 55.000000
       followSideOffsetCm: !<float> 18.000000
       followHeightOffsetCm: !<float> -25.000000
       followLerpSpeed: 3.500000
@@ -3906,10 +3841,13 @@
     waterSplashIntensity: true
     waterSplashMaxParticles: true
     hoverTrack: true
+    leaderboardRoot: true
+    spacePanel: true
     enableDistanceCull: true
     distanceCullHideMeters: true
     distanceCullShowMeters: true
     distanceCullCheckIntervalSec: true
+    spawnMinSeparationCm: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -3956,6 +3894,7 @@
       paletteRoot: !<reference.SceneObject> 9aa42fcc-a72f-4475-a934-1f79675ea728
       globeRoot: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
       clockRoot: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
+      leaderboardRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
       sackMaterial: !<reference.Material> ea3432dd-be57-41c3-a289-4c81ee0b0e0f
@@ -3966,6 +3905,7 @@
       distanceCullHideMeters: !<float> 20.000000
       distanceCullShowMeters: !<float> 18.000000
       distanceCullCheckIntervalSec: 0.350000
+      spawnMinSeparationCm: !<float> 18.000000
       distanceCullIncludeFriend: false
   ScriptTypes:
     "":
@@ -4739,7 +4679,7 @@
   ScriptInputs:
     "":
       debugLogging: false
-      colliderSize: !<Vec3> {x: 420.000000, y: 420.000000, z: 220.000000}
+      colliderSize: !<Vec3> {x: 80.000000, y: 80.000000, z: 30.000000}
       grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
       releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000
@@ -6716,6 +6656,7 @@
   Enabled: true
   ScriptAsset: !<reference> 0f4a6303-5205-42a6-b0cd-0455ebca40bf
   ScriptInputsDefault:
+    spacePanel: true
     agentResponseText: true
     agentResponseText3D: true
     enableSpeechOutput: true
@@ -6977,6 +6918,9 @@
     preferArvisVoiceWhenPaired: true
     agentName: true
     debugLogging: true
+    cloudTtsTimeoutSec: true
+    nativeVoiceTimeoutSec: true
+    speakingLockTimeoutSec: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -6989,6 +6933,9 @@
       preferArvisVoiceWhenPaired: true
       agentName: Arvis
       debugLogging: true
+      cloudTtsTimeoutSec: !<float> 8.000000
+      nativeVoiceTimeoutSec: !<float> 7.000000
+      speakingLockTimeoutSec: !<float> 24.000000
   ScriptTypes:
     "":
       {}
@@ -7015,24 +6962,6 @@
   Shape: !<Box>
     FitVisual: true
     Size: {x: 15.000000, y: 15.000000, z: 15.000000}
-  Matter: !<reference> 00000000-0000-0000-0000-000000000000
-  Filter: !<reference> 00000000-0000-0000-0000-000000000000
-  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
-  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
-  EnableSmoothing: false
-  PositionTension: 30.000000
-  RotationTension: 30.000000
-  ForceCompound: false
-  Intangible: false
-  ShowCollider: false
-- !<ColliderComponent/a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d>
-  PrefabRemaps:
-    []
-  Name: Physics Collider
-  Enabled: true
-  Shape: !<Box>
-    FitVisual: false
-    Size: {x: 7.500000, y: 10.000000, z: 0.500000}
   Matter: !<reference> 00000000-0000-0000-0000-000000000000
   Filter: !<reference> 00000000-0000-0000-0000-000000000000
   OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
@@ -7654,21 +7583,6 @@
     []
   Components:
     []
-- !<SceneObject/b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e>
-  PrefabRemaps:
-    []
-  Name: SpaceTitle
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 4.200000, z: 0.700000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.200000, y: 1.200000, z: 1.200000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a
 - !<SceneObject/b5172c70-ed98-4164-b225-82e26f0df976>
   PrefabRemaps:
     []
@@ -8536,21 +8450,6 @@
     []
   Components:
     []
-- !<SceneObject/c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f>
-  PrefabRemaps:
-    []
-  Name: SpaceBody
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: -1.800000, z: 0.700000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 0.900000, y: 0.900000, z: 0.900000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b
 - !<SceneObject/c5e6509e-d5dc-47a0-9426-729d77870bd8>
   PrefabRemaps:
     []
@@ -9709,21 +9608,6 @@
   ScriptTypes:
     "":
       {}
-- !<SceneObject/d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a>
-  PrefabRemaps:
-    []
-  Name: SpaceImage
-  Enabled: false
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: -6.500000, z: 0.700000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 6.000000, y: 6.000000, z: 0.100000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 3f4a5b6c-7d8e-9f0a-1b2c-3d4e5f6a7b8c
 - !<RenderMeshVisual/d63e43a6-656c-456e-9655-25a9e52d5d1c>
   PrefabRemaps:
     []
@@ -10580,49 +10464,6 @@
   Components:
     - !<own> 3f246ad7-868c-4df4-980c-3d9852f2da5b
     - !<own> c41e67dc-81b3-4543-9a38-cabf581bdb07
-- !<ScriptComponent/e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b>
-  PrefabRemaps:
-    []
-  Name: InteractableManipulation
-  Enabled: true
-  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
-  ScriptInputsDefault:
-    minimumScaleFactor: true
-    maximumScaleFactor: true
-    zStretchFactorMin: true
-    zStretchFactorMax: true
-    useFilter: true
-    showTranslationProperties: true
-    _enableXTranslation: true
-    _enableYTranslation: true
-    _enableZTranslation: true
-    showRotationProperties: true
-    _rotationAxis: true
-    isSynced: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      manipulateRootSceneObject: !<reference.SceneObject> e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2
-      enableTranslation: false
-      enableRotation: false
-      enableScale: false
-      minimumScaleFactor: 0.250000
-      maximumScaleFactor: !<float> 20.000000
-      enableStretchZ: false
-      zStretchFactorMin: !<float> 1.000000
-      zStretchFactorMax: !<float> 12.000000
-      useFilter: true
-      showTranslationProperties: false
-      _enableXTranslation: true
-      _enableYTranslation: true
-      _enableZTranslation: true
-      showRotationProperties: false
-      _rotationAxis: All
-      isSynced: false
-  ScriptTypes:
-    "":
-      {}
 - !<RenderMeshVisual/e7ed69a6-4bc7-40cd-b3db-01f9557f99fd>
   PrefabRemaps:
     []
@@ -10643,26 +10484,6 @@
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2>
-  PrefabRemaps:
-    []
-  Name: SpacePanel
-  Enabled: false
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 24.000000, y: 10.000000, z: -18.000000}
-    Rotation: {x: 0.000000, y: -18.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    - !<own> f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c
-    - !<own> b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e
-    - !<own> c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f
-    - !<own> d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a
-  Components:
-    - !<own> a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d
-    - !<own> f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c
-    - !<own> e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b
 - !<ScriptComponent/e819184b-3907-48f0-a104-01f19156b3fd>
   PrefabRemaps:
     []
@@ -11679,21 +11500,6 @@
     CapitalizationOverride: None
   DepthTest: false
   TwoSided: false
-- !<SceneObject/f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c>
-  PrefabRemaps:
-    []
-  Name: PanelBackground
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 9.500000, y: 12.000000, z: 0.200000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f
 - !<Text3D/f1a2b3c4-d5e6-4f7a-9b0c-1d2e3f4a5b6c>
   PrefabRemaps:
     []
@@ -11978,43 +11784,6 @@
     - !<own> a1b2c3d4-e5f6-4789-a012-000000000101
     - !<own> a1b2c3d4-e5f6-4789-a012-000000000102
     - !<own> a1b2c3d4-e5f6-4789-a012-000000000103
-- !<ScriptComponent/f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c>
-  PrefabRemaps:
-    []
-  Name: Interactable
-  Enabled: true
-  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
-  ScriptInputsDefault:
-    targetingMode: true
-    targetingVisual: true
-    ignoreInteractionPlane: true
-    keepHoverOnTrigger: true
-    isScrollable: true
-    allowMultipleInteractors: true
-    enablePokeDirectionality: true
-    acceptableXDirections: true
-    acceptableYDirections: true
-    acceptableZDirections: true
-    useFilteredPinch: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      targetingMode: !<float> 3.000000
-      targetingVisual: !<float> 1.000000
-      ignoreInteractionPlane: false
-      keepHoverOnTrigger: false
-      enableInstantDrag: true
-      isScrollable: false
-      allowMultipleInteractors: true
-      enablePokeDirectionality: false
-      acceptableXDirections: !<float> 0.000000
-      acceptableYDirections: !<float> 0.000000
-      acceptableZDirections: !<float> 1.000000
-      useFilteredPinch: false
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/f7dc3c08-5d67-469f-be9a-a106d8fd9b51>
   PrefabRemaps:
     []

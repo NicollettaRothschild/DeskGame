@@ -26,7 +26,9 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    {}
+    anchorController: false
+    colliderSize: false
+    debugLogging: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -36,10 +38,13 @@
   Attachments:
     []
   DefaultScriptInputs:
-    -
-      {}
+    - debugLogging: false
+      colliderSize: !<Vec3> {x: 110.000000, y: 95.000000, z: 24.000000}
+      anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}
   InputLines:
-    []
+    - // @input bool debugLogging
+    - "// @input vec3 colliderSize = {110,95,24}"
+    - // @input Component.ScriptComponent anchorController

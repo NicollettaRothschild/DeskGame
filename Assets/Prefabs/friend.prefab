@@ -354,6 +354,12 @@
     grabSoundVolume: true
     releaseSoundVolume: true
     enableGrabSounds: true
+    enablePetReaction: true
+    petSoundTrack: true
+    petReactionCooldownSec: true
+    petPokeColliderSize: true
+    petPokeLocalPosition: true
+    petDialogueLines: true
     enableSpeechBubble: true
     enableTts: true
     enableOnboarding: true
@@ -361,9 +367,12 @@
     onboardingStartDelaySec: true
     onboardingGapSec: true
     onboardingPracticeTimeoutSec: true
+    onboardingPracticeFirstReminderSec: true
+    onboardingPracticeReminderMaxCount: true
     onboardingRequirePractice: true
     onboardingPresentDistanceCm: true
     onboardingPresentHeightCm: true
+    onboardingObjectSpacingCm: true
     onboardingWelcomeLine: true
     onboardingClosingLine: true
     onboardingGlobe: true
@@ -378,6 +387,8 @@
     onboardingPostItLine: true
     onboardingTrash: true
     onboardingTrashLine: true
+    onboardingLeaderboard: true
+    onboardingLeaderboardLine: true
     onboardingGoalPromptLine: true
     onboardingGoalSeedLine: true
     onboardingGoalListenTimeoutSec: true
@@ -398,6 +409,16 @@
     idleBobAmplitudeCm: true
     idleBobSpeed: true
     goalCongratsLine: true
+    enableGoalLeaderboard: true
+    goalLeaderboardModule: true
+    goalLeaderboardName: true
+    goalLeaderboardTtlSec: true
+    nonDistanceGoalScore: true
+    leaderboardDistanceGoalsOnly: true
+    fetchLeaderboardAfterSubmit: true
+    leaderboardUsersLimit: true
+    leaderboardUseGlobal: true
+    announceLeaderboardRank: true
     enableFollowAfterOnboarding: true
     followDistanceCm: true
     followSideOffsetCm: true
@@ -416,6 +437,16 @@
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
+      enablePetReaction: true
+      petSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      petReactionCooldownSec: 2.500000
+      petPokeColliderSize: !<Vec3> {x: 3.400000, y: 4.200000, z: 3.400000}
+      petPokeLocalPosition: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.800000}
+      petDialogueLines: !<string[]>
+        - "Aww, thank you!"
+        - That tickles!
+        - "Hehe, I like that!"
+        - "You're a good friend."
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: false
@@ -423,9 +454,12 @@
       onboardingStartDelaySec: 2.500000
       onboardingGapSec: 0.500000
       onboardingPracticeTimeoutSec: !<float> 14.000000
+      onboardingPracticeFirstReminderSec: 7.500000
+      onboardingPracticeReminderMaxCount: 2
       onboardingRequirePractice: true
       onboardingPresentDistanceCm: !<float> 22.000000
       onboardingPresentHeightCm: !<float> 0.000000
+      onboardingObjectSpacingCm: !<float> 18.000000
       onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
       onboardingClosingLine: "You're all set! Say hey Arvis if you need help. Have fun!"
       onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
@@ -440,6 +474,8 @@
       onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
       onboardingTrash: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingTrashLine: "Here's the trash. Drop things into it to clean up."
+      onboardingLeaderboard: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
       onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
@@ -464,6 +500,16 @@
       idleBobAmplitudeCm: 1.500000
       idleBobSpeed: 1.800000
       goalCongratsLine: "Woohoo! You did it! I'm so proud of you — your plant is fully grown!"
+      enableGoalLeaderboard: true
+      goalLeaderboardModule: !<reference.LeaderboardModule> 00000000-0000-0000-0000-000000000000
+      goalLeaderboardName: DeskGameGoals
+      goalLeaderboardTtlSec: !<float> 31536000.000000
+      nonDistanceGoalScore: 100
+      leaderboardDistanceGoalsOnly: true
+      fetchLeaderboardAfterSubmit: true
+      leaderboardUsersLimit: 5
+      leaderboardUseGlobal: true
+      announceLeaderboardRank: false
       enableFollowAfterOnboarding: true
       followDistanceCm: !<float> 55.000000
       followSideOffsetCm: !<float> 18.000000

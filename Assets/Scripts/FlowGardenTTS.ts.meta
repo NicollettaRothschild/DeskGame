@@ -27,9 +27,12 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     agentName: false
+    cloudTtsTimeoutSec: false
     debugLogging: false
     deviceRegistry: false
+    nativeVoiceTimeoutSec: false
     preferArvisVoiceWhenPaired: false
+    speakingLockTimeoutSec: false
     specsApi: false
     speed: false
     ttsModule: false
@@ -51,6 +54,9 @@
       preferArvisVoiceWhenPaired: true
       agentName: Arvis
       debugLogging: true
+      cloudTtsTimeoutSec: !<float> 8.000000
+      nativeVoiceTimeoutSec: !<float> 7.000000
+      speakingLockTimeoutSec: !<float> 24.000000
   ScriptTypes:
     -
       {}
@@ -63,3 +69,6 @@
     - // @input bool preferArvisVoiceWhenPaired = true
     - '// @input string agentName = "Arvis"'
     - // @input bool debugLogging = true
+    - // @input float cloudTtsTimeoutSec = 8
+    - // @input float nativeVoiceTimeoutSec = 7
+    - // @input float speakingLockTimeoutSec = 24
