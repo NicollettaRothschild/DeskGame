@@ -193,7 +193,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Welcome Line')
   onboardingWelcomeLine: string =
-    "Hey there! I'm your companion, and I've got some objects for you that you can add to your space one by one.";
+    "Hi! I’m your companion. Let’s set up your space! I’ll give you a few tools, and you can put them wherever they work best for you.";
 
   @input
   @label('Closing Line')
@@ -218,7 +218,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Clock Line')
   onboardingClockLine: string =
-    "Here's the clock. Grab it, move it, then let go.";
+    "Here’s your clock. Put it somewhere easy to check while you work.";
 
   @input
   @allowUndefined
@@ -228,7 +228,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Palette Line')
   onboardingPaletteLine: string =
-    "Here's the palette. Grab and release to place it where you like.";
+    "This is your palette. Paint your world with it! Put it somewhere you can reach while you work.";
 
   @input
   @allowUndefined
@@ -238,7 +238,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Planter Line')
   onboardingPlanterLine: string =
-    "Here's the planter stack for extra pots later.";
+    "This is your garden. Your goals will grow into plants here. Find a good spot for your extra planters.";
 
   @input
   @allowUndefined
@@ -248,7 +248,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Post-it Line')
   onboardingPostItLine: string =
-    "Here's the sticky notes. Pull one and speak — your words appear on it.";
+    "These are your sticky notes. Pull one out and start speaking, and I’ll write down what you say.";
 
   @input
   @allowUndefined
@@ -258,7 +258,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Trash Line')
   onboardingTrashLine: string =
-    "Here's the trash. Drop things into it to clean up.";
+    "And here’s the trash. Put it wherever you like, then drop things in when you don’t need them anymore.";
 
   @input
   @allowUndefined
@@ -279,7 +279,7 @@ export class FriendGrab extends BaseScriptComponent {
   @input
   @label('Goal Planted Pot Line')
   onboardingGoalSeedLine: string =
-    "Here's your goal planter — the seed is already planted. Grab it, place it where you like, then water it. Walk goals grow automatically when you finish the distance. Or tell me when you're done!";
+    "There it is! Every goal starts as a seed. Put your planter somewhere you’ll see it, then give it some water. Your plant will grow as you make progress.";
 
   @input('float')
   @label('Goal Listen Timeout (sec)')

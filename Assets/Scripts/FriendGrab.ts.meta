@@ -235,24 +235,24 @@
     - '// @input float onboardingPresentDistanceCm = 22 {"label":"Present Distance (cm)"}'
     - '// @input float onboardingPresentHeightCm {"label":"Present Height Offset (cm)"}'
     - '// @input float onboardingObjectSpacingCm = 18 {"label":"Onboarding Object Spacing (cm)"}'
-    - "// @input string onboardingWelcomeLine = \"Hey there! I'm your companion, and I've got some objects for you that you can add to your space one by one.\" {\"label\":\"Welcome Line\"}"
+    - '// @input string onboardingWelcomeLine = "Hi! I’m your companion. Let’s set up your space! I’ll give you a few tools, and you can put them wherever they work best for you." {"label":"Welcome Line"}'
     - "// @input string onboardingClosingLine = \"You're all set! Say hey friend if you want to talk again. When you finish your goal, say I finished my goal. Have fun!\" {\"label\":\"Closing Line\"}"
     - '// @input SceneObject onboardingGlobe {"label":"Tour Globe"}'
     - "// @input string onboardingGlobeLine = \"Here's the globe. Pinch to grab it, move it, then release.\" {\"label\":\"Globe Line\"}"
     - '// @input SceneObject onboardingClock {"label":"Tour Clock"}'
-    - "// @input string onboardingClockLine = \"Here's the clock. Grab it, move it, then let go.\" {\"label\":\"Clock Line\"}"
+    - '// @input string onboardingClockLine = "Here’s your clock. Put it somewhere easy to check while you work." {"label":"Clock Line"}'
     - '// @input SceneObject onboardingPalette {"label":"Tour Palette"}'
-    - "// @input string onboardingPaletteLine = \"Here's the palette. Grab and release to place it where you like.\" {\"label\":\"Palette Line\"}"
+    - '// @input string onboardingPaletteLine = "This is your palette. Paint your world with it! Put it somewhere you can reach while you work." {"label":"Palette Line"}'
     - '// @input SceneObject onboardingPlanter {"label":"Tour Planter"}'
-    - "// @input string onboardingPlanterLine = \"Here's the planter stack for extra pots later.\" {\"label\":\"Planter Line\"}"
+    - '// @input string onboardingPlanterLine = "This is your garden. Your goals will grow into plants here. Find a good spot for your extra planters." {"label":"Planter Line"}'
     - '// @input SceneObject onboardingPostIt {"label":"Tour Post-its"}'
-    - "// @input string onboardingPostItLine = \"Here's the sticky notes. Pull one and speak — your words appear on it.\" {\"label\":\"Post-it Line\"}"
+    - '// @input string onboardingPostItLine = "These are your sticky notes. Pull one out and start speaking, and I’ll write down what you say." {"label":"Post-it Line"}'
     - '// @input SceneObject onboardingTrash {"label":"Tour Trash"}'
-    - "// @input string onboardingTrashLine = \"Here's the trash. Drop things into it to clean up.\" {\"label\":\"Trash Line\"}"
+    - '// @input string onboardingTrashLine = "And here’s the trash. Put it wherever you like, then drop things in when you don’t need them anymore." {"label":"Trash Line"}'
     - '// @input SceneObject onboardingLeaderboard {"label":"Tour Leaderboard"}'
     - "// @input string onboardingLeaderboardLine = \"And here's your distance leaderboard. Grab it to place it anywhere in your space.\" {\"label\":\"Leaderboard Line\"}"
     - '// @input string onboardingGoalPromptLine = "What goal should we grow together? Say something like: I want to walk 20 meters." {"label":"Goal Prompt Line", "hint":"Spoken after the tour; Friend waits for the player to say a goal"}'
-    - "// @input string onboardingGoalSeedLine = \"Here's your goal planter — the seed is already planted. Grab it, place it where you like, then water it. Walk goals grow automatically when you finish the distance. Or tell me when you're done!\" {\"label\":\"Goal Planted Pot Line\"}"
+    - '// @input string onboardingGoalSeedLine = "There it is! Every goal starts as a seed. Put your planter somewhere you’ll see it, then give it some water. Your plant will grow as you make progress." {"label":"Goal Planted Pot Line"}'
     - '// @input float onboardingGoalListenTimeoutSec = 22 {"label":"Goal Listen Timeout (sec)"}'
     - '// @input string onboardingGoalFallback = "I want to walk 20 meters" {"label":"Goal Fallback Example"}'
     - '// @input bool onboardingAutoGoalFallbackOnTimeout {"label":"Auto Goal Fallback On Timeout", "hint":"When enabled, uses Goal Fallback Example if no goal is heard before timeout."}'
