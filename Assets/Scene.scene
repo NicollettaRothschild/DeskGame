@@ -1869,7 +1869,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.574335, z: 0.000000}
+    Position: {x: 0.000000, y: 0.750859, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 0.671170, y: 0.671170, z: 0.671170}
     HasSegmentScaleCompensation: false
@@ -2930,13 +2930,7 @@
     onboardingPresentDistanceCm: true
     onboardingPresentHeightCm: true
     onboardingObjectSpacingCm: true
-    onboardingWelcomeLine: true
     onboardingGlobeLine: true
-    onboardingClockLine: true
-    onboardingPaletteLine: true
-    onboardingPlanterLine: true
-    onboardingPostItLine: true
-    onboardingTrashLine: true
     onboardingLeaderboard: true
     onboardingLeaderboardLine: true
     onboardingGoalListenTimeoutSec: true
@@ -3007,24 +3001,24 @@
       onboardingPresentDistanceCm: !<float> 22.000000
       onboardingPresentHeightCm: !<float> 0.000000
       onboardingObjectSpacingCm: !<float> 18.000000
-      onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
+      onboardingWelcomeLine: "Hi! I’m your companion. Let’s set up your space! I’ll give you a few tools, and you can put them wherever they work best for you."
       onboardingClosingLine: "You're all set! I'll tag along from here. Say hey friend if you want to talk again. When you finish your goal — or walk the distance — I'll congratulate you and your plant will fully grow. Have fun!"
       onboardingGlobe: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
       onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
       onboardingClock: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
-      onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
+      onboardingClockLine: Here’s your clock. Put it somewhere easy to check while you work.
       onboardingPalette: !<reference.SceneObject> 9aa42fcc-a72f-4475-a934-1f79675ea728
-      onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
+      onboardingPaletteLine: This is your palette. Paint your world with it! Put it somewhere you can reach while you work.
       onboardingPlanter: !<reference.SceneObject> 7c7350dc-41a2-4426-a5bb-047d14525a11
-      onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
+      onboardingPlanterLine: This is your garden. Your goals will grow into plants here. Find a good spot for your extra planters.
       onboardingPostIt: !<reference.SceneObject> d7569447-6ffa-4d71-9778-b93af9b8cb95
-      onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
+      onboardingPostItLine: "These are your sticky notes. Pull one out and start speaking, and I’ll write down what you say."
       onboardingTrash: !<reference.SceneObject> f293204d-edc4-4b3a-8a09-4c89c40d6fa2
-      onboardingTrashLine: "Here's the trash. Drop things into it to clean up."
+      onboardingTrashLine: "And here’s the trash. Put it wherever you like, then drop things in when you don’t need them anymore."
       onboardingLeaderboard: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to walk 20 meters."
-      onboardingGoalSeedLine: "Here's your goal planter — the seed is already planted. Grab it, place it where you like, then water it. Walk goals grow automatically when you finish the distance. Or tell me when you're done!"
+      onboardingGoalSeedLine: "There it is! Every goal starts as a seed. Put your planter somewhere you’ll see it, then give it some water. Your plant will grow as you make progress."
       onboardingGoalListenTimeoutSec: !<float> 22.000000
       onboardingGoalFallback: I want to walk 20 meters
       onboardingAutoGoalFallbackOnTimeout: false
