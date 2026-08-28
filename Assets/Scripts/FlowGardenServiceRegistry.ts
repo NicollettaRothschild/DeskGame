@@ -17,6 +17,7 @@ let friendGrab: FriendGrabLike | null = null;
 
 export type FriendGrabLike = {
   restartOnboardingTour?: (reason?: string) => boolean;
+  showSpeech?: (text: string, speak?: boolean) => void;
 };
 
 export function registerSpeechRecognition(instance: SpeechRecognition): void {

@@ -111,10 +111,36 @@ export class PlantLifecycle extends BaseScriptComponent {
   private static readonly GROWTH_SIZE_DIVISOR = 3;
   /** Goal plants pause ~60% grown until the player finishes the goal. */
   private static readonly GOAL_GROWTH_CAP_RATIO = 0.6;
-  private static readonly GOAL_LABEL_OFFSET = new vec3(18, 18, 0);
-  private static readonly GOAL_LABEL_HALF_WIDTH = 65;
-  private static readonly GOAL_LABEL_HALF_HEIGHT = 14;
-  private static readonly GOAL_LABEL_TEXT_SIZE = 20;
+  /** Goal labels are compact world-space tags positioned above the active plant model. */
+  private static readonly GOAL_LABEL_FALLBACK_OFFSET = new vec3(0, 32, 0);
+  private static readonly GOAL_LABEL_MIN_OFFSET_Y = 24;
+  private static readonly GOAL_LABEL_MARGIN_Y = 8;
+  private static readonly GOAL_LABEL_MIN_WIDTH = 8;
+  private static readonly GOAL_LABEL_MAX_WIDTH = 18;
+  private static readonly GOAL_LABEL_HALF_HEIGHT = 1.25;
+  private static readonly GOAL_LABEL_TEXT_SIZE = 24;
+  private static readonly GOAL_LABEL_DEPTH = 0.16;
+  private static readonly GOAL_LABEL_BACKGROUND_COLOR = new vec4(
+    0.025,
+    0.09,
+    0.055,
+    0.9
+  );
+  private static readonly GOAL_LABEL_TEXT_COLOR = new vec4(1.0, 1.0, 1.0, 1.0);
+  private static readonly GOAL_LABEL_COMPLETE_TEXT_COLOR = new vec4(
+    0.55,
+    1.0,
+    0.65,
+    1.0
+  );
+  private static readonly GOAL_LABEL_TEXT_COLOR_KEYS = [
+    'frontCapStartingColor',
+    'backCapStartingColor',
+    'outerEdgeStartingColor',
+    'outerEdgeEndingColor',
+    'InnerEdgeStartingColor',
+    'InnerEdgeEndingColor',
+  ];
   /** Ignore sub-cm camera jitter when accumulating walk distance (world units = cm). */
   private static readonly WALK_SAMPLE_MIN_CM = 2;
   private static goalPlantRegistry: PlantLifecycle[] = [];
@@ -134,6 +160,8 @@ export class PlantLifecycle extends BaseScriptComponent {
   private walkProgressLogTimer = 0;
   private goalLabelRoot: SceneObject | null = null;
   private goalLabelText3D: Text3D | null = null;
+  private goalLabelBackground: RenderMeshVisual | null = null;
+  private goalLabelTextMaterial: Material | null = null;
   private goalLabelLookAt: LookAtComponent | null = null;
   private goalLabelCamera: SceneObject | null = null;
 
@@ -2113,6 +2141,8 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     const prefix = this.goalCompleted ? 'Goal complete:' : 'Goal:';
     this.goalLabelText3D.text = `${prefix} ${this.goalText}`;
+    this.updateGoalLabelLayout();
+    this.updateGoalLabelTextColor();
     this.goalLabelRoot.enabled = true;
     this.updateGoalLabelTransform();
   }
@@ -2127,7 +2157,8 @@ export class PlantLifecycle extends BaseScriptComponent {
     root.setParent(host);
     root.layer = host.layer;
     root.enabled = false;
-    root.getTransform().setLocalPosition(PlantLifecycle.GOAL_LABEL_OFFSET);
+    root.getTransform().setLocalPosition(PlantLifecycle.GOAL_LABEL_FALLBACK_OFFSET);
+    root.getTransform().setLocalRotation(quat.quatIdentity());
 
     const text3d = root.createComponent('Component.Text3D') as Text3D;
     text3d.enabled = true;
@@ -2135,20 +2166,37 @@ export class PlantLifecycle extends BaseScriptComponent {
     text3d.size = PlantLifecycle.GOAL_LABEL_TEXT_SIZE;
     text3d.extrusionDepth = 0.06;
     text3d.lineSpacing = 1.05;
-    text3d.horizontalAlignment = HorizontalAlignment.Left;
+    text3d.horizontalAlignment = HorizontalAlignment.Center;
     text3d.verticalAlignment = VerticalAlignment.Center;
-    text3d.horizontalOverflow = HorizontalOverflow.Wrap;
+    text3d.horizontalOverflow = HorizontalOverflow.Shrink;
     text3d.verticalOverflow = VerticalOverflow.Overflow;
-    text3d.worldSpaceRect = Rect.create(
-      -PlantLifecycle.GOAL_LABEL_HALF_WIDTH,
-      PlantLifecycle.GOAL_LABEL_HALF_WIDTH,
-      -PlantLifecycle.GOAL_LABEL_HALF_HEIGHT,
-      PlantLifecycle.GOAL_LABEL_HALF_HEIGHT
-    );
-    text3d.renderOrder = 13;
+    text3d.renderOrder = 31;
+
+    try {
+      const template = requireAsset('Text3D.mat') as Material;
+      this.goalLabelTextMaterial = template.clone();
+      text3d.mainMaterial = this.goalLabelTextMaterial;
+    } catch (_error) {
+      this.goalLabelTextMaterial = null;
+    }
+
+    const backgroundObject = global.scene.createSceneObject('GoalLabelBackground');
+    backgroundObject.setParent(root);
+    backgroundObject.layer = host.layer;
+    backgroundObject.getTransform().setLocalPosition(new vec3(0, 0, -0.04));
+    backgroundObject.getTransform().setLocalRotation(quat.quatIdentity());
+
+    const background = backgroundObject.createComponent(
+      'Component.RenderMeshVisual'
+    ) as RenderMeshVisual;
+    background.enabled = true;
+    background.mesh = requireAsset('Meshes/StarCatchSphere.mesh') as RenderMesh;
+    background.mainMaterial = this.createGoalLabelBackgroundMaterial();
+    background.renderOrder = 30;
 
     this.goalLabelRoot = root;
     this.goalLabelText3D = text3d;
+    this.goalLabelBackground = background;
     this.goalLabelLookAt = root.createComponent('Component.LookAtComponent') as LookAtComponent;
     if (!isNull(this.goalLabelLookAt)) {
       this.goalLabelLookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
@@ -2158,17 +2206,103 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
   }
 
+  private updateGoalLabelLayout(): void {
+    if (isNull(this.goalLabelText3D)) {
+      return;
+    }
+
+    const text = String(this.goalLabelText3D.text || '').trim();
+    const labelWidth = Math.max(
+      PlantLifecycle.GOAL_LABEL_MIN_WIDTH,
+      Math.min(PlantLifecycle.GOAL_LABEL_MAX_WIDTH, text.length * 0.32 + 3.8)
+    );
+    this.goalLabelText3D.worldSpaceRect = Rect.create(
+      -labelWidth * 0.5,
+      labelWidth * 0.5,
+      -PlantLifecycle.GOAL_LABEL_HALF_HEIGHT,
+      PlantLifecycle.GOAL_LABEL_HALF_HEIGHT
+    );
+
+    if (!isNull(this.goalLabelBackground)) {
+      this.goalLabelBackground
+        .getSceneObject()
+        .getTransform()
+        .setLocalScale(
+          new vec3(
+            labelWidth,
+            PlantLifecycle.GOAL_LABEL_HALF_HEIGHT * 2.2,
+            PlantLifecycle.GOAL_LABEL_DEPTH
+          )
+        );
+    }
+  }
+
+  private updateGoalLabelTextColor(): void {
+    if (isNull(this.goalLabelTextMaterial)) {
+      return;
+    }
+
+    const pass = this.goalLabelTextMaterial.mainPass as unknown as Record<string, unknown>;
+    const color = this.goalCompleted
+      ? PlantLifecycle.GOAL_LABEL_COMPLETE_TEXT_COLOR
+      : PlantLifecycle.GOAL_LABEL_TEXT_COLOR;
+    for (let i = 0; i < PlantLifecycle.GOAL_LABEL_TEXT_COLOR_KEYS.length; i++) {
+      this.trySetGoalLabelPassValue(pass, PlantLifecycle.GOAL_LABEL_TEXT_COLOR_KEYS[i], color);
+    }
+    this.trySetGoalLabelPassValue(pass, 'depthWrite', false);
+    this.trySetGoalLabelPassValue(pass, 'depthTest', true);
+  }
+
+  private createGoalLabelBackgroundMaterial(): Material {
+    let material: Material | null = null;
+    try {
+      const template = requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material;
+      material = template.clone();
+    } catch (_error) {
+      material = null;
+    }
+
+    if (isNull(material)) {
+      return requireAsset('Text3D.mat') as Material;
+    }
+
+    const pass = material.mainPass as unknown as Record<string, unknown>;
+    this.trySetGoalLabelPassValue(
+      pass,
+      'baseColor',
+      PlantLifecycle.GOAL_LABEL_BACKGROUND_COLOR
+    );
+    this.trySetGoalLabelPassValue(pass, 'depthWrite', false);
+    this.trySetGoalLabelPassValue(pass, 'depthTest', true);
+    this.trySetGoalLabelPassValue(pass, 'blendMode', BlendMode.PremultipliedAlphaAuto);
+    return material;
+  }
+
+  private trySetGoalLabelPassValue(
+    pass: Record<string, unknown>,
+    key: string,
+    value: unknown
+  ): void {
+    try {
+      pass[key] = value;
+    } catch (_error) {
+      // Some material passes expose a restricted property set.
+    }
+  }
+
   private updateGoalLabelTransform(): void {
     if (isNull(this.goalLabelRoot) || !this.goalLabelRoot.enabled) {
       return;
     }
 
-    const hostScale = this.getSceneObject().getTransform().getLocalScale();
+    const hostScale = this.getHierarchyWorldScale(this.getSceneObject());
     const invX = 1 / Math.max(0.001, Math.abs(hostScale.x));
     const invY = 1 / Math.max(0.001, Math.abs(hostScale.y));
     const invZ = 1 / Math.max(0.001, Math.abs(hostScale.z));
     this.goalLabelRoot.getTransform().setLocalScale(new vec3(invX, invY, invZ));
-    this.goalLabelRoot.getTransform().setLocalPosition(PlantLifecycle.GOAL_LABEL_OFFSET);
+    this.goalLabelRoot
+      .getTransform()
+      .setLocalPosition(this.measureGoalLabelLocalPosition());
 
     if (isNull(this.goalLabelLookAt)) {
       return;
@@ -2183,6 +2317,55 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     this.goalLabelLookAt.target = this.goalLabelCamera;
     this.goalLabelLookAt.enabled = true;
+  }
+
+  private measureGoalLabelLocalPosition(): vec3 {
+    const fallback = PlantLifecycle.GOAL_LABEL_FALLBACK_OFFSET;
+    const model = this.getActiveStageModel();
+    if (isNull(model)) {
+      return fallback;
+    }
+
+    const hostWorldToLocal = this.getSceneObject()
+      .getTransform()
+      .getWorldTransform()
+      .inverse();
+    const visuals = this.findChildMeshVisuals(model as SceneObject);
+    if (visuals.length === 0) {
+      return fallback;
+    }
+
+    const corners: vec3[] = [];
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let i = 0; i < visuals.length; i++) {
+      if (isNull(visuals[i]) || !visuals[i].enabled) {
+        continue;
+      }
+      this.appendWorldAabbCorners(corners, visuals[i].worldAabbMin(), visuals[i].worldAabbMax());
+    }
+
+    for (let i = 0; i < corners.length; i++) {
+      const localPoint = hostWorldToLocal.multiplyPoint(corners[i]);
+      minX = Math.min(minX, localPoint.x);
+      maxX = Math.max(maxX, localPoint.x);
+      maxY = Math.max(maxY, localPoint.y);
+      minZ = Math.min(minZ, localPoint.z);
+      maxZ = Math.max(maxZ, localPoint.z);
+    }
+
+    if (maxY === -Infinity) {
+      return fallback;
+    }
+
+    return new vec3(
+      (minX + maxX) * 0.5,
+      Math.max(PlantLifecycle.GOAL_LABEL_MIN_OFFSET_Y, maxY + PlantLifecycle.GOAL_LABEL_MARGIN_Y),
+      (minZ + maxZ) * 0.5
+    );
   }
 
   private findCameraObject(): SceneObject | null {

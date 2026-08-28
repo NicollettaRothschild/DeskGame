@@ -1,11 +1,22 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable';
 import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
+import { InteractorInputType } from 'SpectaclesInteractionKit.lspkg/Core/Interactor/Interactor';
+import { SIK } from 'SpectaclesInteractionKit.lspkg/SIK';
+import { GLOBE_COUNTRY_REGIONS, GlobeCountryRegion } from './GlobeCountryData';
+import {
+  getSharedFlowGardenTts,
+  getSharedFriendGrab,
+} from './FlowGardenServiceRegistry';
 
 type InteractableLike = ScriptComponent & {
   targetingMode?: number;
   ignoreInteractionPlane?: boolean;
   keepHoverOnTrigger?: boolean;
   enableInstantDrag?: boolean;
+  onHoverEnter?: { add: (cb: (event?: InteractorEventLike) => void) => void };
+  onHoverExit?: { add: (cb: (event?: InteractorEventLike) => void) => void };
+  onInteractorHoverEnter?: { add: (cb: (event?: InteractorEventLike) => void) => void };
+  onInteractorHoverExit?: { add: (cb: (event?: InteractorEventLike) => void) => void };
   onDragStart?: { add: (cb: () => void) => void };
   onDragEnd?: { add: (cb: () => void) => void };
   onTriggerEnd?: { add: (cb: () => void) => void };
@@ -22,6 +33,18 @@ type InteractableManipulationLike = ScriptComponent & {
   useFilter?: boolean;
   onManipulationStart?: { add: (cb: () => void) => void };
   onManipulationEnd?: { add: (cb: () => void) => void };
+};
+
+type InteractorLike = {
+  startPoint?: vec3 | null;
+  direction?: vec3 | null;
+  targetHitPosition?: vec3 | null;
+  planecastPoint?: vec3 | null;
+  isActive?: () => boolean;
+};
+
+type InteractorEventLike = {
+  interactor?: InteractorLike | null;
 };
 
 /**
@@ -73,8 +96,25 @@ export class GlobeGrab extends BaseScriptComponent {
   private grabAudioPlayer: AudioComponent | null = null;
   private resolvedGrabTrack: AudioTrackAsset | null = null;
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
+  private countryHoverWired = false;
+  private countryHoverActive = false;
+  private countryHoverPollingFallback = false;
+  private hoveredInteractors: InteractorLike[] = [];
+  private pendingHoverCountry = '';
+  private pendingHoverCountrySince = 0;
+  private countryHoverLastSeenAt = 0;
+  private lastAnnouncedCountry = '';
+  private lastResolvedLatitude = Number.NaN;
+  private lastResolvedLongitude = Number.NaN;
+  private lastResolvedCountry: string | null = null;
 
   private static readonly ANCHOR_SOURCE_NAME = 'Globe';
+  private static readonly COUNTRY_HOVER_STABILITY_SEC = 0.2;
+  private static readonly COUNTRY_HOVER_EXIT_GRACE_SEC = 0.35;
+  private static readonly COUNTRY_HOVER_MIN_COORD_DELTA_DEG = 0.25;
+  private static readonly GLOBE_UNIT_RADIUS = 1.0;
+  private static readonly GLOBE_MIN_HIT_RADIUS = 0.2;
+  private static readonly GLOBE_MAX_HIT_RADIUS = 1.8;
 
   private getAnchorHandler(): {
     persistGardenSourceTransform?: (sourceName: string) => void;
@@ -98,7 +138,10 @@ export class GlobeGrab extends BaseScriptComponent {
       }
     });
 
-    this.createEvent('UpdateEvent').bind(() => this.updateIdleRotation());
+    this.createEvent('UpdateEvent').bind(() => {
+      this.updateIdleRotation();
+      this.updateCountryHover();
+    });
 
     this.scheduleGrabWireRetry(0.25);
     this.scheduleGrabWireRetry(0.75);
@@ -253,11 +296,322 @@ export class GlobeGrab extends BaseScriptComponent {
       interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
     }
 
+    this.bindCountryHover(interactable);
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;
 
     this.moveInteractionWired = true;
     print('[GlobeGrab] grab interaction wired');
+  }
+
+  private bindCountryHover(interactable: InteractableLike): void {
+    if (this.countryHoverWired) {
+      return;
+    }
+
+    let bound = false;
+    const onHoverEnter = (event?: InteractorEventLike): void => {
+      this.countryHoverActive = true;
+      const interactor = event?.interactor || null;
+      if (isNull(interactor)) {
+        this.countryHoverPollingFallback = true;
+        return;
+      }
+      this.addHoveredInteractor(interactor);
+    };
+    const onHoverExit = (event?: InteractorEventLike): void => {
+      const interactor = event?.interactor || null;
+      if (isNull(interactor)) {
+        this.clearCountryHover();
+        return;
+      }
+      this.removeHoveredInteractor(interactor);
+    };
+
+    if (interactable.onHoverEnter) {
+      interactable.onHoverEnter.add(onHoverEnter);
+      bound = true;
+    }
+    if (interactable.onInteractorHoverEnter) {
+      interactable.onInteractorHoverEnter.add(onHoverEnter);
+      bound = true;
+    }
+    if (interactable.onHoverExit) {
+      interactable.onHoverExit.add(onHoverExit);
+      bound = true;
+    }
+    if (interactable.onInteractorHoverExit) {
+      interactable.onInteractorHoverExit.add(onHoverExit);
+      bound = true;
+    }
+
+    this.countryHoverWired = bound;
+    this.countryHoverPollingFallback = !bound;
+    if (this.debugLogging) {
+      print(
+        `[GlobeGrab] country hover ${bound ? 'wired' : 'using interactor polling fallback'}`
+      );
+    }
+  }
+
+  private addHoveredInteractor(interactor: InteractorLike): void {
+    for (let i = 0; i < this.hoveredInteractors.length; i++) {
+      if (this.hoveredInteractors[i] === interactor) {
+        return;
+      }
+    }
+    this.hoveredInteractors.push(interactor);
+    this.countryHoverPollingFallback = false;
+    this.resetCountryAnnouncement();
+  }
+
+  private removeHoveredInteractor(interactor: InteractorLike): void {
+    const index = this.hoveredInteractors.indexOf(interactor);
+    if (index >= 0) {
+      this.hoveredInteractors.splice(index, 1);
+    }
+    if (this.hoveredInteractors.length === 0) {
+      this.clearCountryHover();
+    }
+  }
+
+  private clearCountryHover(): void {
+    this.countryHoverActive = false;
+    this.countryHoverPollingFallback = false;
+    this.hoveredInteractors = [];
+    this.resetCountryAnnouncement();
+  }
+
+  private resetCountryAnnouncement(): void {
+    this.pendingHoverCountry = '';
+    this.pendingHoverCountrySince = 0;
+    this.countryHoverLastSeenAt = 0;
+    this.lastAnnouncedCountry = '';
+    this.lastResolvedLatitude = Number.NaN;
+    this.lastResolvedLongitude = Number.NaN;
+    this.lastResolvedCountry = null;
+  }
+
+  private updateCountryHover(): void {
+    const now = getTime();
+    const localPoint = this.resolveCurrentHoverLocalPoint();
+    if (isNull(localPoint)) {
+      if (
+        this.countryHoverActive &&
+        this.countryHoverLastSeenAt > 0 &&
+        now - this.countryHoverLastSeenAt > GlobeGrab.COUNTRY_HOVER_EXIT_GRACE_SEC
+      ) {
+        this.clearCountryHover();
+      }
+      return;
+    }
+
+    this.countryHoverActive = true;
+    this.countryHoverLastSeenAt = now;
+    const country = this.resolveCountryAtLocalPoint(localPoint);
+    if (!country) {
+      this.pendingHoverCountry = '';
+      this.pendingHoverCountrySince = 0;
+      return;
+    }
+
+    if (country !== this.pendingHoverCountry) {
+      this.pendingHoverCountry = country;
+      this.pendingHoverCountrySince = now;
+      return;
+    }
+
+    if (
+      country !== this.lastAnnouncedCountry &&
+      now - this.pendingHoverCountrySince >= GlobeGrab.COUNTRY_HOVER_STABILITY_SEC
+    ) {
+      this.lastAnnouncedCountry = country;
+      this.announceCountry(country);
+    }
+  }
+
+  private resolveCurrentHoverLocalPoint(): vec3 | null {
+    const candidates: InteractorLike[] =
+      this.hoveredInteractors.length > 0
+        ? this.hoveredInteractors
+        : this.countryHoverPollingFallback
+          ? this.getAllInteractors()
+          : [];
+
+    for (let i = 0; i < candidates.length; i++) {
+      const localPoint = this.resolveInteractorGlobePoint(candidates[i]);
+      if (!isNull(localPoint)) {
+        return localPoint;
+      }
+    }
+    return null;
+  }
+
+  private getAllInteractors(): InteractorLike[] {
+    try {
+      return SIK.InteractionManager.getInteractorsByType(
+        InteractorInputType.All
+      ) as unknown as InteractorLike[];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  private resolveInteractorGlobePoint(interactor: InteractorLike | null): vec3 | null {
+    if (isNull(interactor)) {
+      return null;
+    }
+    if (typeof interactor.isActive === 'function' && !interactor.isActive()) {
+      return null;
+    }
+
+    const globeTransform = this.getSceneObject().getTransform();
+    const worldToLocal = globeTransform.getWorldTransform().inverse();
+    const start = interactor.startPoint || null;
+    const direction = interactor.direction || null;
+    const targetHit = interactor.targetHitPosition || null;
+    if (!isNull(targetHit)) {
+      const localTargetHit = worldToLocal.multiplyPoint(targetHit as vec3);
+      const targetHitRadius = localTargetHit.distance(vec3.zero());
+      if (
+        targetHitRadius < GlobeGrab.GLOBE_MIN_HIT_RADIUS ||
+        targetHitRadius > GlobeGrab.GLOBE_MAX_HIT_RADIUS
+      ) {
+        return null;
+      }
+    }
+
+    if (!isNull(start) && !isNull(direction)) {
+      const localStart = worldToLocal.multiplyPoint(start as vec3);
+      const localDirection = worldToLocal
+        .multiplyPoint((start as vec3).add(direction as vec3))
+        .sub(localStart);
+      const a = localDirection.dot(localDirection);
+      if (a > 0.000001) {
+        const b = 2 * localStart.dot(localDirection);
+        const c =
+          localStart.dot(localStart) -
+          GlobeGrab.GLOBE_UNIT_RADIUS * GlobeGrab.GLOBE_UNIT_RADIUS;
+        const discriminant = b * b - 4 * a * c;
+        if (discriminant >= 0) {
+          const root = Math.sqrt(discriminant);
+          const firstHit = (-b - root) / (2 * a);
+          const secondHit = (-b + root) / (2 * a);
+          const hitDistance = firstHit >= 0 ? firstHit : secondHit;
+          if (hitDistance >= 0) {
+            const localHit = localStart.add(localDirection.uniformScale(hitDistance));
+            const hitRadius = localHit.distance(vec3.zero());
+            if (hitRadius >= GlobeGrab.GLOBE_MIN_HIT_RADIUS) {
+              return localHit.uniformScale(1 / hitRadius);
+            }
+          }
+        }
+      }
+    }
+
+    const target = targetHit || interactor.planecastPoint || null;
+    if (isNull(target)) {
+      return null;
+    }
+
+    const localTarget = worldToLocal.multiplyPoint(target as vec3);
+    const targetRadius = localTarget.distance(vec3.zero());
+    if (
+      targetRadius < GlobeGrab.GLOBE_MIN_HIT_RADIUS ||
+      targetRadius > GlobeGrab.GLOBE_MAX_HIT_RADIUS
+    ) {
+      return null;
+    }
+    return localTarget.uniformScale(1 / targetRadius);
+  }
+
+  private resolveCountryAtLocalPoint(localPoint: vec3): string | null {
+    const latitude = (Math.asin(Math.max(-1, Math.min(1, localPoint.y))) * 180) / Math.PI;
+    const longitude = (Math.atan2(localPoint.x, -localPoint.z) * 180) / Math.PI;
+
+    if (
+      !Number.isNaN(this.lastResolvedLatitude) &&
+      Math.abs(latitude - this.lastResolvedLatitude) <
+        GlobeGrab.COUNTRY_HOVER_MIN_COORD_DELTA_DEG &&
+      Math.abs(longitude - this.lastResolvedLongitude) <
+        GlobeGrab.COUNTRY_HOVER_MIN_COORD_DELTA_DEG
+    ) {
+      return this.lastResolvedCountry;
+    }
+
+    this.lastResolvedLatitude = latitude;
+    this.lastResolvedLongitude = longitude;
+    this.lastResolvedCountry = this.findCountry(latitude, longitude);
+    return this.lastResolvedCountry;
+  }
+
+  private findCountry(latitude: number, longitude: number): string | null {
+    for (let i = 0; i < GLOBE_COUNTRY_REGIONS.length; i++) {
+      const region = GLOBE_COUNTRY_REGIONS[i];
+      const longitudeSpan = region.maxLon - region.minLon;
+      if (
+        longitudeSpan <= 180 &&
+        (longitude < region.minLon || longitude > region.maxLon)
+      ) {
+        continue;
+      }
+      if (latitude < region.minLat || latitude > region.maxLat) {
+        continue;
+      }
+      if (this.isPointInCountryRing(longitude, latitude, region)) {
+        return region.name;
+      }
+    }
+    return null;
+  }
+
+  private isPointInCountryRing(
+    longitude: number,
+    latitude: number,
+    region: GlobeCountryRegion
+  ): boolean {
+    let inside = false;
+    const ring = region.ring;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      let firstLongitude = ring[i][0];
+      let lastLongitude = ring[j][0];
+      const firstLatitude = ring[i][1];
+      const lastLatitude = ring[j][1];
+
+      if (Math.abs(firstLongitude - longitude) > 180) {
+        firstLongitude += firstLongitude < longitude ? 360 : -360;
+      }
+      if (Math.abs(lastLongitude - longitude) > 180) {
+        lastLongitude += lastLongitude < longitude ? 360 : -360;
+      }
+
+      if (
+        firstLatitude > latitude !== lastLatitude > latitude &&
+        longitude <
+          ((lastLongitude - firstLongitude) * (latitude - firstLatitude)) /
+            (lastLatitude - firstLatitude) +
+            firstLongitude
+      ) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  private announceCountry(country: string): void {
+    const message = `You're hovering over ${country}.`;
+    const friend = getSharedFriendGrab();
+    if (!isNull(friend) && typeof friend.showSpeech === 'function') {
+      friend.showSpeech(message, true);
+    } else {
+      const tts = getSharedFlowGardenTts();
+      if (!isNull(tts)) {
+        tts.speak(message, () => {});
+      }
+    }
+    if (this.debugLogging) {
+      print(`[GlobeGrab] country hover: ${country}`);
+    }
   }
 
   private onGlobeGrabStart(): void {
