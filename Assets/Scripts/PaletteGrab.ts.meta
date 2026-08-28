@@ -44,6 +44,11 @@
     paintSampleStepCm: false
     releaseSoundTrack: false
     releaseSoundVolume: false
+    selectedColorIndicatorLiftCm: false
+    selectedColorIndicatorScale: false
+    selectedColorPulseDurationSec: false
+    selectedColorPulseScale: false
+    showSelectedColorFeedback: false
     useStablePaintDotMesh: false
   ScriptTypesHidden:
     {}
@@ -70,6 +75,11 @@
       colorBlobProxyRadiusCm: 2.600000
       cancelButtonRadiusCm: 3.200000
       useStablePaintDotMesh: true
+      showSelectedColorFeedback: true
+      selectedColorIndicatorScale: 1.280000
+      selectedColorIndicatorLiftCm: 0.150000
+      selectedColorPulseScale: 1.180000
+      selectedColorPulseDurationSec: 0.180000
       enablePaletteMoveHandle: true
       moveHandleLocalPosition: !<Vec3> {x: 0.000000, y: 9.000000, z: 0.000000}
       moveHandleRadiusCm: 4.200000
@@ -93,6 +103,11 @@
     - // @input float colorBlobProxyRadiusCm = 2.6
     - // @input float cancelButtonRadiusCm = 3.2
     - '// @input bool useStablePaintDotMesh = true {"hint":"Use a stable mesh for paint dots instead of color-blob meshes"}'
+    - // @input bool showSelectedColorFeedback = true
+    - // @input float selectedColorIndicatorScale = 1.28
+    - // @input float selectedColorIndicatorLiftCm = 0.15
+    - // @input float selectedColorPulseScale = 1.18
+    - // @input float selectedColorPulseDurationSec = 0.18
     - '// @input bool enablePaletteMoveHandle {"hint":"Legacy fallback handle. AnchorController now supplies the standard garden MoveHandle."}'
     - "// @input vec3 moveHandleLocalPosition = {0,9,0}"
     - // @input float moveHandleRadiusCm = 4.2

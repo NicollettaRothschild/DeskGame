@@ -20,6 +20,8 @@ type ColorBlobTarget = {
   rotation: quat;
   material: Material;
   mesh: RenderMesh;
+  visualObject: SceneObject;
+  proxyObject?: SceneObject;
 };
 
 type InteractableLike = ScriptComponent & {
@@ -110,6 +112,21 @@ export class PaletteGrab extends BaseScriptComponent {
   useStablePaintDotMesh: boolean = true;
 
   @input
+  showSelectedColorFeedback: boolean = true;
+
+  @input('float')
+  selectedColorIndicatorScale: number = 1.28;
+
+  @input('float')
+  selectedColorIndicatorLiftCm: number = 0.15;
+
+  @input('float')
+  selectedColorPulseScale: number = 1.18;
+
+  @input('float')
+  selectedColorPulseDurationSec: number = 0.18;
+
+  @input
   @hint('Legacy fallback handle. AnchorController now supplies the standard garden MoveHandle.')
   enablePaletteMoveHandle: boolean = false;
 
@@ -152,6 +169,14 @@ export class PaletteGrab extends BaseScriptComponent {
   private colorBlobTargets: ColorBlobTarget[] = [];
   private lastColorPickIndex = -1;
   private lastColorPickAt = -9999;
+  private selectedColorIndicator: SceneObject | null = null;
+  private selectedColorIndicatorVisual: RenderMeshVisual | null = null;
+  private selectedColorIndicatorMaterial: Material | null = null;
+  private selectedColorIndicatorSourceMaterial: Material | null = null;
+  private selectedColorPulseEvent: UpdateEvent | null = null;
+  private selectedColorPulseTarget: SceneObject | null = null;
+  private selectedColorPulseBaseScale: vec3 = vec3.one();
+  private selectedColorPulseStartedAt = 0;
 
   private static readonly ANCHOR_SOURCE_NAME = 'palette';
   private static readonly COLORS_NODE_NAME = 'Colors';
@@ -242,6 +267,7 @@ export class PaletteGrab extends BaseScriptComponent {
         rotation: colorsNode.getTransform().getWorldRotation(),
         material: visual.mainMaterial as Material,
         mesh: visual.mesh as RenderMesh,
+        visualObject: visual.getSceneObject(),
       });
     }
 
@@ -266,6 +292,7 @@ export class PaletteGrab extends BaseScriptComponent {
         Math.min(this.colorBlobProxyRadiusCm, visualRadius, separationRadius)
       );
       const proxy = global.scene.createSceneObject(`PaletteColorBlob_${i}`);
+      target.proxyObject = proxy;
       proxy.setParent(this.getSceneObject());
       proxy.getTransform().setWorldPosition(target.center);
       proxy.getTransform().setWorldRotation(quat.quatIdentity());
@@ -294,7 +321,7 @@ export class PaletteGrab extends BaseScriptComponent {
         }
         this.lastColorPickIndex = i;
         this.lastColorPickAt = now;
-        this.enterPaintMode(target.material, target.mesh, event?.interactor || null);
+        this.enterPaintMode(i, target.material, target.mesh, event?.interactor || null);
       };
       if (interactable.onTriggerStart) {
         interactable.onTriggerStart.add(onPick);
@@ -687,6 +714,7 @@ export class PaletteGrab extends BaseScriptComponent {
   }
 
   private enterPaintMode(
+    colorIndex: number,
     material: Material | null,
     mesh: RenderMesh | null,
     interactor: InteractorLike | null
@@ -703,6 +731,7 @@ export class PaletteGrab extends BaseScriptComponent {
     // Color tap should only arm paint mode. User must release and pinch again to draw.
     this.paintNeedsReleaseAfterPick = true;
     this.paintArmReadyAt = getTime() + 0.12;
+    this.showSelectedColor(colorIndex);
   }
 
   private setPaintMode(active: boolean): void {
@@ -731,6 +760,7 @@ export class PaletteGrab extends BaseScriptComponent {
       this.paintStrokeActive = false;
       this.paintNeedsReleaseAfterPick = false;
       this.paintArmReadyAt = 0;
+      this.hideSelectedColorIndicator();
     }
 
     if (this.debugLogging) {
@@ -749,6 +779,155 @@ export class PaletteGrab extends BaseScriptComponent {
     if (!isNull(this.grabInteractable)) {
       (this.grabInteractable as ScriptComponent).enabled = enabled;
     }
+  }
+
+  private showSelectedColor(colorIndex: number): void {
+    if (!this.showSelectedColorFeedback) {
+      return;
+    }
+    if (colorIndex < 0 || colorIndex >= this.colorBlobTargets.length) {
+      return;
+    }
+
+    const target = this.colorBlobTargets[colorIndex];
+    this.updateSelectedColorIndicator(target);
+    this.startSelectedColorPulse(target.visualObject);
+  }
+
+  private updateSelectedColorIndicator(target: ColorBlobTarget): void {
+    const indicator = this.ensureSelectedColorIndicator();
+    if (isNull(indicator) || isNull(this.selectedColorIndicatorVisual)) {
+      return;
+    }
+
+    const sourceObject = target.visualObject;
+    const sourceTransform = sourceObject.getTransform();
+    const paletteTransform = this.getSceneObject().getTransform();
+    const lift = Math.max(0, this.selectedColorIndicatorLiftCm);
+    const indicatorPosition = sourceTransform
+      .getWorldPosition()
+      .add(paletteTransform.up.uniformScale(lift));
+
+    indicator.enabled = true;
+    indicator.layer = this.getSceneObject().layer;
+    indicator.getTransform().setWorldPosition(indicatorPosition);
+    indicator.getTransform().setWorldRotation(sourceTransform.getWorldRotation());
+
+    const sourceScale = sourceTransform.getWorldScale();
+    const indicatorScale = Math.max(1.01, this.selectedColorIndicatorScale);
+    indicator.getTransform().setWorldScale(
+      new vec3(
+        sourceScale.x * indicatorScale,
+        sourceScale.y * indicatorScale,
+        sourceScale.z * indicatorScale
+      )
+    );
+
+    const visual = this.selectedColorIndicatorVisual as RenderMeshVisual;
+    visual.mesh = target.mesh;
+    const material = this.createSelectedColorIndicatorMaterial(target.material);
+    if (!isNull(material)) {
+      visual.mainMaterial = material as Material;
+    } else {
+      visual.mainMaterial = target.material;
+    }
+    visual.renderOrder = 10;
+  }
+
+  private ensureSelectedColorIndicator(): SceneObject {
+    if (this.isUsableSceneObject(this.selectedColorIndicator)) {
+      return this.selectedColorIndicator as SceneObject;
+    }
+
+    const indicator = global.scene.createSceneObject('PaletteSelectedColorIndicator');
+    indicator.setParent(this.getSceneObject());
+    indicator.enabled = false;
+    indicator.layer = this.getSceneObject().layer;
+    this.selectedColorIndicator = indicator;
+    this.selectedColorIndicatorVisual = indicator.createComponent(
+      'Component.RenderMeshVisual'
+    ) as RenderMeshVisual;
+    return indicator;
+  }
+
+  private hideSelectedColorIndicator(): void {
+    if (!isNull(this.selectedColorIndicator)) {
+      (this.selectedColorIndicator as SceneObject).enabled = false;
+    }
+  }
+
+  private createSelectedColorIndicatorMaterial(source: Material): Material | null {
+    if (
+      !isNull(this.selectedColorIndicatorMaterial) &&
+      !isNull(this.selectedColorIndicatorSourceMaterial) &&
+      this.selectedColorIndicatorSourceMaterial === source
+    ) {
+      return this.selectedColorIndicatorMaterial as Material;
+    }
+
+    const material = this.tryCloneMaterial(source);
+    if (isNull(material)) {
+      return null;
+    }
+
+    const pass = (material as Material).mainPass as unknown as Record<string, unknown>;
+    this.trySetPassValue(pass, 'depthWrite', false);
+    this.trySetPassValue(pass, 'depthTest', true);
+    this.trySetPassValue(pass, 'blendMode', BlendMode.PremultipliedAlphaAuto);
+    this.trySetPassValue(pass, 'Port_Emissive_N170', new vec3(0.35, 0.35, 0.35));
+
+    this.selectedColorIndicatorMaterial = material as Material;
+    this.selectedColorIndicatorSourceMaterial = source;
+    return this.selectedColorIndicatorMaterial;
+  }
+
+  private startSelectedColorPulse(target: SceneObject): void {
+    if (isNull(target) || this.selectedColorPulseDurationSec <= 0) {
+      return;
+    }
+
+    this.selectedColorPulseTarget = target;
+    this.selectedColorPulseBaseScale = target.getTransform().getWorldScale();
+    this.selectedColorPulseStartedAt = getTime();
+
+    if (isNull(this.selectedColorPulseEvent)) {
+      this.selectedColorPulseEvent = this.createEvent('UpdateEvent');
+      this.selectedColorPulseEvent.bind(() => this.updateSelectedColorPulse());
+    }
+    this.selectedColorPulseEvent.enabled = true;
+  }
+
+  private updateSelectedColorPulse(): void {
+    const target = this.selectedColorPulseTarget;
+    if (isNull(target)) {
+      this.stopSelectedColorPulse();
+      return;
+    }
+
+    const duration = Math.max(0.001, this.selectedColorPulseDurationSec);
+    const t = Math.min(1, (getTime() - this.selectedColorPulseStartedAt) / duration);
+    const eased = 1 - (1 - t) * (1 - t);
+    const pulse = Math.max(1, this.selectedColorPulseScale);
+    const scale = pulse + (1 - pulse) * eased;
+    target.getTransform().setWorldScale(
+      new vec3(
+        this.selectedColorPulseBaseScale.x * scale,
+        this.selectedColorPulseBaseScale.y * scale,
+        this.selectedColorPulseBaseScale.z * scale
+      )
+    );
+
+    if (t >= 1) {
+      target.getTransform().setWorldScale(this.selectedColorPulseBaseScale);
+      this.stopSelectedColorPulse();
+    }
+  }
+
+  private stopSelectedColorPulse(): void {
+    if (!isNull(this.selectedColorPulseEvent)) {
+      (this.selectedColorPulseEvent as UpdateEvent).enabled = false;
+    }
+    this.selectedColorPulseTarget = null;
   }
 
   private ensurePaintUpdateLoop(enabled: boolean): void {

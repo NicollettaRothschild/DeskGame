@@ -545,6 +545,11 @@
     colorBlobProxyRadiusCm: true
     cancelButtonRadiusCm: true
     useStablePaintDotMesh: true
+    showSelectedColorFeedback: true
+    selectedColorIndicatorScale: true
+    selectedColorIndicatorLiftCm: true
+    selectedColorPulseScale: true
+    selectedColorPulseDurationSec: true
     enablePaletteMoveHandle: true
     moveHandleLocalPosition: true
     moveHandleRadiusCm: true
@@ -568,6 +573,11 @@
       colorBlobProxyRadiusCm: 2.600000
       cancelButtonRadiusCm: 3.200000
       useStablePaintDotMesh: true
+      showSelectedColorFeedback: true
+      selectedColorIndicatorScale: 1.280000
+      selectedColorIndicatorLiftCm: 0.150000
+      selectedColorPulseScale: 1.180000
+      selectedColorPulseDurationSec: 0.180000
       enablePaletteMoveHandle: true
       moveHandleLocalPosition: !<Vec3> {x: 0.000000, y: 9.000000, z: 0.000000}
       moveHandleRadiusCm: 4.200000

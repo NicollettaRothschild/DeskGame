@@ -20,10 +20,10 @@
     - !<own> f293204d-edc4-4b3a-8a09-4c89c40d6fa2
     - !<own> 7576c1fb-b8e0-4047-b500-2d347889203c
     - !<own> 9aa42fcc-a72f-4475-a934-1f79675ea728
-    - !<own> 703481b0-029e-48b4-ade7-43eb28ca59e6
     - !<own> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
     - !<own> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
     - !<own> 73f05e7f-c38e-4a68-a5dd-6c0e83c3fecf
+    - !<own> 703481b0-029e-48b4-ade7-43eb28ca59e6
     - !<own> d7569447-6ffa-4d71-9778-b93af9b8cb95
     - !<own> 1b43cd61-3988-4889-8b6c-30b5ba738b1e
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
@@ -10041,6 +10041,11 @@
     colorBlobProxyRadiusCm: true
     cancelButtonRadiusCm: true
     useStablePaintDotMesh: true
+    showSelectedColorFeedback: true
+    selectedColorIndicatorScale: true
+    selectedColorIndicatorLiftCm: true
+    selectedColorPulseScale: true
+    selectedColorPulseDurationSec: true
     enablePaletteMoveHandle: true
     moveHandleLocalPosition: true
     moveHandleRadiusCm: true
@@ -10064,6 +10069,11 @@
       colorBlobProxyRadiusCm: 2.600000
       cancelButtonRadiusCm: 3.200000
       useStablePaintDotMesh: true
+      showSelectedColorFeedback: true
+      selectedColorIndicatorScale: 1.280000
+      selectedColorIndicatorLiftCm: 0.150000
+      selectedColorPulseScale: 1.180000
+      selectedColorPulseDurationSec: 0.180000
       enablePaletteMoveHandle: true
       moveHandleLocalPosition: !<Vec3> {x: 0.000000, y: 9.000000, z: 0.000000}
       moveHandleRadiusCm: 4.200000
