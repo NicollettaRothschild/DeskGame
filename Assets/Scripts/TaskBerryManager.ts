@@ -53,6 +53,9 @@ export class TaskBerryManager extends BaseScriptComponent {
   apiBaseUrl: string = 'https://arvis.space';
 
   @input('float')
+  startupDelaySec: number = 12;
+
+  @input('float')
   pairPollSec: number = 4;
 
   @input('float')
@@ -65,10 +68,10 @@ export class TaskBerryManager extends BaseScriptComponent {
   berryHeight: number = 2;
 
   @input
-  useDemoTasksWhenOffline: boolean = true;
+  useDemoTasksWhenOffline: boolean = false;
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   private berries: BerryRecord[] = [];
   private pairPollEvent: DelayedCallbackEvent | null = null;
@@ -200,7 +203,9 @@ export class TaskBerryManager extends BaseScriptComponent {
       return;
     }
 
-    this.registerDevice();
+    const startup = this.createEvent('DelayedCallbackEvent');
+    startup.bind(() => this.registerDevice());
+    startup.reset(Math.max(0, this.startupDelaySec));
   }
 
   private registerDevice(): void {

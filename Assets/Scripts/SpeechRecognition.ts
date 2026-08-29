@@ -108,6 +108,11 @@ const SPEECH_CONTEXT = [
 
 @component
 export class SpeechRecognition extends BaseScriptComponent {
+  private static readonly INTERIM_UI_INTERVAL_SEC = 0.25;
+  private static readonly INTERIM_LOG_INTERVAL_SEC = 4;
+  private static readonly MAX_TRANSCRIPT_DISPLAY_CHARS = 280;
+  private static readonly MAX_TRANSCRIPT_PROCESSING_CHARS = 512;
+
   @input
   startupDisabled: boolean = false;
 
@@ -115,7 +120,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   languageCode: string = 'en_US';
 
   @input
-  autoStartListening: boolean = true;
+  autoStartListening: boolean = false;
 
   @input
   startupListenDelaySec: number = 2.5;
@@ -128,7 +133,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   listeningWindowSec: number = 8;
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   @input
   commandCooldownSec: number = 1.5;
@@ -150,6 +155,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   private asrModule: AsrModuleLike | null = null;
   private asrOptions: AsrTranscriptionOptions | null = null;
   private asrActive = false;
+  private asrRestartPending = false;
 
   private lastCommandTime = 0;
   private instanceId = Math.floor(Math.random() * 1000);
@@ -162,6 +168,7 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   private agentSessionActive = false;
   private lastLoggedHeard = '';
+  private lastLoggedHeardAt = -Infinity;
   private isListening = false;
   private listeningWindowEvent: DelayedCallbackEvent | null = null;
   private lastPushedTranscriptKey = '';
@@ -170,6 +177,10 @@ export class SpeechRecognition extends BaseScriptComponent {
   private suppressVoiceCommandsUntil = 0;
   private transcriptListeners: Array<(text: string, isFinal: boolean) => void> = [];
   private postItCaptureDepth = 0;
+  private lastInterimUiUpdateAt = -Infinity;
+  private lastAsrErrorLogAt = -Infinity;
+  private lastVoiceMlErrorLogAt = -Infinity;
+  private resumeAfterTts = false;
 
   onAwake(): void {
     if (this.startupDisabled) {
@@ -189,6 +200,8 @@ export class SpeechRecognition extends BaseScriptComponent {
     registerSpeechRecognition(this);
 
     this.createEvent('OnDestroyEvent').bind(() => {
+      this.resumeAfterTts = false;
+      this.stopListeningNow();
       const current = (global as unknown as Record<string, unknown>)[GLOBAL_SPEECH_OWNER];
       if (current === this.instanceId) {
         delete (global as unknown as Record<string, unknown>)[GLOBAL_SPEECH_OWNER];
@@ -244,7 +257,11 @@ export class SpeechRecognition extends BaseScriptComponent {
         this.isListening = false;
         this.asrActive = false;
         this.setListeningStatus('Microphone restarting...');
-        print(`[SpeechRecognition] ASR error: ${String(code)} — restarting`);
+        const now = getTime();
+        if (now - this.lastAsrErrorLogAt >= 5) {
+          this.lastAsrErrorLogAt = now;
+          print(`[SpeechRecognition] ASR error: ${String(code)} — restarting`);
+        }
         this.scheduleAsrRestart(1.5);
       });
       return true;
@@ -288,6 +305,28 @@ export class SpeechRecognition extends BaseScriptComponent {
     }
   }
 
+  private limitTranscriptForDisplay(text: string): string {
+    const value = String(text || '');
+    const maxChars = SpeechRecognition.MAX_TRANSCRIPT_DISPLAY_CHARS;
+    if (value.length <= maxChars) {
+      return value;
+    }
+    return `…${value.slice(-(maxChars - 1))}`;
+  }
+
+  /** Keep repeated ASR work bounded when the module appends room audio indefinitely. */
+  private limitTranscriptForProcessing(text: string): string {
+    const value = String(text || '');
+    const maxChars = SpeechRecognition.MAX_TRANSCRIPT_PROCESSING_CHARS;
+    if (value.length <= maxChars) {
+      return value;
+    }
+
+    const headChars = Math.floor((maxChars - 1) / 2);
+    const tailChars = maxChars - headChars - 1;
+    return `${value.slice(0, headChars)}…${value.slice(-tailChars)}`;
+  }
+
   public requestListening(): void {
     this.ensureListening(true);
   }
@@ -322,9 +361,14 @@ export class SpeechRecognition extends BaseScriptComponent {
       this.setListeningStatus('Tap to speak');
       return;
     }
+    if (this.asrRestartPending) {
+      return;
+    }
 
+    this.asrRestartPending = true;
     const restartEvent = this.createEvent('DelayedCallbackEvent');
     restartEvent.bind(() => {
+      this.asrRestartPending = false;
       if (this.backend !== 'asr') {
         return;
       }
@@ -335,6 +379,16 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   private startAsrIfNeeded(): void {
     if (!this.asrModule || !this.asrOptions || this.asrActive) {
+      return;
+    }
+
+    const suppressionRemaining = this.suppressVoiceCommandsUntil - getTime();
+    if (
+      suppressionRemaining > 0 &&
+      !this.agentSessionActive &&
+      this.postItCaptureDepth === 0
+    ) {
+      this.scheduleAsrRestart(suppressionRemaining);
       return;
     }
 
@@ -355,7 +409,11 @@ export class SpeechRecognition extends BaseScriptComponent {
     } catch (e) {
       this.asrActive = false;
       this.isListening = false;
-      print('[SpeechRecognition] ASR startTranscribing failed: ' + e);
+      const now = getTime();
+      if (now - this.lastAsrErrorLogAt >= 5) {
+        this.lastAsrErrorLogAt = now;
+        print('[SpeechRecognition] ASR startTranscribing failed: ' + e);
+      }
       this.scheduleAsrRestart(2);
     }
   }
@@ -381,7 +439,9 @@ export class SpeechRecognition extends BaseScriptComponent {
   public clearFinalTranscript(): void {
     this.finalTranscript = '';
     this.interimTranscript = '';
+    this.lastHeard = '';
     this.displayTranscript = '';
+    this.lastHeardChangeTime = getTime();
   }
 
   public getLiveTranscript(): string {
@@ -461,6 +521,14 @@ export class SpeechRecognition extends BaseScriptComponent {
 
   public endPostItCapture(): void {
     this.postItCaptureDepth = Math.max(0, this.postItCaptureDepth - 1);
+    if (
+      this.postItCaptureDepth === 0 &&
+      !this.autoStartListening &&
+      !this.agentSessionActive
+    ) {
+      this.stopListeningNow();
+      this.setListeningStatus('Tap to speak');
+    }
   }
 
   public isPostItCaptureActive(): boolean {
@@ -473,7 +541,9 @@ export class SpeechRecognition extends BaseScriptComponent {
     this.lastHeard = '';
     this.displayTranscript = '';
     this.lastLoggedHeard = '';
+    this.lastLoggedHeardAt = -Infinity;
     this.lastPushedTranscriptKey = '';
+    this.lastInterimUiUpdateAt = -Infinity;
   }
 
   public endAgentSessionPreserveListening(): string {
@@ -503,7 +573,12 @@ export class SpeechRecognition extends BaseScriptComponent {
 
     if (this.backend === 'asr') {
       this.clearFinalTranscript();
-      this.ensureListening();
+      if (this.autoStartListening) {
+        this.ensureListening();
+      } else {
+        this.stopAsrIfNeeded();
+        this.setListeningStatus('Tap to speak');
+      }
       return text;
     }
 
@@ -513,6 +588,23 @@ export class SpeechRecognition extends BaseScriptComponent {
       this.ensureListening();
     }
     return text;
+  }
+
+  /** Pause the microphone while native/cloud speech is playing. */
+  public pauseForTts(): void {
+    this.resumeAfterTts = this.isListening;
+    if (this.resumeAfterTts) {
+      this.stopListeningNow();
+    }
+  }
+
+  /** Resume ASR/VoiceML only if it was active before TTS began. */
+  public resumeAfterTtsPlayback(): void {
+    const shouldResume = this.resumeAfterTts;
+    this.resumeAfterTts = false;
+    if (shouldResume) {
+      this.ensureListening();
+    }
   }
 
   public cancelAgentSession(): void {
@@ -578,7 +670,7 @@ export class SpeechRecognition extends BaseScriptComponent {
       return;
     }
 
-    const displayText = String(rawText || '').trim();
+    const displayText = this.limitTranscriptForProcessing(String(rawText || '').trim());
     const text = displayText.toLowerCase();
     if (!text) {
       if (this.debugLogging && this.emptyUpdateLogCount < 3) {
@@ -590,14 +682,13 @@ export class SpeechRecognition extends BaseScriptComponent {
       return;
     }
 
-    if (text !== this.lastHeard) {
+    const textChanged = text !== this.lastHeard;
+    if (textChanged) {
       this.lastHeardChangeTime = getTime();
     }
 
     this.lastHeard = text;
     this.displayTranscript = displayText;
-    this.setTranscriptText(text);
-    this.notifyTranscriptListeners(displayText, isFinal);
     if (!isFinal) {
       this.interimTranscript = text;
       // Surface embedded wake early from noisy interim streams.
@@ -607,11 +698,6 @@ export class SpeechRecognition extends BaseScriptComponent {
           ? `hey arvis ${interimWake.message}`
           : 'hey arvis';
       }
-    }
-    if (this.debugLogging && text !== this.lastLoggedHeard) {
-      this.lastLoggedHeard = text;
-      const suffix = isFinal ? ' (final)' : '';
-      print(`[SpeechRecognition] Heard: ${text}${suffix}`);
     }
 
     if (isFinal) {
@@ -637,7 +723,32 @@ export class SpeechRecognition extends BaseScriptComponent {
       }
     }
 
-    this.pushTranscriptToSpacePanel(true);
+    const now = getTime();
+    const shouldPublish =
+      isFinal ||
+      (textChanged &&
+        now - this.lastInterimUiUpdateAt >= SpeechRecognition.INTERIM_UI_INTERVAL_SEC);
+    if (shouldPublish) {
+      this.lastInterimUiUpdateAt = now;
+      this.setTranscriptText(this.limitTranscriptForDisplay(displayText));
+      this.notifyTranscriptListeners(displayText, isFinal);
+      this.pushTranscriptToSpacePanel(true);
+    }
+
+    if (
+      this.debugLogging &&
+      isFinal &&
+      text !== this.lastLoggedHeard &&
+      now - this.lastLoggedHeardAt >= SpeechRecognition.INTERIM_LOG_INTERVAL_SEC
+    ) {
+      this.lastLoggedHeard = text;
+      this.lastLoggedHeardAt = now;
+      print(
+        `[SpeechRecognition] Final transcript (${text.length} chars): ${this.limitTranscriptForDisplay(
+          text
+        )}`
+      );
+    }
   }
 
   private bindVoiceEvents(): void {
@@ -675,9 +786,13 @@ export class SpeechRecognition extends BaseScriptComponent {
     module.onListeningError.add((eventErrorArgs) => {
       this.isListening = false;
       this.setListeningStatus('Microphone error');
-      print(
-        `[SpeechRecognition] Error: ${eventErrorArgs.error} | ${eventErrorArgs.description}`
-      );
+      const now = getTime();
+      if (now - this.lastVoiceMlErrorLogAt >= 5) {
+        this.lastVoiceMlErrorLogAt = now;
+        print(
+          `[SpeechRecognition] Error: ${eventErrorArgs.error} | ${eventErrorArgs.description}`
+        );
+      }
     });
 
     module.onListeningUpdate.add((eventArgs) => {
@@ -719,7 +834,7 @@ export class SpeechRecognition extends BaseScriptComponent {
       return;
     }
 
-    const transcript = this.getLiveTranscript();
+    const transcript = this.limitTranscriptForDisplay(this.getLiveTranscript());
     const key = `${isListening ? 1 : 0}|${transcript}`;
     if (key === this.lastPushedTranscriptKey) {
       return;

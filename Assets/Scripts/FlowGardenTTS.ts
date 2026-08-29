@@ -36,13 +36,13 @@ export class FlowGardenTTS extends BaseScriptComponent {
   speed: number = 1;
 
   @input
-  preferArvisVoiceWhenPaired: boolean = true;
+  preferArvisVoiceWhenPaired: boolean = false;
 
   @input
   agentName: string = 'Arvis';
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   @input('float')
   cloudTtsTimeoutSec: number = 8;
@@ -60,6 +60,8 @@ export class FlowGardenTTS extends BaseScriptComponent {
   private speakingStartedAt = -9999;
   private speechRequestId = 0;
   private suppressVoiceCommandsUntil = 0;
+  private cloudTtsDisabled = false;
+  private cloudTtsFailureLogged = false;
 
   onAwake(): void {
     registerFlowGardenTts(this);
@@ -127,6 +129,10 @@ export class FlowGardenTTS extends BaseScriptComponent {
     this.speakingStartedAt = getTime();
     const requestId = ++this.speechRequestId;
     this.beginVoiceCommandSuppression(spokenText);
+    const speech = getSharedSpeechRecognition();
+    if (!isNull(speech)) {
+      speech.pauseForTts();
+    }
     print('[FlowGardenTTS] Speaking: ' + spokenText.slice(0, 120));
 
     let finished = false;
@@ -146,6 +152,7 @@ export class FlowGardenTTS extends BaseScriptComponent {
         const speech = getSharedSpeechRecognition();
         if (!isNull(speech)) {
           speech.clearUtteranceState();
+          speech.resumeAfterTtsPlayback();
         }
         if (onDone) {
           onDone(ok);
@@ -157,6 +164,7 @@ export class FlowGardenTTS extends BaseScriptComponent {
 
     if (
       this.preferArvisVoiceWhenPaired &&
+      !this.cloudTtsDisabled &&
       !isNull(this.specsApi) &&
       !isNull(this.deviceRegistry) &&
       this.deviceRegistry.isPaired() &&
@@ -206,15 +214,16 @@ export class FlowGardenTTS extends BaseScriptComponent {
       return;
     }
 
+    const timeout = this.createEvent('DelayedCallbackEvent');
     let settled = false;
     const settle = (ok: boolean): void => {
       if (settled) {
         return;
       }
       settled = true;
+      timeout.enabled = false;
       onDone(ok);
     };
-    const timeout = this.createEvent('DelayedCallbackEvent');
     timeout.bind(() => {
       if (this.debugLogging && !settled) {
         print('[FlowGardenTTS] Arvis TTS timed out — falling back to native');
@@ -223,34 +232,52 @@ export class FlowGardenTTS extends BaseScriptComponent {
     });
     timeout.reset(Math.max(3, this.cloudTtsTimeoutSec));
 
-    this.specsApi.speakAgent(
-      this.deviceRegistry.getDeviceId(),
-      this.deviceRegistry.getDeviceSecret(),
-      text,
-      this.agentName,
-      (result, error) => {
-        if (settled) {
-          return;
-        }
-        if (!result || !result.audioBase64) {
-          if (this.debugLogging) {
-            print('[FlowGardenTTS] Arvis TTS failed: ' + (error || 'no audio'));
+    try {
+      this.specsApi.speakAgent(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        text,
+        this.agentName,
+        (result, error) => {
+          if (settled) {
+            return;
           }
-          settle(false);
-          return;
-        }
+          if (!result || !result.audioBase64) {
+            if (this.shouldDisableCloudTts(error)) {
+              this.disableCloudTts(error || 'remote credential rejected');
+            }
+            if (this.debugLogging) {
+              print('[FlowGardenTTS] Arvis TTS failed: ' + (error || 'no audio'));
+            }
+            settle(false);
+            return;
+          }
 
-        // The network request succeeded; allow a short second window for the
-        // RemoteMediaModule to decode and create the AudioTrackAsset.
-        timeout.reset(5);
-        this.playBase64Audio(result.audioBase64, (played) => {
-          if (this.debugLogging) {
-            print('[FlowGardenTTS] Arvis voice played=' + played + ' voice=' + (result.voiceId || ''));
-          }
-          settle(played);
-        });
+          // The network request succeeded; allow a short second window for the
+          // RemoteMediaModule to decode and create the AudioTrackAsset.
+          timeout.reset(5);
+          this.playBase64Audio(result.audioBase64, (played) => {
+            if (settled) {
+              return;
+            }
+            if (this.debugLogging) {
+              print(
+                '[FlowGardenTTS] Arvis voice played=' +
+                  played +
+                  ' voice=' +
+                  (result.voiceId || '')
+              );
+            }
+            settle(played);
+          });
+        }
+      );
+    } catch (e) {
+      if (this.debugLogging) {
+        print('[FlowGardenTTS] Arvis TTS request threw: ' + e);
       }
-    );
+      settle(false);
+    }
   }
 
   private speakViaNative(text: string, onDone?: (ok: boolean) => void): void {
@@ -359,10 +386,16 @@ export class FlowGardenTTS extends BaseScriptComponent {
         return;
       }
 
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
+      const binaryParts: string[] = [];
+      for (let start = 0; start < bytes.length; start += 8192) {
+        let part = '';
+        const end = Math.min(bytes.length, start + 8192);
+        for (let i = start; i < end; i++) {
+          part += String.fromCharCode(bytes[i]);
+        }
+        binaryParts.push(part);
       }
+      const binary = binaryParts.join('');
 
       const blob = (internetModule as InternetModule).makeResourceFromBlob(
         new Blob([binary], { type: 'audio/mpeg' })
@@ -408,6 +441,20 @@ export class FlowGardenTTS extends BaseScriptComponent {
       return require('LensStudio:RemoteMediaModule') as RemoteMediaModule;
     } catch {
       return null;
+    }
+  }
+
+  private shouldDisableCloudTts(error?: string): boolean {
+    return /api key|only valid api keys|unauthori[sz]ed|forbidden|HTTP 401|HTTP 403/i.test(
+      String(error || '')
+    );
+  }
+
+  private disableCloudTts(reason: string): void {
+    this.cloudTtsDisabled = true;
+    if (!this.cloudTtsFailureLogged) {
+      this.cloudTtsFailureLogged = true;
+      print('[FlowGardenTTS] Cloud TTS disabled for this session: ' + reason);
     }
   }
 

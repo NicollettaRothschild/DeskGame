@@ -51,7 +51,7 @@
       deviceRegistry: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
       voiceName: Sasha
       speed: !<float> 1.000000
-      preferArvisVoiceWhenPaired: true
+      preferArvisVoiceWhenPaired: false
       agentName: Arvis
       debugLogging: true
       cloudTtsTimeoutSec: !<float> 8.000000
@@ -68,7 +68,7 @@
     - // @input float speed = 1
     - // @input bool preferArvisVoiceWhenPaired = true
     - '// @input string agentName = "Arvis"'
-    - // @input bool debugLogging = true
+    - // @input bool debugLogging
     - // @input float cloudTtsTimeoutSec = 8
     - // @input float nativeVoiceTimeoutSec = 7
     - // @input float speakingLockTimeoutSec = 24

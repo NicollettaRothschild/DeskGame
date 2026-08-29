@@ -1349,6 +1349,9 @@ export class PaletteGrab extends BaseScriptComponent {
     if (isNull(interactable)) {
       interactable = anchor.createComponent(Interactable.getTypeName()) as InteractableLike;
     }
+    // Set the mode before creating manipulation. A newly-created Interactable
+    // defaults to Poke, which makes SIK reject the manipulation component.
+    interactable.targetingMode = isNull(this.anchorController) ? 3 : 2;
 
     let manipulation = this.findExistingManipulation(anchor);
     if (isNull(manipulation)) {
@@ -1357,7 +1360,6 @@ export class PaletteGrab extends BaseScriptComponent {
       ) as unknown as InteractableManipulationLike;
     }
 
-    interactable.targetingMode = 7;
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
     interactable.enableInstantDrag = true;
@@ -1593,17 +1595,21 @@ export class PaletteGrab extends BaseScriptComponent {
       }
     };
 
-    // The palette is grabbed directly; remove any dedicated handle left by an
-    // older scene/runtime version.
+    // AnchorController owns the standard MoveHandle. Keep the legacy palette
+    // handle hidden, but adopt the standard handle when it is created after
+    // this component's OnStartEvent.
     if (!isNull(this.anchorController)) {
       disableLegacyHandle();
       const gardenHandle = this.findNamedChild(root, 'MoveHandle');
       if (!isNull(gardenHandle)) {
-        gardenHandle.enabled = false;
+        this.moveHandleObject = gardenHandle;
+        this.moveHandleInteractable = this.findExistingInteractable(gardenHandle);
+        this.moveHandleManipulation = this.findExistingManipulation(gardenHandle);
+      } else {
+        this.moveHandleObject = null;
+        this.moveHandleInteractable = null;
+        this.moveHandleManipulation = null;
       }
-      this.moveHandleObject = null;
-      this.moveHandleInteractable = null;
-      this.moveHandleManipulation = null;
       return;
     }
 
@@ -1669,7 +1675,9 @@ export class PaletteGrab extends BaseScriptComponent {
     if (isNull(interactable)) {
       interactable = handle.createComponent(Interactable.getTypeName()) as InteractableLike;
     }
-    interactable.targetingMode = 7;
+    // Move handles use pinch/ray targeting; Poke is incompatible with
+    // InteractableManipulation.
+    interactable.targetingMode = 3;
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
     interactable.enableInstantDrag = true;

@@ -6,6 +6,7 @@ import {
 } from './ArvisGhostSpeechBubble';
 import { estimateSpeechDurationSec, FlowGardenTTS } from './FlowGardenTTS';
 import {
+  getSharedArvisAgentChat,
   getSharedFlowGardenTts,
   getSharedSpeechRecognition,
   registerFriendGrab,
@@ -54,6 +55,7 @@ type InteractableLike = ScriptComponent & {
   onDragEnd?: { add: (cb: () => void) => void };
   onTriggerEnd?: { add: (cb: () => void) => void };
   onTriggerEndOutside?: { add: (cb: () => void) => void };
+  onTriggerCanceled?: { add: (cb: () => void) => void };
   onInteractorTriggerEnd?: { add: (cb: () => void) => void };
   onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
   onHoverEnter?: { add: (cb: () => void) => void };
@@ -463,6 +465,7 @@ export class FriendGrab extends BaseScriptComponent {
   private moveInteractionWired = false;
   private moveBindAttempts = 0;
   private moveActive = false;
+  private companionTalkActive = false;
   private grabAudioPlayer: AudioComponent | null = null;
   private resolvedGrabTrack: AudioTrackAsset | null = null;
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
@@ -709,7 +712,10 @@ export class FriendGrab extends BaseScriptComponent {
       shape?: { size?: vec3 };
     };
     colliderLike.enabled = this.enablePetReaction;
-    colliderLike.intangible = true;
+    // Keep this as a real overlap target so the tracked hand collider can
+    // make contact with the pet zone without affecting the companion's grab
+    // collider.
+    colliderLike.intangible = false;
     colliderLike.fitVisual = false;
     colliderLike.debugDrawEnabled = false;
     const shape = Shape.createBoxShape();
@@ -722,12 +728,18 @@ export class FriendGrab extends BaseScriptComponent {
     if (isNull(interactable)) {
       interactable = target.createComponent(Interactable.getTypeName()) as InteractableLike;
     }
-    // Direct-only keeps this as a physical poke target. It deliberately has no
-    // InteractableManipulation, so SIK does not disable poke targeting.
-    interactable.targetingMode = 1;
-    interactable.ignoreInteractionPlane = false;
+    // Poke is the open-hand/index-finger contact path. Direct would require a
+    // pinch, which makes the pet interaction feel like another grab.
+    interactable.targetingMode = 4;
+    interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = false;
     interactable.enableInstantDrag = false;
+    const interactableOptions = interactable as unknown as {
+      allowMultipleInteractors?: boolean;
+      enablePokeDirectionality?: boolean;
+    };
+    interactableOptions.allowMultipleInteractors = true;
+    interactableOptions.enablePokeDirectionality = false;
     (interactable as ScriptComponent).enabled = this.enablePetReaction;
 
     this.petPokeTarget = target;
@@ -809,6 +821,9 @@ export class FriendGrab extends BaseScriptComponent {
     if (interactable.onInteractorTriggerEndOutside) {
       interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
     }
+    if (interactable.onTriggerCanceled) {
+      interactable.onTriggerCanceled.add(onGrabRelease);
+    }
     (manipulation as ScriptComponent).enabled = true;
     (interactable as ScriptComponent).enabled = true;
 
@@ -857,14 +872,17 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
     this.moveActive = true;
+    this.companionTalkActive =
+      !this.onboardingActive && this.beginCompanionGrabTalk();
     this.resetIdleBobOffset();
+    // Keep the physical SFX, but never speak a grab quip. Grabbing is now the
+    // companion's hold-to-talk gesture, so "Whee!" would pollute the mic and
+    // can repeat when SIK reports more than one end/start event.
     this.playFriendSound(this.resolvedGrabTrack, this.grabSoundVolume, 'grab');
-    // Don't interrupt the onboarding tour with grab quips.
-    if (!this.onboardingActive && this.grabBubbleText) {
-      this.showSpeech(this.grabBubbleText, true, this.grabSpeechTrack);
-    }
     if (this.debugLogging) {
-      print('[FriendGrab] grab start');
+      print(
+        `[FriendGrab] grab start${this.companionTalkActive ? ' — companion voice capture active' : ''}`
+      );
     }
   }
 
@@ -873,14 +891,31 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
     this.moveActive = false;
+    const wasCompanionTalkActive = this.companionTalkActive;
+    this.companionTalkActive = false;
+    if (wasCompanionTalkActive) {
+      const agent = getSharedArvisAgentChat();
+      if (!isNull(agent)) {
+        agent.endAgentTalkAndSend();
+      }
+    }
     this.captureIdleBasePosition();
+    // Release feedback is audio-only; do not speak "Thanks!" after a voice
+    // capture because it can be heard as another command on the next session.
     this.playFriendSound(this.resolvedReleaseTrack, this.releaseSoundVolume, 'release');
-    if (!this.onboardingActive && this.releaseBubbleText) {
-      this.showSpeech(this.releaseBubbleText, true, this.releaseSpeechTrack);
-    }
     if (this.debugLogging) {
-      print('[FriendGrab] grab end');
+      print(
+        `[FriendGrab] grab end${wasCompanionTalkActive ? ' — companion voice capture submitted' : ''}`
+      );
     }
+  }
+
+  private beginCompanionGrabTalk(): boolean {
+    const agent = getSharedArvisAgentChat();
+    if (isNull(agent)) {
+      return false;
+    }
+    return agent.beginCompanionGrabTalk();
   }
 
   private ensureFriendSounds(): void {
@@ -1175,12 +1210,6 @@ export class FriendGrab extends BaseScriptComponent {
 
     return [
       {
-        key: 'globe',
-        object: resolve(this.onboardingGlobe, 'Globe'),
-        line: this.onboardingGlobeLine,
-        requirePractice: true,
-      },
-      {
         key: 'clock',
         object: resolve(this.onboardingClock, 'Clock'),
         line: this.onboardingClockLine,
@@ -1332,16 +1361,40 @@ export class FriendGrab extends BaseScriptComponent {
       distance,
       height
     );
-    // Every step reuses Buddy's presentation slot. The previous object must
-    // be moved clear before its step can complete, so overlap avoidance must
-    // never push a new object away from Buddy or outside the user's view.
-    const present = basePresent;
+    // Keep each tour prop in its own nearby presentation slot. This prevents
+    // props that are released without much movement from stacking at one point.
+    const slot = this.getOnboardingPresentationSlot(key);
+    const spacing = Math.max(10, this.onboardingObjectSpacingCm);
+    const rightX = dirZ;
+    const rightZ = -dirX;
+    const present = new vec3(
+      basePresent.x + rightX * slot * spacing,
+      basePresent.y,
+      basePresent.z + rightZ * slot * spacing
+    );
     obj.getTransform().setWorldPosition(present);
 
     if (this.debugLogging) {
       print(
         `[FriendGrab] present ${key} at ${present.x.toFixed(1)}, ${present.y.toFixed(1)}, ${present.z.toFixed(1)}`
       );
+    }
+  }
+
+  private getOnboardingPresentationSlot(key: string): number {
+    switch (key) {
+      case 'clock':
+        return -2;
+      case 'palette':
+        return -1;
+      case 'postit':
+        return 0;
+      case 'trash':
+        return 1;
+      case 'leaderboard':
+        return 2;
+      default:
+        return 0;
     }
   }
 
@@ -1410,9 +1463,6 @@ export class FriendGrab extends BaseScriptComponent {
     if (this.treatAsNewUser) {
       print('[FriendGrab] treat as new user — forcing onboarding this session');
     }
-
-    // Wipe last-session plants/layout so the tour never starts with leftover anchors.
-    this.requestOnboardingSessionClear();
 
     // Hide tour props immediately so the desk starts empty aside from Friend.
     this.hideOnboardingTourObjects();
@@ -1684,6 +1734,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.onboardingGoalListening = true;
     speech.suppressVoiceCommandsFor(Math.max(8, this.onboardingGoalListenTimeoutSec + 2));
     speech.clearUtteranceState();
+    speech.beginAgentSession();
 
     let settled = false;
     const finish = (text: string): void => {
@@ -1693,6 +1744,7 @@ export class FriendGrab extends BaseScriptComponent {
       settled = true;
       this.onboardingGoalListening = false;
       speech.removeTranscriptListener(onTranscript);
+      speech.endAgentSession();
       speech.clearUtteranceState();
       onGoal(text);
     };
@@ -2009,7 +2061,8 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
     speech.addTranscriptListener((text, isFinal) => {
-      if (!isFinal && String(text || '').trim().length < 12) {
+      const rawText = String(text || '').trim();
+      if (!isFinal && rawText.length < 12 && !this.companionTalkActive) {
         return;
       }
       if (this.onboardingGoalListening) {
@@ -2017,6 +2070,11 @@ export class FriendGrab extends BaseScriptComponent {
       }
       const normalized = this.normalizeGoalUtterance(text);
       if (this.tryHandleFollowVoiceCommands(normalized)) {
+        return;
+      }
+      // While Buddy is held, short interim text is only a command candidate.
+      // Do not let it trigger unrelated goal-completion logic.
+      if (!isFinal && this.companionTalkActive) {
         return;
       }
       if (this.tryWorkspaceResetFromSpeech(text)) {
@@ -2102,6 +2160,7 @@ export class FriendGrab extends BaseScriptComponent {
     }
 
     if (this.isStopFollowingCommand(cleaned)) {
+      this.cancelCompanionGrabTalk();
       this.pauseFollowingByVoice();
       return true;
     }
@@ -2115,9 +2174,17 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private isStopFollowingCommand(cleanedLower: string): boolean {
-    if (cleanedLower.indexOf('hey friend') < 0) {
+    const addressedWithWake = cleanedLower.indexOf('hey friend') >= 0;
+    if (!addressedWithWake && !this.companionTalkActive) {
       return false;
     }
+
+    if (this.companionTalkActive) {
+      return /\b(?:leave me alone|leave us alone|go away|get away|stay there|stop following(?: me| us)?|(?:dont|don t|do not) follow(?: me| us)?|pause following(?: me| us)?|stop tagging along|(?:dont|don t|do not) come with me)\b/.test(
+        cleanedLower
+      );
+    }
+
     const asksStop =
       cleanedLower.indexOf('stop following') >= 0 ||
       cleanedLower.indexOf('dont follow') >= 0 ||
@@ -2128,6 +2195,20 @@ export class FriendGrab extends BaseScriptComponent {
       cleanedLower.indexOf('us') >= 0 ||
       cleanedLower.indexOf('my') >= 0;
     return asksStop && targetMe;
+  }
+
+  private cancelCompanionGrabTalk(): void {
+    if (!this.companionTalkActive) {
+      return;
+    }
+    this.companionTalkActive = false;
+    // If the command is spoken while Buddy is still held, the hide operation
+    // can prevent a later SIK release event. Clear the movement latch now.
+    this.moveActive = false;
+    const agent = getSharedArvisAgentChat();
+    if (!isNull(agent)) {
+      agent.cancelAgentTalk();
+    }
   }
 
   private isHeyFriendWakeCommand(cleanedLower: string): boolean {

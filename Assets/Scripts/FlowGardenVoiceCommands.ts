@@ -46,6 +46,8 @@ type SpawnSourceLike = {
 
 @component
 export class FlowGardenVoiceCommands extends BaseScriptComponent {
+  private static readonly POLL_INTERVAL_SEC = 0.15;
+
   @input
   @allowUndefined
   speechRecognition!: SpeechRecognition;
@@ -83,11 +85,12 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   spacePanel!: ScriptComponent;
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   private lastPollUtterance = '';
   private lastPollUtteranceAt = 0;
   private wiringLogged = false;
+  private nextPollAt = 0;
 
   onAwake(): void {
     this.createEvent('OnStartEvent').bind(() => this.resolveDependencies());
@@ -107,6 +110,12 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   }
 
   private pollTranscript(): void {
+    const now = getTime();
+    if (now < this.nextPollAt) {
+      return;
+    }
+    this.nextPollAt = now + FlowGardenVoiceCommands.POLL_INTERVAL_SEC;
+
     this.resolveDependencies();
     if (isNull(this.speechRecognition)) {
       return;

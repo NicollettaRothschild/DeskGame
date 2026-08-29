@@ -161,7 +161,7 @@ export class SpecsApiClient extends BaseScriptComponent {
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo';
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   private networkChecked = false;
   private networkAvailable = false;
@@ -1324,7 +1324,7 @@ export class SpecsApiClient extends BaseScriptComponent {
     body: JsonRecord | null,
     headers: Record<string, string> | null,
     onDone: (data: JsonRecord | null, error?: string) => void,
-    _timeoutSec?: number
+    timeoutSec?: number
   ): void {
     this.resolveInternetModule();
     if (isNull(this.internetModule)) {
@@ -1332,6 +1332,10 @@ export class SpecsApiClient extends BaseScriptComponent {
       return;
     }
 
+    const requestTimeoutSec = Math.max(
+      1,
+      Number(timeoutSec || this.requestTimeoutSec || 20)
+    );
     const fetchFn = (
       this.internetModule as InternetModule & {
         fetch?: (resource: string, options?: unknown) => Promise<Response>;
@@ -1339,11 +1343,18 @@ export class SpecsApiClient extends BaseScriptComponent {
     ).fetch;
 
     if (typeof fetchFn === 'function') {
-      this.requestJsonViaFetch(url, method, body, headers, onDone);
+      this.requestJsonViaFetch(url, method, body, headers, onDone, requestTimeoutSec);
       return;
     }
 
-    this.requestJsonViaRemoteService(url, method, body, headers, onDone);
+    this.requestJsonViaRemoteService(
+      url,
+      method,
+      body,
+      headers,
+      onDone,
+      requestTimeoutSec
+    );
   }
 
   private requestJsonViaFetch(
@@ -1351,7 +1362,8 @@ export class SpecsApiClient extends BaseScriptComponent {
     method: 'GET' | 'POST',
     body: JsonRecord | null,
     headers: Record<string, string> | null,
-    onDone: (data: JsonRecord | null, error?: string) => void
+    onDone: (data: JsonRecord | null, error?: string) => void,
+    timeoutSec: number
   ): void {
     const options: Record<string, unknown> = {
       method,
@@ -1360,6 +1372,21 @@ export class SpecsApiClient extends BaseScriptComponent {
     if (method !== 'GET' && body) {
       options.body = JSON.stringify(body);
     }
+
+    let settled = false;
+    const timeoutEvent = this.createEvent('DelayedCallbackEvent');
+    const finish = (data: JsonRecord | null, error?: string): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      timeoutEvent.enabled = false;
+      onDone(data, error);
+    };
+    timeoutEvent.bind(() => {
+      finish(null, `Request timed out after ${timeoutSec.toFixed(1)} seconds`);
+    });
+    timeoutEvent.reset(timeoutSec);
 
     const run = async (): Promise<void> => {
       try {
@@ -1386,7 +1413,7 @@ export class SpecsApiClient extends BaseScriptComponent {
           } catch {
             // keep status message
           }
-          onDone(null, message);
+          finish(null, message);
           return;
         }
 
@@ -1394,19 +1421,19 @@ export class SpecsApiClient extends BaseScriptComponent {
         this.networkAvailable = true;
 
         if (!raw) {
-          onDone({});
+          finish({});
           return;
         }
         try {
-          onDone(JSON.parse(raw) as JsonRecord);
+          finish(JSON.parse(raw) as JsonRecord);
         } catch {
-          onDone(null, 'Invalid JSON response');
+          finish(null, 'Invalid JSON response');
         }
       } catch (e) {
         if (this.debugLogging) {
           print('[SpecsApi] fetch failed: ' + e);
         }
-        onDone(null, this.formatNetworkError(e));
+        finish(null, this.formatNetworkError(e));
       }
     };
 
@@ -1418,13 +1445,29 @@ export class SpecsApiClient extends BaseScriptComponent {
     method: 'GET' | 'POST',
     body: JsonRecord | null,
     headers: Record<string, string> | null,
-    onDone: (data: JsonRecord | null, error?: string) => void
+    onDone: (data: JsonRecord | null, error?: string) => void,
+    timeoutSec: number
   ): void {
+    let settled = false;
+    const timeoutEvent = this.createEvent('DelayedCallbackEvent');
+    const finish = (data: JsonRecord | null, error?: string): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      timeoutEvent.enabled = false;
+      onDone(data, error);
+    };
+    timeoutEvent.bind(() => {
+      finish(null, `Request timed out after ${timeoutSec.toFixed(1)} seconds`);
+    });
+    timeoutEvent.reset(timeoutSec);
+
     let request: RemoteServiceHttpRequest;
     try {
       request = RemoteServiceHttpRequest.create();
     } catch (e) {
-      onDone(null, this.formatNetworkError(e));
+      finish(null, this.formatNetworkError(e));
       return;
     }
 
@@ -1443,13 +1486,20 @@ export class SpecsApiClient extends BaseScriptComponent {
       request.body = JSON.stringify(body);
     }
 
-    this.internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
-      try {
-        this.handleHttpResponse(request, response, onDone);
-      } catch (e) {
-        onDone(null, String(e));
-      }
-    });
+    try {
+      this.internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
+        if (settled) {
+          return;
+        }
+        try {
+          this.handleHttpResponse(request, response, finish);
+        } catch (e) {
+          finish(null, String(e));
+        }
+      });
+    } catch (e) {
+      finish(null, String(e));
+    }
   }
 
   private shouldUseUnpairedMockFallback(error?: string, message?: string): boolean {

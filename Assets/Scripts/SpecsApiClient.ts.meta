@@ -66,7 +66,7 @@
       autoPairPassword: test321
       arvisSupabaseUrl: "https://bigsedudegjukszrfyil.supabase.co"
       arvisSupabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo
-      debugLogging: true
+      debugLogging: false
   ScriptTypes:
     -
       {}
@@ -86,4 +86,4 @@
     - '// @input string autoPairPassword = "test321"'
     - '// @input string arvisSupabaseUrl = "https://bigsedudegjukszrfyil.supabase.co"'
     - '// @input string arvisSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo"'
-    - // @input bool debugLogging = true
+    - // @input bool debugLogging = false

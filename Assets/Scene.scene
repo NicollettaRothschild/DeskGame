@@ -554,7 +554,7 @@
       autoPairPassword: test321
       arvisSupabaseUrl: "https://bigsedudegjukszrfyil.supabase.co"
       arvisSupabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo
-      debugLogging: true
+      debugLogging: false
   ScriptTypes:
     "":
       {}
@@ -1856,12 +1856,13 @@
       statusText: !<reference.Text> 0b3d2d71-1b09-468b-91dd-cae34f37aa6d
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       apiBaseUrl: "https://arvis.space"
+      startupDelaySec: !<float> 12.000000
       pairPollSec: !<float> 4.000000
       taskPollSec: !<float> 45.000000
       berryRingRadius: !<float> 22.000000
       berryHeight: !<float> 2.000000
-      useDemoTasksWhenOffline: true
-      debugLogging: true
+      useDemoTasksWhenOffline: false
+      debugLogging: false
   ScriptTypes:
     "":
       {}
@@ -2992,7 +2993,7 @@
     {}
   ScriptInputs:
     "":
-      debugLogging: true
+      debugLogging: false
       colliderSize: !<Vec3> {x: 1.500000, y: 2.200000, z: 1.500000}
       grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
       releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
@@ -3014,7 +3015,7 @@
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: true
-      treatAsNewUser: true
+      treatAsNewUser: false
       onboardingStartDelaySec: 2.500000
       onboardingGapSec: 0.500000
       onboardingPracticeTimeoutSec: !<float> 14.000000
@@ -3026,7 +3027,7 @@
       onboardingObjectSpacingCm: !<float> 18.000000
       onboardingWelcomeLine: "Hi! I’m your companion. Let’s set up your space! I’ll give you a few tools, and you can put them wherever they work best for you."
       onboardingClosingLine: "You're all set! I'll tag along from here. Say hey friend if you want to talk again. When you finish your goal — or walk the distance — I'll congratulate you and your plant will fully grow. Have fun!"
-      onboardingGlobe: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
+      onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
       onboardingClock: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
       onboardingClockLine: Here’s your clock. Put it somewhere easy to check while you work.
@@ -3319,11 +3320,11 @@
     "":
       startupDisabled: false
       languageCode: en_US
-      autoStartListening: true
-      startupListenDelaySec: 2.500000
+      autoStartListening: false
+      startupListenDelaySec: 8.000000
       tapToListen: true
       listeningWindowSec: !<float> 8.000000
-      debugLogging: true
+      debugLogging: false
       commandCooldownSec: 1.500000
       mirrorTranscriptToSpacePanel: true
       transcriptText: !<reference.Text3D> b7c8d9e0-f1a2-4b3c-8d4e-5f6a7b8c9d0e
@@ -3931,7 +3932,7 @@
       seedsRoot: !<reference.SceneObject> 8ee0f565-368b-4fd9-957d-8e90c5fb48d2
       postItNotesRoot: !<reference.SceneObject> d7569447-6ffa-4d71-9778-b93af9b8cb95
       paletteRoot: !<reference.SceneObject> 9aa42fcc-a72f-4475-a934-1f79675ea728
-      globeRoot: !<reference.SceneObject> e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5
+      globeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       clockRoot: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
       leaderboardRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
@@ -4924,7 +4925,7 @@
   ScriptInputs:
     "":
       sourceRoot: !<reference.SceneObject> 8ee0f565-368b-4fd9-957d-8e90c5fb48d2
-      sourceName: Water Source
+      sourceName: Seeds
       anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
       handleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       glowMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
@@ -6806,7 +6807,7 @@
       agentName: Arvis
       useHoldToTalk: false
       maxHistoryTurns: !<float> 8.000000
-      debugLogging: true
+      debugLogging: false
       transcriptOnlyMode: false
   ScriptTypes:
     "":
@@ -7055,9 +7056,9 @@
       deviceRegistry: !<MappingBased.AssignableType_1> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
       voiceName: Sasha
       speed: !<float> 1.000000
-      preferArvisVoiceWhenPaired: true
+      preferArvisVoiceWhenPaired: false
       agentName: Arvis
-      debugLogging: true
+      debugLogging: false
       cloudTtsTimeoutSec: !<float> 8.000000
       nativeVoiceTimeoutSec: !<float> 7.000000
       speakingLockTimeoutSec: !<float> 24.000000
@@ -7624,7 +7625,6 @@
   Components:
     - !<own> 5a6e4839-efd9-42a9-b7e7-a8bccce44635
     - !<own> a65aa6b0-2fbb-4f76-b2af-91a6b792ad91
-    - !<own> e9da13a7-5296-4cbc-a368-e9e3177dc029
 - !<ScriptComponent/b207ead9-c5c8-4d57-9e47-fb35ba6e389b>
   PrefabRemaps:
     []
@@ -8533,7 +8533,7 @@
   PrefabRemaps:
     []
   Name: GlobeGrab
-  Enabled: true
+  Enabled: false
   ScriptAsset: !<reference> 6eef640f-bbb6-4aa5-88e2-8108b2b6d8a1
   ScriptInputsDefault:
     debugLogging: true
@@ -9404,7 +9404,7 @@
       activePulseSpeed: 1.350000
       thinkingPulseSpeed: 2.100000
       enablePinchToTalk: true
-      debugLogging: true
+      debugLogging: false
       grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
       releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
       grabSoundVolume: 0.850000
@@ -10590,8 +10590,8 @@
 - !<SceneObject/e6cc3ace-c02e-4e7f-9580-195c2ad2f4a5>
   PrefabRemaps:
     []
-  Name: Globe
-  Enabled: true
+  Name: Archived_Globe
+  Enabled: false
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
@@ -10917,42 +10917,6 @@
       stackLayerThickness: 0.035000
       stackLayerGap: 0.028000
       stackLayerOffsetSpread: 0.018000
-  ScriptTypes:
-    "":
-      {}
-- !<ScriptComponent/e9da13a7-5296-4cbc-a368-e9e3177dc029>
-  PrefabRemaps:
-    []
-  Name: MainSeedSource
-  Enabled: true
-  ScriptAsset: !<reference> 5ebcbd7e-859e-4c10-b5ff-79c541179c59
-  ScriptInputsDefault:
-    spawnForwardOffset: true
-    fallbackRayDistance: true
-    followInteractorWhileHeld: true
-    allowMultipleActiveSeeds: true
-    debugLogging: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      seedPrefab: !<reference.ObjectPrefab> 1b4e65f7-89b6-4a66-8b40-734a318bfc98
-      plantSpawnConfigs: !<MappingBased.AssignableType[]>
-        - !<reference> 034e88c3-d236-477b-81f3-05ccebbdf9a8
-        - !<reference> 3d54ed6d-d16c-4b26-aae6-4e875a56001e
-        - !<reference> 9c149ea5-09c6-460e-bd27-0a1c160bd37e
-        - !<reference> a572bd4e-d10b-4cac-83b9-7278744d5417
-        - !<reference> d8530748-4910-4ceb-afa4-40d3eeec328d
-        - !<reference> 254db73f-25bd-4bad-b900-861a7d7115da
-        - !<reference> 8bfe1920-359f-449a-b002-027b3e46e7cd
-      anchorController: !<reference.ScriptComponent> 5f0a5450-dec9-48b7-b2e3-fd9185898b19
-      sourceInteractable: !<reference.ScriptComponent> 5a6e4839-efd9-42a9-b7e7-a8bccce44635
-      spawnParent: !<reference.SceneObject> b0bf5e9a-1efe-452b-9e49-c9711533f11e
-      spawnForwardOffset: !<float> 0.000000
-      fallbackRayDistance: !<float> 35.000000
-      followInteractorWhileHeld: true
-      allowMultipleActiveSeeds: false
-      debugLogging: false
   ScriptTypes:
     "":
       {}

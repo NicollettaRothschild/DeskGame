@@ -88,7 +88,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   enablePinchToTalk: boolean = true;
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   @input
   @allowUndefined

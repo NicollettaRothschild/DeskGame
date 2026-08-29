@@ -25,8 +25,9 @@ const GLOBAL_OBJECT_SCALE_MULTIPLIER = 1.5;
 const PALETTE_EXTRA_SCALE_MULTIPLIER = 1.5;
 const TRASH_BIN_SCALE_MULTIPLIER = 2.0;
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
-/** Desk props that already have grab scripts — persist/reparent like garden sources, no MoveHandle. */
-const DESK_PROP_NAMES = ['palette', 'Globe', 'Clock', 'Leaderboard'];
+const GARDEN_SOURCE_MOVE_HANDLE_NAMES = GARDEN_SPAWN_SOURCE_NAMES.concat(['palette']);
+/** Desk props that already have grab scripts — persist/reparent like garden sources. */
+const DESK_PROP_NAMES = ['palette', 'Clock', 'Leaderboard'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
 const TRASH_BIN_SOURCE_NAME = 'TrashBin';
 const GARDEN_MOVE_HANDLE_REFERENCE_SOURCE = 'Water Source';
@@ -3777,7 +3778,7 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private wireGardenSourceMoveHandles(): void {
-    const handleNames = GARDEN_SPAWN_SOURCE_NAMES;
+    const handleNames = GARDEN_SOURCE_MOVE_HANDLE_NAMES;
     const template = this.findMoveHandleTemplate();
     for (let i = 0; i < handleNames.length; i++) {
       const name = handleNames[i];

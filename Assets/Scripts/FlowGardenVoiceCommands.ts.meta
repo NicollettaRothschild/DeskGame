@@ -54,7 +54,7 @@
       potSource: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-      debugLogging: true
+      debugLogging: false
   ScriptTypes:
     -
       {}

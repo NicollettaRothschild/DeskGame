@@ -115,7 +115,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   maxHistoryTurns: number = 8;
 
   @input
-  debugLogging: boolean = true;
+  debugLogging: boolean = false;
 
   @input
   transcriptOnlyMode: boolean = false;
@@ -139,7 +139,11 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private static readonly LISTENING_CUE = 'Listening…';
   private static readonly VOICE_WAKE_DEDUPE_SEC = 2.5;
   private static readonly VOICE_WAKE_STABLE_SEC = 0.55;
+  private static readonly VOICE_POLL_INTERVAL_SEC = 0.15;
   private static readonly EMAIL_DRAFT_STATUS_MAX_POLLS = 45;
+
+  private nextVoiceWakePollAt = 0;
+  private nextListeningBoardRefreshAt = 0;
 
   onAwake(): void {
     registerArvisAgentChat(this);
@@ -156,6 +160,12 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   private refreshListeningBoard(): void {
+    const now = getTime();
+    if (now < this.nextListeningBoardRefreshAt) {
+      return;
+    }
+    this.nextListeningBoardRefreshAt = now + ArvisAgentChat.VOICE_POLL_INTERVAL_SEC;
+
     if (!this.listening || this.sending || isNull(this.speechRecognition)) {
       return;
     }
@@ -195,6 +205,12 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   private pollIdleVoiceWake(): void {
+    const now = getTime();
+    if (now < this.nextVoiceWakePollAt) {
+      return;
+    }
+    this.nextVoiceWakePollAt = now + ArvisAgentChat.VOICE_POLL_INTERVAL_SEC;
+
     if (this.listening || this.sending) {
       return;
     }
@@ -417,6 +433,34 @@ export class ArvisAgentChat extends BaseScriptComponent {
     this.lastListeningBoardTranscript = ArvisAgentChat.LISTENING_CUE;
     this.updateBoard('listening', ArvisAgentChat.LISTENING_CUE, null);
     this.setStatus(this.agentName + ' is listening…');
+  }
+
+  /**
+   * Starts a hold-to-talk session owned by the companion grab interaction.
+   * Unlike wake-word listening, every spoken phrase is treated as the user's
+   * prompt so the user can address Arvis directly while holding Buddy.
+   */
+  public beginCompanionGrabTalk(): boolean {
+    if (this.listening || this.sending) {
+      return false;
+    }
+
+    this.resolveDependencies();
+    if (isNull(this.speechRecognition)) {
+      this.setStatus('Speech recognition not wired');
+      return false;
+    }
+
+    this.listening = true;
+    this.wakeAwaitingPrompt = false;
+    this.resetListeningBoardCache();
+    this.consumedWakeFinal = '';
+    this.speechRecognition.clearUtteranceState();
+    this.speechRecognition.beginAgentSession();
+    this.lastListeningBoardTranscript = ArvisAgentChat.LISTENING_CUE;
+    this.updateBoard('listening', ArvisAgentChat.LISTENING_CUE, null);
+    this.setStatus(this.agentName + ' is listening — release to send');
+    return true;
   }
 
   public endAgentTalkAndSend(): void {
@@ -670,41 +714,47 @@ export class ArvisAgentChat extends BaseScriptComponent {
       text: entry.text,
     }));
 
-    this.specsApi.chatWithAgent(
-      this.deviceRegistry.getDeviceId(),
-      this.deviceRegistry.getDeviceSecret(),
-      outbound,
-      this.agentName,
-      payloadHistory,
-      (result, error) => {
-        this.sending = false;
-        if (!result) {
-          this.updateBoard('error', outbound, error || 'unknown');
-          this.setStatus('');
-          return;
-        }
-
-        this.pushHistory('user', outbound);
-        this.pushHistory('assistant', result.response);
-        const label = result.agentName || this.agentName;
-        this.activeReplyTranscript = outbound;
-        this.activeReplyText = result.response;
-        this.updateBoard('reply', outbound, result.response, label, result.imageUrl || null);
-        this.setStatus('');
-        if (!isNull(this.speechRecognition)) {
-          this.speechRecognition.clearUtteranceState();
-          this.speechRecognition.markCommandHandled();
-          this.speechRecognition.suppressVoiceCommandsFor(2.5);
-        }
-        if (this.debugLogging) {
-          print(`[ArvisAgentChat] ${label}: ${result.response}`);
-          if (result.imageUrl) {
-            print(`[ArvisAgentChat] image ${String(result.imageUrl).slice(0, 120)}`);
+    try {
+      this.specsApi.chatWithAgent(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        outbound,
+        this.agentName,
+        payloadHistory,
+        (result, error) => {
+          this.sending = false;
+          if (!result) {
+            this.updateBoard('error', outbound, error || 'unknown');
+            this.setStatus('');
+            return;
           }
+
+          this.pushHistory('user', outbound);
+          this.pushHistory('assistant', result.response);
+          const label = result.agentName || this.agentName;
+          this.activeReplyTranscript = outbound;
+          this.activeReplyText = result.response;
+          this.updateBoard('reply', outbound, result.response, label, result.imageUrl || null);
+          this.setStatus('');
+          if (!isNull(this.speechRecognition)) {
+            this.speechRecognition.clearUtteranceState();
+            this.speechRecognition.markCommandHandled();
+            this.speechRecognition.suppressVoiceCommandsFor(2.5);
+          }
+          if (this.debugLogging) {
+            print(`[ArvisAgentChat] ${label}: ${result.response}`);
+            if (result.imageUrl) {
+              print(`[ArvisAgentChat] image ${String(result.imageUrl).slice(0, 120)}`);
+            }
+          }
+          this.speakAgentResponse(result.response, label);
         }
-        this.speakAgentResponse(result.response, label);
-      }
-    );
+      );
+    } catch (e) {
+      this.sending = false;
+      this.updateBoard('error', outbound, String(e));
+      this.setStatus('Agent request failed');
+    }
   }
 
   private queueEmailDraft(emailDraftIntent: ArvisEmailDraftIntent, outbound: string): void {
@@ -716,32 +766,38 @@ export class ArvisAgentChat extends BaseScriptComponent {
     this.sending = true;
     this.updateBoard('thinking', outbound, 'Sending the draft request to Arvis on your Mac…');
     this.setStatus('Sending email draft to Arvis on your Mac…');
-    this.specsApi.queueEmailDraft(
-      this.deviceRegistry.getDeviceId(),
-      this.deviceRegistry.getDeviceSecret(),
-      emailDraftIntent.requestId,
-      emailDraftIntent.recipient,
-      emailDraftIntent.subject,
-      emailDraftIntent.body,
-      (result, error) => {
-        this.sending = false;
-        if (isNull(result)) {
-          this.updateBoard('error', outbound, error || 'Could not reach the Arvis Mac bridge');
-          this.setStatus(error || 'Arvis Mac bridge unavailable');
-          return;
-        }
+    try {
+      this.specsApi.queueEmailDraft(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        emailDraftIntent.requestId,
+        emailDraftIntent.recipient,
+        emailDraftIntent.subject,
+        emailDraftIntent.body,
+        (result, error) => {
+          this.sending = false;
+          if (isNull(result)) {
+            this.updateBoard('error', outbound, error || 'Could not reach the Arvis Mac bridge');
+            this.setStatus(error || 'Arvis Mac bridge unavailable');
+            return;
+          }
 
-        const waitingResponse =
-          'Draft sent to Arvis on your Mac. Thunderbird will open an unsent draft shortly.';
-        this.pushHistory('user', outbound);
-        this.pushHistory('assistant', waitingResponse);
-        this.activeReplyTranscript = outbound;
-        this.activeReplyText = waitingResponse;
-        this.updateBoard('reply', outbound, waitingResponse, this.agentName);
-        this.speakAgentResponse(waitingResponse, this.agentName);
-        this.watchEmailDraftStatus(outbound, result.commandId);
-      }
-    );
+          const waitingResponse =
+            'Draft sent to Arvis on your Mac. Thunderbird will open an unsent draft shortly.';
+          this.pushHistory('user', outbound);
+          this.pushHistory('assistant', waitingResponse);
+          this.activeReplyTranscript = outbound;
+          this.activeReplyText = waitingResponse;
+          this.updateBoard('reply', outbound, waitingResponse, this.agentName);
+          this.speakAgentResponse(waitingResponse, this.agentName);
+          this.watchEmailDraftStatus(outbound, result.commandId);
+        }
+      );
+    } catch (e) {
+      this.sending = false;
+      this.updateBoard('error', outbound, String(e));
+      this.setStatus('Arvis Mac bridge request failed');
+    }
   }
 
   private handleCalendarIntent(intent: ArvisCalendarIntent, outbound: string): void {

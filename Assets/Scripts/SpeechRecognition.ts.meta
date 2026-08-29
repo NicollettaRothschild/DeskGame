@@ -63,11 +63,11 @@
   InputLines:
     - // @input bool startupDisabled
     - '// @input string languageCode = "en_US"'
-    - // @input bool autoStartListening = true
+    - // @input bool autoStartListening
     - // @input float startupListenDelaySec = 2.5
     - // @input bool tapToListen = true
     - // @input float listeningWindowSec = 8
-    - // @input bool debugLogging = true
+    - // @input bool debugLogging
     - // @input float commandCooldownSec = 1.5
     - // @input bool mirrorTranscriptToSpacePanel = true
     - // @input Component.Text3D transcriptText

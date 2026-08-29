@@ -270,7 +270,6 @@ export class MainSeedSource extends BaseScriptComponent {
 
   private updatePulledSeedPosition(): void {
     if (
-      !this.followInteractorWhileHeld ||
       isNull(this.activePull) ||
       isNull((this.activePull as PullState).seedObject)
     ) {
@@ -291,6 +290,21 @@ export class MainSeedSource extends BaseScriptComponent {
     }
 
     const interactor = pull.interactor;
+    if (
+      interactor &&
+      typeof interactor.isActive === 'function' &&
+      !interactor.isActive()
+    ) {
+      // Some SIK cancellation paths do not emit an end event. Do not leave a
+      // seed permanently attached to a stale pinch in that case.
+      this.releaseActivePull();
+      return;
+    }
+
+    if (!this.followInteractorWhileHeld) {
+      return;
+    }
+
     const position = this.getInteractorPosition(interactor, pull.rayDistance);
     this.syncTrackedWrapper(pull.seedObject, position);
   }

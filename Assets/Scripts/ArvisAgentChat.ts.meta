@@ -82,5 +82,5 @@
     - '// @input string agentName = "Arvis"'
     - // @input bool useHoldToTalk
     - // @input float maxHistoryTurns = 8
-    - // @input bool debugLogging = true
+    - // @input bool debugLogging
     - // @input bool transcriptOnlyMode
