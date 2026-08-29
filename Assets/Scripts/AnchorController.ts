@@ -4861,6 +4861,14 @@ export class AnchorController extends BaseScriptComponent {
     } else {
       store.remove(targetTypeKey);
     }
+
+    const sourcePendingGoalKey = `w${fromIndex}_pot_pending_goal`;
+    const targetPendingGoalKey = `w${toIndex}_pot_pending_goal`;
+    if (store.has(sourcePendingGoalKey)) {
+      store.putString(targetPendingGoalKey, store.getString(sourcePendingGoalKey));
+    } else {
+      store.remove(targetPendingGoalKey);
+    }
   }
 
   private captureObjectSlotSnapshot(index: number): TrashObjectStoreSnapshot {
@@ -4933,6 +4941,9 @@ export class AnchorController extends BaseScriptComponent {
     if (store.has(`w${index}_plant_type`)) {
       snapshot.strings.plant_type = store.getString(`w${index}_plant_type`);
     }
+    if (store.has(`w${index}_pot_pending_goal`)) {
+      snapshot.strings.pot_pending_goal = store.getString(`w${index}_pot_pending_goal`);
+    }
 
     return snapshot;
   }
@@ -4965,6 +4976,9 @@ export class AnchorController extends BaseScriptComponent {
     }
     if (snapshot.strings.plant_type !== undefined) {
       store.putString(`w${index}_plant_type`, snapshot.strings.plant_type);
+    }
+    if (snapshot.strings.pot_pending_goal !== undefined) {
+      store.putString(`w${index}_pot_pending_goal`, snapshot.strings.pot_pending_goal);
     }
   }
 
@@ -5325,6 +5339,21 @@ export class AnchorController extends BaseScriptComponent {
   }
 
   private persistPlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
+    const pot = this.findPotScript(obj);
+    const pendingGoal =
+      !isNull(pot) && typeof pot.getPendingGoalText === 'function'
+        ? String(pot.getPendingGoalText() || '').trim()
+        : '';
+    if (!isNull(pot)) {
+      if (pendingGoal) {
+        store.putString(`w${index}_pot_pending_goal`, pendingGoal);
+      } else {
+        store.remove(`w${index}_pot_pending_goal`);
+      }
+    } else {
+      store.remove(`w${index}_pot_pending_goal`);
+    }
+
     const plant = this.findPlantLifecycle(obj);
     if (isNull(plant)) {
       return;
@@ -5384,10 +5413,19 @@ export class AnchorController extends BaseScriptComponent {
       store.remove(`w${index}_plant_goal_required`);
       store.remove(`w${index}_plant_goal_done`);
     }
+    store.remove(`w${index}_pot_pending_goal`);
   }
 
   private restorePlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
+    const pot = this.findPotScript(obj);
     if (!store.has(`w${index}_plant_stage`)) {
+      if (
+        !isNull(pot) &&
+        typeof pot.setPendingGoal === 'function' &&
+        store.has(`w${index}_pot_pending_goal`)
+      ) {
+        pot.setPendingGoal(store.getString(`w${index}_pot_pending_goal`));
+      }
       return;
     }
 
@@ -5469,6 +5507,15 @@ export class AnchorController extends BaseScriptComponent {
         store.has(`w${index}_plant_goal_done`) && store.getBool(`w${index}_plant_goal_done`),
     };
     plant.applySaveState(state);
+
+    if (
+      !isNull(pot) &&
+      !state.goalText &&
+      typeof pot.setPendingGoal === 'function' &&
+      store.has(`w${index}_pot_pending_goal`)
+    ) {
+      pot.setPendingGoal(store.getString(`w${index}_pot_pending_goal`));
+    }
   }
 
   private getOrCreateRestoredPlantLifecycle(
@@ -5523,6 +5570,7 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_goal_text`);
     store.remove(`w${index}_plant_goal_required`);
     store.remove(`w${index}_plant_goal_done`);
+    store.remove(`w${index}_pot_pending_goal`);
   }
 
   private getActivePlantConfigs(): PlantSpawnConfig[] {
@@ -5788,6 +5836,8 @@ export class AnchorController extends BaseScriptComponent {
     createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
     getPlantedLifecycle?: () => PlantLifecycle | null;
     tryAttachSeed?: (plant: PlantLifecycle) => boolean;
+    setPendingGoal?: (goalText: string) => void;
+    getPendingGoalText?: () => string;
   } {
     const stack: SceneObject[] = [root];
     while (stack.length > 0) {
@@ -5803,6 +5853,8 @@ export class AnchorController extends BaseScriptComponent {
           createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
           getPlantedLifecycle?: () => PlantLifecycle | null;
           tryAttachSeed?: (plant: PlantLifecycle) => boolean;
+          setPendingGoal?: (goalText: string) => void;
+          getPendingGoalText?: () => string;
         };
         if (
           !isNull(candidate) &&
@@ -5810,7 +5862,9 @@ export class AnchorController extends BaseScriptComponent {
             typeof candidate.setAnchorPersistence === 'function' ||
             typeof candidate.createRestoredPlant === 'function' ||
             typeof candidate.getPlantedLifecycle === 'function' ||
-            typeof candidate.tryAttachSeed === 'function'
+            typeof candidate.tryAttachSeed === 'function' ||
+            typeof candidate.setPendingGoal === 'function' ||
+            typeof candidate.getPendingGoalText === 'function'
           )
         ) {
           return candidate;
@@ -5825,6 +5879,8 @@ export class AnchorController extends BaseScriptComponent {
     return null as unknown as {
       setAnchorPersistence?: (persistence: AnchorController) => void;
       createRestoredPlant?: (plantPrefab: ObjectPrefab) => PlantLifecycle;
+      setPendingGoal?: (goalText: string) => void;
+      getPendingGoalText?: () => string;
     };
   }
 

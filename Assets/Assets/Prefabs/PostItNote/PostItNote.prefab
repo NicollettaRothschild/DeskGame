@@ -60,6 +60,7 @@
     noteInteractable: true
     maxCharacters: true
     textSize: true
+    displayPrefix: true
     debugLogging: true
   ScriptTypesDefault:
     {}
@@ -68,6 +69,7 @@
       noteInteractable: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       maxCharacters: !<float> 0.000000
       textSize: !<float> 0.000000
+      displayPrefix: ""
       debugLogging: false
   ScriptTypes:
     "":

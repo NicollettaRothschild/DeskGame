@@ -568,22 +568,58 @@ export class MainSeedSource extends BaseScriptComponent {
     this.abandonActivePull();
 
     const anchorSpawner = this.getAnchorSeedSpawner();
-    if (!isNull(anchorSpawner) && !wasPlanted) {
-      const spawner = anchorSpawner as AnchorSeedSpawner;
-      const worldPos = releasedSeed.getTransform().getWorldPosition();
-      if (typeof spawner.placeTrackedContentAtWorld === 'function') {
-        spawner.placeTrackedContentAtWorld(releasedSeed, worldPos);
-      } else if (typeof spawner.syncTrackedWrapperToContent === 'function') {
-        spawner.syncTrackedWrapperToContent(releasedSeed);
-      }
-      if (typeof spawner.setActiveManipulatedRoot === 'function') {
-        spawner.setActiveManipulatedRoot(releasedSeed);
-      }
-      this.notifyTrashSpawnGrace(releasedSeed, 5);
-      if (typeof spawner.saveObjectPosition === 'function') {
-        spawner.saveObjectPosition();
-      }
+    if (
+      !isNull(anchorSpawner) &&
+      typeof (anchorSpawner as AnchorSeedSpawner).setActiveManipulatedRoot === 'function'
+    ) {
+      // This source owns the pull; do not leave a discarded or planted seed
+      // as AnchorController's "currently manipulated" object.
+      (anchorSpawner as AnchorSeedSpawner).setActiveManipulatedRoot!(null);
     }
+
+    if (wasPlanted) {
+      this.debugLog(`kept ${releasedSeed.name}: seed was planted in a pot.`);
+      return;
+    }
+
+    // Seeds are consumable source items, not desk objects. Give PlantPot's
+    // overlap callbacks a brief chance to claim the seed, then remove it if
+    // it was released anywhere else so loose seeds cannot accumulate.
+    this.scheduleUnplantedSeedCleanup(releasedSeed);
+  }
+
+  private scheduleUnplantedSeedCleanup(seedObject: SceneObject): void {
+    const cleanup = this.createEvent('DelayedCallbackEvent');
+    cleanup.bind(() => {
+      if (!this.isSceneObjectAlive(seedObject)) {
+        return;
+      }
+
+      const plant = this.findPlantLifecycle(seedObject);
+      if (
+        !isNull(plant) &&
+        typeof plant.getIsPlanted === 'function' &&
+        plant.getIsPlanted()
+      ) {
+        this.debugLog(`kept ${seedObject.name}: seed was planted during release grace.`);
+        return;
+      }
+
+      const anchorSpawner = this.getAnchorSeedSpawner();
+      if (
+        !isNull(anchorSpawner) &&
+        typeof (anchorSpawner as AnchorSeedSpawner).destroyTrackedObject === 'function' &&
+        (anchorSpawner as AnchorSeedSpawner).destroyTrackedObject!(seedObject)
+      ) {
+        this.debugLog(`discarded ${seedObject.name}: it was released outside a pot.`);
+        return;
+      }
+
+      scheduleDeferredDestroy(this, seedObject, () => {
+        this.debugLog(`discarded ${seedObject.name}: it was released outside a pot.`);
+      });
+    });
+    cleanup.reset(0.35);
   }
 
   private notifyTrashSpawnGrace(root: SceneObject, graceSeconds: number): void {

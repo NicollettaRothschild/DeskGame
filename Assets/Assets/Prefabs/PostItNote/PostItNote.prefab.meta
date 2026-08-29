@@ -67,6 +67,7 @@
   Enabled: true
   ScriptAsset: !<reference> 6bc12286-b963-41fb-b1d2-0968b3bc5187
   ScriptInputsDefault:
+    displayPrefix: true
     debugLogging: true
   ScriptTypesDefault:
     {}
@@ -75,6 +76,7 @@
       noteInteractable: !<reference.ScriptComponent> 49a1b6ec-3cbd-48a2-666c-6eff9c8fffe7
       maxCharacters: !<float> 140.000000
       textSize: !<float> 26.000000
+      displayPrefix: ""
       debugLogging: false
   ScriptTypes:
     "":

@@ -31,6 +31,7 @@
     debugLogging: false
     fallbackRayDistance: false
     followInteractorWhileHeld: false
+    postReleaseCaptureSec: false
     potPrefabs: false
     sourceInteractable: false
     spawnForwardOffset: false
@@ -54,6 +55,7 @@
       followInteractorWhileHeld: true
       allowMultipleActivePots: false
       debugLogging: false
+      postReleaseCaptureSec: !<float> 12.000000
   ScriptTypes:
     -
       {}
@@ -67,3 +69,4 @@
     - // @input bool followInteractorWhileHeld = true
     - // @input bool allowMultipleActivePots
     - // @input bool debugLogging
+    - '// @input float postReleaseCaptureSec = 12 {"hint":"Keep goal transcript capture active briefly after release"}'

@@ -4,6 +4,7 @@ import { playInteractionSound } from './InteractionSoundRegistry';
 type AnchorPersistence = {
   registerPlantedObject(objectRoot: SceneObject): void;
   releaseTrackedContentObject?: (contentRoot: SceneObject) => void;
+  persistPlantLifecycleState?: (plantContainer: SceneObject) => void;
 };
 
 type InteractableManipulationLike = ScriptComponent & {
@@ -35,6 +36,7 @@ export class PlantPot extends BaseScriptComponent {
 
   private plantedPlant: PlantLifecycle | null = null;
   private anchorPersistence: AnchorPersistence | null = null;
+  private pendingGoalText = '';
 
   onAwake(): void {
     this.anchorPersistence = this.getAnchorPersistenceFromInput();
@@ -83,6 +85,7 @@ export class PlantPot extends BaseScriptComponent {
     plant.applyDefaultPlantedWorldScale();
     plant.setAllowTrashManipulation(false);
     plant.setPlanted(true);
+    this.applyPendingGoalToPlant(plant);
 
     if (this.disablePlantInteractionWhenPlanted) {
       this.setPlantInteractionEnabled(plantRoot, false);
@@ -139,6 +142,28 @@ export class PlantPot extends BaseScriptComponent {
     return this.plantedPlant;
   }
 
+  /**
+   * Hold a spoken goal on an empty pot until a seed is planted into it.
+   * If the pot already has a plant, update that plant immediately.
+   */
+  public setPendingGoal(goalText: string): void {
+    const text = String(goalText || '').trim();
+    if (!text) {
+      return;
+    }
+
+    this.pendingGoalText = text;
+    if (!isNull(this.plantedPlant)) {
+      this.applyPendingGoalToPlant(this.plantedPlant as PlantLifecycle);
+    }
+    this.notifyAnchorStateChanged();
+    this.debugLog(`pending goal "${text}"`);
+  }
+
+  public getPendingGoalText(): string {
+    return this.pendingGoalText;
+  }
+
   public tryWaterPlantedPlant(): boolean {
     if (isNull(this.plantedPlant)) {
       return false;
@@ -165,6 +190,7 @@ export class PlantPot extends BaseScriptComponent {
     // Once planted in a pot, prevent accidental re-grabs that offset the seed/plant.
     plant.setAllowTrashManipulation(false);
     plant.setPlanted(true);
+    this.applyPendingGoalToPlant(plant);
 
     if (
       !isNull(this.anchorPersistence) &&
@@ -216,6 +242,28 @@ export class PlantPot extends BaseScriptComponent {
     }
 
     return null;
+  }
+
+  private applyPendingGoalToPlant(plant: PlantLifecycle): void {
+    const goal = String(this.pendingGoalText || '').trim();
+    if (!goal || isNull(plant) || typeof plant.bindGoal !== 'function') {
+      return;
+    }
+
+    plant.bindGoal(goal);
+    this.pendingGoalText = '';
+    this.debugLog(`assigned pending goal to ${plant.getSceneObject().name}`);
+  }
+
+  private notifyAnchorStateChanged(): void {
+    if (
+      isNull(this.anchorPersistence) ||
+      typeof this.anchorPersistence.persistPlantLifecycleState !== 'function'
+    ) {
+      return;
+    }
+
+    this.anchorPersistence.persistPlantLifecycleState(this.getSceneObject());
   }
 
   private findPlantInAncestors(sceneObject: SceneObject): PlantLifecycle {

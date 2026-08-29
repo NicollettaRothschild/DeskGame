@@ -44,6 +44,11 @@ export class PostItNoteTranscript extends BaseScriptComponent {
   textSize: number = TEXT_SIZE;
 
   @input
+  @allowUndefined
+  @label('Display Prefix')
+  displayPrefix: string = '';
+
+  @input
   debugLogging: boolean = false;
 
   private speech: SpeechRecognition | null = null;
@@ -144,7 +149,7 @@ export class PostItNoteTranscript extends BaseScriptComponent {
     }
 
     this.noteText = cleaned;
-    this.writeText(cleaned);
+    this.writeText(this.formatDisplayText(cleaned));
   }
 
   private writeText(value: string): void {
@@ -321,9 +326,14 @@ export class PostItNoteTranscript extends BaseScriptComponent {
     this.text3d = text3d;
 
     if (this.noteText) {
-      this.writeText(this.noteText);
+      this.writeText(this.formatDisplayText(this.noteText));
       root.enabled = true;
     }
+  }
+
+  private formatDisplayText(value: string): string {
+    const prefix = String(this.displayPrefix || '').trim();
+    return prefix ? `${prefix}: ${value}` : value;
   }
 
   private applyInkColor(color: vec4): void {

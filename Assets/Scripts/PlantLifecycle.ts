@@ -111,9 +111,9 @@ export class PlantLifecycle extends BaseScriptComponent {
   private static readonly GROWTH_SIZE_DIVISOR = 3;
   /** Goal plants pause ~60% grown until the player finishes the goal. */
   private static readonly GOAL_GROWTH_CAP_RATIO = 0.6;
-  /** Goal labels are compact world-space tags positioned above the active plant model. */
-  private static readonly GOAL_LABEL_FALLBACK_OFFSET = new vec3(0, 32, 0);
-  private static readonly GOAL_LABEL_MIN_OFFSET_Y = 24;
+  /** Goal labels are compact world-space tags positioned below the planter. */
+  private static readonly GOAL_LABEL_FALLBACK_OFFSET = new vec3(0, -32, 0);
+  private static readonly GOAL_LABEL_MIN_BELOW_OFFSET_Y = 24;
   private static readonly GOAL_LABEL_MARGIN_Y = 8;
   private static readonly GOAL_LABEL_MIN_WIDTH = 8;
   private static readonly GOAL_LABEL_MAX_WIDTH = 18;
@@ -495,7 +495,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     return updated;
   }
 
-  /** Finish the bound goal and bloom to Adult if the plant is growing. */
+  /** Finish the bound goal and bloom to Adult once the plant is planted. */
   public completeGoal(): boolean {
     if (!this.requiresGoalCompletion || this.goalCompleted) {
       return false;
@@ -507,7 +507,11 @@ export class PlantLifecycle extends BaseScriptComponent {
 
     if (this.currentStage === PlantStage.Growing || this.currentStage === PlantStage.WateredBaby) {
       this.finishGrowthToAdult();
-    } else if (this.currentStage === PlantStage.Seed && this.isPlanted && this.hasBeenWatered) {
+    } else if (this.currentStage === PlantStage.Seed && this.isPlanted) {
+      // A completed goal must still bloom a seed if watering was skipped.
+      // Cancel any in-flight watering transition before replacing the seed model.
+      this.seedWaterScaleOutActive = false;
+      this.seedWaterScaleOutStartScale = null;
       this.startGrowth();
       this.finishGrowthToAdult();
     } else {
@@ -2338,6 +2342,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     const corners: vec3[] = [];
     let minX = Infinity;
     let maxX = -Infinity;
+    let minY = Infinity;
     let maxY = -Infinity;
     let minZ = Infinity;
     let maxZ = -Infinity;
@@ -2352,18 +2357,22 @@ export class PlantLifecycle extends BaseScriptComponent {
       const localPoint = hostWorldToLocal.multiplyPoint(corners[i]);
       minX = Math.min(minX, localPoint.x);
       maxX = Math.max(maxX, localPoint.x);
+      minY = Math.min(minY, localPoint.y);
       maxY = Math.max(maxY, localPoint.y);
       minZ = Math.min(minZ, localPoint.z);
       maxZ = Math.max(maxZ, localPoint.z);
     }
 
-    if (maxY === -Infinity) {
+    if (minY === Infinity || maxY === -Infinity) {
       return fallback;
     }
 
     return new vec3(
       (minX + maxX) * 0.5,
-      Math.max(PlantLifecycle.GOAL_LABEL_MIN_OFFSET_Y, maxY + PlantLifecycle.GOAL_LABEL_MARGIN_Y),
+      Math.min(
+        -PlantLifecycle.GOAL_LABEL_MIN_BELOW_OFFSET_Y,
+        minY - PlantLifecycle.GOAL_LABEL_MARGIN_Y
+      ),
       (minZ + maxZ) * 0.5
     );
   }

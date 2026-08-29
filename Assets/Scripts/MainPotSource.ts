@@ -3,7 +3,11 @@ import {
   shouldBlockGardenSourceSpawn,
   setGardenSourceSpawnPullActive,
 } from './GardenSourceSpawnGuard';
-import { scheduleDeferredDestroy } from './FlowGardenDestroyHooks';
+import {
+  registerPreDestroyHook,
+  scheduleDeferredDestroy,
+} from './FlowGardenDestroyHooks';
+import { PostItNoteTranscript } from './PostItNoteTranscript';
 
 type PublicEventLike<T> = {
   add(callback: (event: T) => void): void;
@@ -52,6 +56,23 @@ type AnchorPotSpawner = {
   destroyTrackedObject?: (candidate: SceneObject) => boolean;
 };
 
+type PotGoalTranscriptLike = ScriptComponent & {
+  beginCapture?: () => void;
+  endCapture?: () => void;
+  getNoteText?: () => string;
+  displayPrefix?: string;
+};
+
+type PlantPotLike = ScriptComponent & {
+  setPendingGoal?: (goalText: string) => void;
+  getPendingGoalText?: () => string;
+  getPlantedLifecycle?: () => PlantLifecycleLike | null;
+};
+
+type PlantLifecycleLike = {
+  getGoalText?: () => string;
+};
+
 type PullState = {
   potObject: SceneObject;
   interactor: InteractorLike | null;
@@ -90,6 +111,10 @@ export class MainPotSource extends BaseScriptComponent {
   @input
   debugLogging: boolean = false;
 
+  @input('float')
+  @hint('Keep goal transcript capture active briefly after release')
+  postReleaseCaptureSec: number = 12;
+
   private activePull: PullState | null = null;
   private updateEvent: UpdateEvent | null = null;
   private bindAttempts = 0;
@@ -98,6 +123,7 @@ export class MainPotSource extends BaseScriptComponent {
   private spawnSuppressed = false;
 
   onAwake(): void {
+    registerPreDestroyHook((root) => this.abandonActivePullIfMatches(root));
     this.createEvent('OnStartEvent').bind(() => this.tryBindInteractable());
   }
 
@@ -111,6 +137,7 @@ export class MainPotSource extends BaseScriptComponent {
     }
 
     const potObject = this.activePull.potObject;
+    this.endPotGoalCapture(potObject);
     setGardenSourceSpawnPullActive(this.getSceneObject(), false);
     this.activePull = null;
     if (!isNull(this.updateEvent)) {
@@ -238,6 +265,7 @@ export class MainPotSource extends BaseScriptComponent {
       rayDistance: rayDistance,
     };
     setGardenSourceSpawnPullActive(this.getSceneObject(), true);
+    this.beginPotGoalCapture(potObject as SceneObject);
     const anchorSpawner = this.getAnchorPotSpawner();
     if (!isNull(anchorSpawner)) {
       const spawner = anchorSpawner as AnchorPotSpawner;
@@ -274,7 +302,22 @@ export class MainPotSource extends BaseScriptComponent {
     }
 
     const pull = this.activePull as PullState;
+    if (!this.isSceneObjectAlive(pull.potObject)) {
+      this.endPotGoalCapture(pull.potObject);
+      this.abandonActivePull();
+      return;
+    }
+
     const interactor = pull.interactor;
+    if (
+      interactor &&
+      typeof interactor.isActive === 'function' &&
+      !interactor.isActive()
+    ) {
+      this.releaseActivePull();
+      return;
+    }
+
     const position = this.getInteractorPosition(interactor, pull.rayDistance);
     this.syncTrackedWrapper(pull.potObject, position);
   }
@@ -294,6 +337,173 @@ export class MainPotSource extends BaseScriptComponent {
     if (typeof spawner.syncTrackedWrapperToContent === 'function') {
       spawner.syncTrackedWrapperToContent(content);
     }
+  }
+
+  private beginPotGoalCapture(potObject: SceneObject): void {
+    const transcript = this.ensurePotGoalTranscript(potObject);
+    if (!isNull(transcript) && typeof transcript.beginCapture === 'function') {
+      transcript.beginCapture();
+      this.debugLog(`goal transcript capture ON for ${potObject.name}`);
+      return;
+    }
+
+    this.debugLog(`goal transcript unavailable for ${potObject.name}`);
+  }
+
+  private endPotGoalCapture(potObject: SceneObject): void {
+    if (!this.isSceneObjectAlive(potObject)) {
+      return;
+    }
+
+    const transcript = this.findPotGoalTranscript(potObject);
+    if (!isNull(transcript) && typeof transcript.endCapture === 'function') {
+      transcript.endCapture();
+      this.debugLog(`goal transcript capture OFF for ${potObject.name}`);
+    }
+  }
+
+  private schedulePotGoalFinalization(potObject: SceneObject): void {
+    this.finalizePotGoal(potObject);
+
+    const delaySec = Math.max(0, this.postReleaseCaptureSec);
+    if (delaySec <= 0.001) {
+      this.endPotGoalCapture(potObject);
+      return;
+    }
+
+    const finalizeEvent = this.createEvent('DelayedCallbackEvent');
+    finalizeEvent.bind(() => {
+      this.finalizePotGoal(potObject);
+      this.endPotGoalCapture(potObject);
+    });
+    finalizeEvent.reset(delaySec);
+  }
+
+  private finalizePotGoal(potObject: SceneObject): void {
+    if (!this.isSceneObjectAlive(potObject)) {
+      return;
+    }
+
+    const transcript = this.findPotGoalTranscript(potObject);
+    if (isNull(transcript) || typeof transcript.getNoteText !== 'function') {
+      return;
+    }
+
+    const goalText = String(transcript.getNoteText() || '').trim();
+    if (!goalText) {
+      return;
+    }
+
+    const pot = this.findPlantPot(potObject);
+    if (isNull(pot) || typeof pot.setPendingGoal !== 'function') {
+      this.debugLog(`could not assign goal: PlantPot missing on ${potObject.name}`);
+      return;
+    }
+
+    const pendingGoal =
+      typeof pot.getPendingGoalText === 'function'
+        ? String(pot.getPendingGoalText() || '').trim()
+        : '';
+    if (pendingGoal === goalText) {
+      return;
+    }
+
+    const plantedPlant =
+      typeof pot.getPlantedLifecycle === 'function' ? pot.getPlantedLifecycle() : null;
+    if (
+      !isNull(plantedPlant) &&
+      typeof plantedPlant.getGoalText === 'function' &&
+      String(plantedPlant.getGoalText() || '').trim()
+    ) {
+      this.debugLog(`skipped goal rebind: ${potObject.name} already has a plant goal`);
+      return;
+    }
+
+    pot.setPendingGoal(goalText);
+    this.debugLog(`assigned goal "${goalText}" to ${potObject.name}`);
+  }
+
+  private ensurePotGoalTranscript(potObject: SceneObject): PotGoalTranscriptLike | null {
+    const existing = this.findPotGoalTranscript(potObject);
+    if (!isNull(existing)) {
+      existing.displayPrefix = 'Goal';
+      return existing;
+    }
+
+    try {
+      const created = potObject.createComponent(
+        PostItNoteTranscript.getTypeName()
+      ) as PotGoalTranscriptLike;
+      if (!isNull(created)) {
+        created.displayPrefix = 'Goal';
+        return created;
+      }
+    } catch (error) {
+      this.debugLog(`could not create pot goal transcript: ${String(error)}`);
+    }
+
+    return null;
+  }
+
+  private findPotGoalTranscript(potObject: SceneObject): PotGoalTranscriptLike | null {
+    if (isNull(potObject)) {
+      return null;
+    }
+
+    const stack: SceneObject[] = [potObject];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as PotGoalTranscriptLike;
+        if (
+          !isNull(candidate) &&
+          typeof candidate.beginCapture === 'function' &&
+          typeof candidate.endCapture === 'function' &&
+          typeof candidate.getNoteText === 'function'
+        ) {
+          return candidate;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
+  }
+
+  private findPlantPot(potObject: SceneObject): PlantPotLike | null {
+    if (isNull(potObject)) {
+      return null;
+    }
+
+    const stack: SceneObject[] = [potObject];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as PlantPotLike;
+        if (!isNull(candidate) && typeof candidate.setPendingGoal === 'function') {
+          return candidate;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
   }
 
   private spawnPot(worldPosition: vec3, interactor: InteractorLike | null): SceneObject | null {
@@ -477,6 +687,7 @@ export class MainPotSource extends BaseScriptComponent {
 
     this.debugLog('released active pot pull.');
     const releasedPot = this.activePull.potObject;
+    this.schedulePotGoalFinalization(releasedPot);
     this.abandonActivePull();
 
     const anchorSpawner = this.getAnchorPotSpawner();
@@ -495,6 +706,46 @@ export class MainPotSource extends BaseScriptComponent {
       if (typeof spawner.saveObjectPosition === 'function') {
         spawner.saveObjectPosition();
       }
+    }
+  }
+
+  private abandonActivePullIfMatches(root: SceneObject): void {
+    if (isNull(this.activePull) || isNull(this.activePull.potObject) || isNull(root)) {
+      return;
+    }
+
+    const pot = this.activePull.potObject;
+    if (pot === root || this.isSameHierarchy(pot, root)) {
+      this.endPotGoalCapture(pot);
+      this.abandonActivePull();
+    }
+  }
+
+  private isSameHierarchy(a: SceneObject, b: SceneObject): boolean {
+    return this.isDescendantOf(a, b) || this.isDescendantOf(b, a);
+  }
+
+  private isDescendantOf(candidate: SceneObject, ancestor: SceneObject): boolean {
+    let current = candidate;
+    while (!isNull(current)) {
+      if (current === ancestor) {
+        return true;
+      }
+      current = current.getParent();
+    }
+    return false;
+  }
+
+  private isSceneObjectAlive(sceneObject: SceneObject | null): boolean {
+    if (isNull(sceneObject)) {
+      return false;
+    }
+
+    try {
+      sceneObject.getTransform();
+      return true;
+    } catch (_error) {
+      return false;
     }
   }
 
