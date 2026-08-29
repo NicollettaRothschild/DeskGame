@@ -35,8 +35,8 @@ const TRASH_MOVE_HANDLE_REFERENCE_SOURCE = 'Planter';
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_OFFSETS: { [sourceName: string]: vec3 } = {
   'Water Source': new vec3(1.35, 0.08, 1.35),
   Seeds: new vec3(1.25, 0.08, 1.25),
-  // Keep the fallback pose fully outside the stack's large note-grab collider.
-  PostItNotes: new vec3(5, 1.5, 5),
+  // Keep the fallback pose near the stack edge rather than far into the room.
+  PostItNotes: new vec3(2, 0.8, 2),
 };
 const GARDEN_SOURCE_MOVE_HANDLE_LOCAL_SCALES: { [sourceName: string]: vec3 } = {
   // Post-it pad is smaller than other sources; use a bigger handle for parity.
@@ -2558,6 +2558,13 @@ export class AnchorController extends BaseScriptComponent {
       return;
     }
 
+    // Do not reparent or otherwise reconcile a source while SIK is actively
+    // manipulating it. Reparenting during a grab can cancel the interaction,
+    // which is especially noticeable on the dynamically-created leaderboard.
+    if (!isNull(this.activeManipulatedRoot) && this.activeManipulatedRoot === source) {
+      return;
+    }
+
     if (this.anchorRestorePending || this.startupRebindInProgress) {
       return;
     }
@@ -3888,15 +3895,17 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     const sourcePos = source.getTransform().getWorldPosition();
-    const colliderClearanceCm = 18;
-    const visualClearanceCm = 8;
+    // Stay just beyond the source's grab collider so direct note pulling does
+    // not steal the handle interaction, while keeping it within easy reach.
+    const colliderClearanceCm = 8;
+    const visualClearanceCm = 3.5;
     handle.getTransform().setWorldPosition(
       new vec3(
         Math.max(
           bounds.max.x + visualClearanceCm,
           sourcePos.x + colliderClearanceCm
         ),
-        bounds.max.y + 5,
+        bounds.max.y + 3,
         Math.max(
           bounds.max.z + visualClearanceCm,
           sourcePos.z + colliderClearanceCm

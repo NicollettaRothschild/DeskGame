@@ -22,16 +22,76 @@ type MockPairStatus = {
   userEmail: string | null;
 };
 
+export type MockCalendarConfig = {
+  calendarId: string | null;
+  calendarName: string | null;
+  connected: boolean;
+};
+
+export type MockCalendar = {
+  id: string;
+  name: string;
+  description: string;
+  primary: boolean;
+  timeZone: string;
+};
+
+export type MockCalendarEvent = {
+  id: string;
+  calendarId: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  description: string;
+  location: string;
+  allDay: boolean;
+};
+
+export type MockCalendarEventQuery = {
+  calendarId?: string;
+  timeMin?: string;
+  timeMax?: string;
+  maxResults?: number;
+};
+
+export type MockCalendarEventInput = {
+  calendarId?: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  description?: string;
+  location?: string;
+};
+
 const STORAGE_DEVICE_SECRET = 'specs_device_secret';
 const STORAGE_PAIRED = 'specs_device_paired';
 const STORAGE_MOCK_TASKS = 'specs_editor_mock_tasks';
 const STORAGE_MOCK_EMAIL = 'specs_editor_mock_user_email';
 const STORAGE_MOCK_SPACE = 'specs_editor_mock_space_panel';
+const STORAGE_MOCK_CALENDAR_CONFIG = 'specs_editor_mock_calendar_config';
+const STORAGE_MOCK_CALENDAR_EVENTS = 'specs_editor_mock_calendar_events';
 
 const DEFAULT_MOCK_TASKS: MockTask[] = [
   { id: 'mock-1', text: 'Water the focus tree', deadline: null, source: 'editor', done: false },
   { id: 'mock-2', text: 'Reply to design review', deadline: null, source: 'editor', done: false },
   { id: 'mock-3', text: 'Ship berry sync prototype', deadline: null, source: 'editor', done: false },
+];
+
+const DEFAULT_MOCK_CALENDARS: MockCalendar[] = [
+  {
+    id: 'primary',
+    name: 'Personal',
+    description: 'Primary editor preview calendar',
+    primary: true,
+    timeZone: 'local',
+  },
+  {
+    id: 'work',
+    name: 'Work',
+    description: 'Work calendar for editor preview',
+    primary: false,
+    timeZone: 'local',
+  },
 ];
 
 export class SpecsEditorMock {
@@ -62,6 +122,8 @@ export class SpecsEditorMock {
     store.putBool(STORAGE_PAIRED, true);
     store.putString(STORAGE_MOCK_EMAIL, userEmail);
     this.ensureDefaultTasks();
+    this.fetchCalendarConfig();
+    this.loadCalendarEvents();
   }
 
   public static clearPaired(): void {
@@ -115,6 +177,117 @@ export class SpecsEditorMock {
     const next = tasks.filter((task) => task.id !== taskId);
     global.persistentStorageSystem.store.putString(STORAGE_MOCK_TASKS, JSON.stringify(next));
     return true;
+  }
+
+  public static fetchCalendarConfig(): MockCalendarConfig {
+    const store = global.persistentStorageSystem.store;
+    const raw = store.getString(STORAGE_MOCK_CALENDAR_CONFIG);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as {
+          calendarId?: unknown;
+          calendarName?: unknown;
+          connected?: unknown;
+        };
+        if (parsed && typeof parsed === 'object') {
+          const calendarId = String(parsed.calendarId || '').trim();
+          return {
+            calendarId: calendarId || null,
+            calendarName: parsed.calendarName ? String(parsed.calendarName) : null,
+            connected: parsed.connected !== false,
+          };
+        }
+      } catch {
+        // fall through to the default editor calendar
+      }
+    }
+
+    const config: MockCalendarConfig = {
+      calendarId: 'primary',
+      calendarName: 'Personal',
+      connected: true,
+    };
+    store.putString(STORAGE_MOCK_CALENDAR_CONFIG, JSON.stringify(config));
+    return config;
+  }
+
+  public static setCalendarId(calendarId: string): MockCalendarConfig {
+    const normalizedId = String(calendarId || '').trim();
+    const matchingCalendar = DEFAULT_MOCK_CALENDARS.find(
+      (calendar) => calendar.id === normalizedId
+    );
+    const config: MockCalendarConfig = {
+      calendarId: normalizedId || null,
+      calendarName: matchingCalendar ? matchingCalendar.name : null,
+      connected: true,
+    };
+    global.persistentStorageSystem.store.putString(
+      STORAGE_MOCK_CALENDAR_CONFIG,
+      JSON.stringify(config)
+    );
+    return config;
+  }
+
+  public static fetchAvailableCalendars(): MockCalendar[] {
+    return DEFAULT_MOCK_CALENDARS.map((calendar) => ({ ...calendar }));
+  }
+
+  public static fetchCalendarEvents(
+    query: MockCalendarEventQuery = {}
+  ): MockCalendarEvent[] {
+    const config = this.fetchCalendarConfig();
+    const calendarId = String(query.calendarId || config.calendarId || '').trim();
+    const timeMin = query.timeMin ? Date.parse(query.timeMin) : NaN;
+    const timeMax = query.timeMax ? Date.parse(query.timeMax) : NaN;
+    const events = this.loadCalendarEvents()
+      .filter((event) => {
+        if (calendarId && event.calendarId !== calendarId) {
+          return false;
+        }
+        const eventTime = Date.parse(event.startAt);
+        if (Number.isFinite(timeMin) && (!Number.isFinite(eventTime) || eventTime < timeMin)) {
+          return false;
+        }
+        if (Number.isFinite(timeMax) && (!Number.isFinite(eventTime) || eventTime >= timeMax)) {
+          return false;
+        }
+        return true;
+      })
+      .sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
+
+    const maxResults = Number(query.maxResults || 10);
+    return events
+      .slice(0, Number.isFinite(maxResults) ? Math.max(1, Math.floor(maxResults)) : 10)
+      .map((event) => ({ ...event }));
+  }
+
+  public static createCalendarEvent(input: MockCalendarEventInput): MockCalendarEvent {
+    const config = this.fetchCalendarConfig();
+    const calendarId = String(input.calendarId || config.calendarId || 'primary').trim();
+    const title = String(input.title || '').trim();
+    const startAt = String(input.startAt || '').trim();
+    const explicitEndAt = String(input.endAt || '').trim();
+    const startTime = Date.parse(startAt);
+    const endAt =
+      explicitEndAt ||
+      (Number.isFinite(startTime) ? new Date(startTime + 60 * 60 * 1000).toISOString() : startAt);
+    const event: MockCalendarEvent = {
+      id: `mock-calendar-event-${Date.now()}`,
+      calendarId,
+      title,
+      startAt,
+      endAt,
+      description: String(input.description || '').trim(),
+      location: String(input.location || '').trim(),
+      allDay: false,
+    };
+    const events = this.loadCalendarEvents();
+    events.unshift(event);
+    global.persistentStorageSystem.store.putString(
+      STORAGE_MOCK_CALENDAR_EVENTS,
+      JSON.stringify(events)
+    );
+    return event;
   }
 
   public static chatWithAgent(
@@ -261,5 +434,56 @@ export class SpecsEditorMock {
     const copy = DEFAULT_MOCK_TASKS.map((task) => ({ ...task }));
     global.persistentStorageSystem.store.putString(STORAGE_MOCK_TASKS, JSON.stringify(copy));
     return copy;
+  }
+
+  private static loadCalendarEvents(): MockCalendarEvent[] {
+    const store = global.persistentStorageSystem.store;
+    const raw = store.getString(STORAGE_MOCK_CALENDAR_EVENTS);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as MockCalendarEvent[];
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (event) =>
+              event &&
+              String(event.id || '').trim() &&
+              String(event.calendarId || '').trim() &&
+              String(event.title || '').trim() &&
+              String(event.startAt || '').trim()
+          );
+        }
+      } catch {
+        // fall through to the default editor events
+      }
+    }
+
+    const now = new Date();
+    const firstStart = new Date(now.getTime() + 60 * 60 * 1000);
+    firstStart.setMinutes(0, 0, 0);
+    const secondStart = new Date(firstStart.getTime() + 24 * 60 * 60 * 1000);
+    const defaults: MockCalendarEvent[] = [
+      {
+        id: 'mock-calendar-event-1',
+        calendarId: 'primary',
+        title: 'Flow Garden planning',
+        startAt: firstStart.toISOString(),
+        endAt: new Date(firstStart.getTime() + 60 * 60 * 1000).toISOString(),
+        description: 'Review the garden and next steps.',
+        location: '',
+        allDay: false,
+      },
+      {
+        id: 'mock-calendar-event-2',
+        calendarId: 'primary',
+        title: 'Design review',
+        startAt: secondStart.toISOString(),
+        endAt: new Date(secondStart.getTime() + 60 * 60 * 1000).toISOString(),
+        description: 'Review the DeskGame experience.',
+        location: '',
+        allDay: false,
+      },
+    ];
+    store.putString(STORAGE_MOCK_CALENDAR_EVENTS, JSON.stringify(defaults));
+    return defaults;
   }
 }

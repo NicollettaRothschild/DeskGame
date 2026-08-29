@@ -1,5 +1,7 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable';
 import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
+import { InteractorInputType } from 'SpectaclesInteractionKit.lspkg/Core/Interactor/Interactor';
+import { SIK } from 'SpectaclesInteractionKit.lspkg/SIK';
 
 type InteractorLike = {
   activeTargetingMode?: number;
@@ -8,6 +10,13 @@ type InteractorLike = {
   distanceToTarget?: number | null;
   targetHitPosition?: vec3 | null;
   isActive?: () => boolean;
+  isTriggering?: boolean;
+  wasTriggering?: boolean;
+  planecastPoint?: vec3 | null;
+  onTriggerStart?: { add: (callback: (event?: unknown) => void) => void };
+  onTriggerUpdate?: { add: (callback: (event?: unknown) => void) => void };
+  onTriggerEnd?: { add: (callback: (event?: unknown) => void) => void };
+  onTriggerCanceled?: { add: (callback: (event?: unknown) => void) => void };
 };
 
 type InteractorEventLike = {
@@ -166,6 +175,9 @@ export class PaletteGrab extends BaseScriptComponent {
   private cancelInteractionActive = false;
   private paintArmReadyAt = 0;
   private paintNeedsReleaseAfterPick = false;
+  private freeSpaceInteractorsWired = false;
+  private freeSpaceBindAttempts = 0;
+  private freeSpaceBindRetryEvent: DelayedCallbackEvent | null = null;
   private colorBlobTargets: ColorBlobTarget[] = [];
   private lastColorPickIndex = -1;
   private lastColorPickAt = -9999;
@@ -230,8 +242,133 @@ export class PaletteGrab extends BaseScriptComponent {
     }
     this.resolveStablePaintMesh();
     this.createColorBlobTouchProxies();
+    this.bindFreeSpacePaintInteractors();
     this.ensureCancelPaintButton();
     this.setPaintMode(false);
+  }
+
+  private bindFreeSpacePaintInteractors(): void {
+    if (this.freeSpaceInteractorsWired) {
+      return;
+    }
+
+    try {
+      const interactors = SIK.InteractionManager.getInteractorsByType(
+        InteractorInputType.All
+      ) as unknown as InteractorLike[];
+      let bound = false;
+      for (let i = 0; i < interactors.length; i++) {
+        const interactor = interactors[i];
+        if (isNull(interactor)) {
+          continue;
+        }
+
+        if (interactor.onTriggerStart) {
+          interactor.onTriggerStart.add(() => this.onFreeSpacePaintStart(interactor));
+          bound = true;
+        }
+        if (interactor.onTriggerUpdate) {
+          interactor.onTriggerUpdate.add(() => this.onFreeSpacePaintUpdate(interactor));
+          bound = true;
+        }
+        if (interactor.onTriggerEnd) {
+          interactor.onTriggerEnd.add(() => this.onFreeSpacePaintEnd(interactor));
+          bound = true;
+        }
+        if (interactor.onTriggerCanceled) {
+          interactor.onTriggerCanceled.add(() => this.onFreeSpacePaintEnd(interactor));
+          bound = true;
+        }
+      }
+
+      if (bound) {
+        this.freeSpaceInteractorsWired = true;
+        if (this.debugLogging) {
+          print(`[PaletteGrab] free-space paint interactors wired (${interactors.length})`);
+        }
+        return;
+      }
+    } catch (error) {
+      if (this.debugLogging) {
+        print('[PaletteGrab] free-space interactor binding deferred: ' + error);
+      }
+    }
+
+    this.scheduleFreeSpaceInteractorBindRetry();
+  }
+
+  private scheduleFreeSpaceInteractorBindRetry(): void {
+    if (
+      this.freeSpaceInteractorsWired ||
+      !isNull(this.freeSpaceBindRetryEvent) ||
+      this.freeSpaceBindAttempts >= 20
+    ) {
+      return;
+    }
+
+    this.freeSpaceBindAttempts++;
+    const retryEvent = this.createEvent('DelayedCallbackEvent') as DelayedCallbackEvent;
+    retryEvent.bind(() => {
+      this.freeSpaceBindRetryEvent = null;
+      this.bindFreeSpacePaintInteractors();
+    });
+    this.freeSpaceBindRetryEvent = retryEvent;
+    retryEvent.reset(0.25);
+  }
+
+  private onFreeSpacePaintStart(interactor: InteractorLike): void {
+    if (!this.paintModeActive || this.cancelInteractionActive || isNull(interactor)) {
+      return;
+    }
+
+    const sameActiveStroke =
+      this.paintStrokeActive && this.activePaintInteractor === interactor;
+    this.activePaintInteractor = interactor;
+    if (this.paintNeedsReleaseAfterPick || getTime() < this.paintArmReadyAt) {
+      return;
+    }
+    if (sameActiveStroke) {
+      return;
+    }
+
+    this.paintStrokeActive = true;
+    this.lastPaintPoint = null;
+    this.paintFromInteractor(interactor, true);
+  }
+
+  private onFreeSpacePaintUpdate(interactor: InteractorLike): void {
+    if (!this.paintModeActive || this.cancelInteractionActive || isNull(interactor)) {
+      return;
+    }
+
+    this.activePaintInteractor = interactor;
+    if (this.paintNeedsReleaseAfterPick || getTime() < this.paintArmReadyAt) {
+      return;
+    }
+    if (!this.paintStrokeActive) {
+      this.paintStrokeActive = true;
+      this.lastPaintPoint = null;
+      this.paintFromInteractor(interactor, true);
+      return;
+    }
+    this.paintFromInteractor(interactor, false);
+  }
+
+  private onFreeSpacePaintEnd(interactor: InteractorLike): void {
+    if (!this.paintModeActive || isNull(interactor)) {
+      return;
+    }
+    if (
+      !isNull(this.activePaintInteractor) &&
+      this.activePaintInteractor !== interactor
+    ) {
+      return;
+    }
+
+    this.paintNeedsReleaseAfterPick = false;
+    this.paintStrokeActive = false;
+    this.lastPaintPoint = null;
+    this.activePaintInteractor = interactor;
   }
 
   private createColorBlobTouchProxies(): void {
@@ -312,9 +449,6 @@ export class PaletteGrab extends BaseScriptComponent {
       interactable.enableInstantDrag = true;
 
       const onPick = (event: InteractorEventLike): void => {
-        if (!this.isClosestColorBlob(i, event)) {
-          return;
-        }
         const now = getTime();
         if (this.lastColorPickIndex === i && now - this.lastColorPickAt < 0.15) {
           return;
@@ -436,13 +570,19 @@ export class PaletteGrab extends BaseScriptComponent {
     const textNode = global.scene.createSceneObject(PaletteGrab.CANCEL_BUTTON_TEXT_NAME);
     textNode.setParent(button);
     textNode.layer = root.layer;
-    textNode.getTransform().setLocalPosition(new vec3(0, 0.8, 0));
+    // Put the X beyond the button surface, not inside its background mesh.
+    // This keeps it visible before hover/press state changes.
+    textNode
+      .getTransform()
+      .setLocalPosition(new vec3(0, visualRadius + 0.35, 0));
     textNode.getTransform().setLocalRotation(quat.quatIdentity());
-    textNode.getTransform().setLocalScale(new vec3(0.1, 0.1, 0.1));
+    textNode.getTransform().setLocalScale(new vec3(0.13, 0.13, 0.13));
 
     const text = textNode.createComponent('Component.Text3D') as Text3D;
+    text.enabled = true;
     text.text = 'X';
     text.size = 38;
+    text.extrusionDepth = 0.05;
     text.horizontalAlignment = HorizontalAlignment.Center;
     text.verticalAlignment = VerticalAlignment.Center;
     text.renderOrder = 13;
@@ -675,7 +815,7 @@ export class PaletteGrab extends BaseScriptComponent {
     }
 
     const pass = materialPass as unknown as Record<string, vec4>;
-    const white = new vec4(0.96, 0.96, 0.98, 1);
+    const red = new vec4(0.95, 0.13, 0.16, 1);
     const colorKeys = [
       'frontCapStartingColor',
       'backCapStartingColor',
@@ -686,7 +826,7 @@ export class PaletteGrab extends BaseScriptComponent {
     ];
     for (let i = 0; i < colorKeys.length; i++) {
       if (typeof pass[colorKeys[i]] !== 'undefined') {
-        pass[colorKeys[i]] = white;
+        pass[colorKeys[i]] = red;
       }
     }
     this.cancelButtonTextMaterial = material;
@@ -744,7 +884,7 @@ export class PaletteGrab extends BaseScriptComponent {
 
     this.paintModeActive = active;
     this.setPaletteMoveInteractionEnabled(!active);
-    this.ensurePaintUpdateLoop(false);
+    this.ensurePaintUpdateLoop(active);
 
     if (isNull(this.cancelButton)) {
       this.ensureCancelPaintButton();
@@ -777,7 +917,9 @@ export class PaletteGrab extends BaseScriptComponent {
       (this.grabManipulation as ScriptComponent).enabled = enabled;
     }
     if (!isNull(this.grabInteractable)) {
-      (this.grabInteractable as ScriptComponent).enabled = enabled;
+      // Keep the palette Interactable alive while painting so its ancestor
+      // events continue to cover editor MouseInteractor and free-space pinches.
+      (this.grabInteractable as ScriptComponent).enabled = true;
     }
   }
 
@@ -944,7 +1086,28 @@ export class PaletteGrab extends BaseScriptComponent {
         if (!this.paintModeActive) {
           return;
         }
-        this.paintFromInteractor(this.activePaintInteractor, false);
+        const interactor = this.activePaintInteractor;
+        if (
+          isNull(interactor) ||
+          (typeof interactor.isActive === 'function' && !interactor.isActive())
+        ) {
+          return;
+        }
+        if (typeof interactor.isTriggering === 'boolean' && !interactor.isTriggering) {
+          if (this.paintNeedsReleaseAfterPick) {
+            this.paintNeedsReleaseAfterPick = false;
+          }
+          this.paintStrokeActive = false;
+          this.lastPaintPoint = null;
+          return;
+        }
+        if (this.paintNeedsReleaseAfterPick || getTime() < this.paintArmReadyAt) {
+          return;
+        }
+        if (!this.paintStrokeActive) {
+          return;
+        }
+        this.paintFromInteractor(interactor, false);
       });
     }
     this.paintUpdateEvent.enabled = true;
@@ -984,14 +1147,12 @@ export class PaletteGrab extends BaseScriptComponent {
     const paletteUp = this.getSceneObject().getTransform().up;
     const clampDistance = Math.max(12, this.paintMaxDistanceFromPaletteCm);
 
-    // Only accept direct hit positions that are near the palette plane.
-    if (!isNull(interactor.targetHitPosition)) {
-      const hit = interactor.targetHitPosition as vec3;
-      if (hit.distance(palettePos) <= clampDistance) {
-        const planeOffset = Math.abs(hit.sub(palettePos).dot(paletteUp));
-        if (planeOffset <= 8) {
-          return hit;
-        }
+    // SIK's planecastPoint follows the active Interactable's world-space
+    // interaction plane in both Editor MouseInteractor and HandInteractor.
+    if (!isNull(interactor.planecastPoint)) {
+      const planePoint = interactor.planecastPoint as vec3;
+      if (planePoint.distance(palettePos) <= clampDistance) {
+        return planePoint;
       }
     }
 
@@ -1018,6 +1179,18 @@ export class PaletteGrab extends BaseScriptComponent {
           if (planeHit.distance(palettePos) <= clampDistance) {
             return planeHit;
           }
+        }
+      }
+    }
+
+    // Keep the hit-position fallback for older SIK builds that do not expose
+    // planecastPoint while still rejecting stale hits far from this palette.
+    if (!isNull(interactor.targetHitPosition)) {
+      const hit = interactor.targetHitPosition as vec3;
+      if (hit.distance(palettePos) <= clampDistance) {
+        const planeOffset = Math.abs(hit.sub(palettePos).dot(paletteUp));
+        if (planeOffset <= 8) {
+          return hit;
         }
       }
     }
@@ -1131,6 +1304,15 @@ export class PaletteGrab extends BaseScriptComponent {
   }
 
   private resolveStablePaintMesh(): void {
+    try {
+      // Palette color meshes are flat triangles with palette-specific scale.
+      // A built-in sphere gives strokes a stable, round silhouette instead.
+      this.stablePaintMesh = requireAsset('Meshes/StarCatchSphere.mesh') as RenderMesh;
+      return;
+    } catch (_error) {
+      // Fall back to an authored renderable if the built-in mesh is unavailable.
+    }
+
     const renderable = this.findFirstRenderable(this.getSceneObject());
     if (!isNull(renderable) && !isNull(renderable.mesh)) {
       this.stablePaintMesh = renderable.mesh as RenderMesh;
@@ -1552,7 +1734,11 @@ export class PaletteGrab extends BaseScriptComponent {
     if (getTime() < this.paintArmReadyAt) {
       return;
     }
-    this.activePaintInteractor = event?.interactor || null;
+    const interactor = event?.interactor || null;
+    if (this.paintStrokeActive && this.activePaintInteractor === interactor) {
+      return;
+    }
+    this.activePaintInteractor = interactor;
     this.paintStrokeActive = true;
     this.lastPaintPoint = null;
     this.paintFromInteractor(this.activePaintInteractor, true);
@@ -1577,7 +1763,6 @@ export class PaletteGrab extends BaseScriptComponent {
       this.paintNeedsReleaseAfterPick = false;
     }
     this.paintStrokeActive = false;
-    this.activePaintInteractor = null;
     this.lastPaintPoint = null;
   }
 

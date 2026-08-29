@@ -28,6 +28,7 @@
   ScriptInputsHidden:
     activePulseSpeed: false
     baseScale: false
+    companionName: false
     debugLogging: false
     enableGrabSounds: false
     enablePinchToTalk: false
@@ -43,6 +44,7 @@
     idlePulseSpeed: false
     releaseSoundTrack: false
     releaseSoundVolume: false
+    showNameTagWhenMultiple: false
     speechBubbleHideDelaySec: false
     thinkingPulseSpeed: false
     waterMaterialTemplate: false
@@ -75,6 +77,8 @@
       enableGrabSounds: true
       enableSpeechBubble: true
       speechBubbleHideDelaySec: !<float> 14.000000
+      companionName: Arvis
+      showNameTagWhenMultiple: true
   ScriptTypes:
     -
       {}
@@ -99,3 +103,5 @@
     - // @input bool enableGrabSounds = true
     - // @input bool enableSpeechBubble = true
     - // @input float speechBubbleHideDelaySec = 14
+    - '// @input string companionName = "Arvis" {"label":"Companion Name", "hint":"Name shown above this companion when multiple AI companions are active."}'
+    - '// @input bool showNameTagWhenMultiple = true {"label":"Show Name Tag With Multiple Companions", "hint":"Display this name tag when more than one enabled companion is present."}'

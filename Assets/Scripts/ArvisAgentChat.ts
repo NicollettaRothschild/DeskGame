@@ -20,8 +20,22 @@ import {
 import { isImageQuery, normalizeImagePrompt } from './ArvisImageSkill';
 import { isMeshQuery, normalizeMeshPrompt } from './ArvisMeshSkill';
 import { isMusicQuery, normalizeMusicPrompt } from './ArvisMusicSkill';
+import {
+  ArvisCalendarIntent,
+  parseArvisCalendarIntent,
+} from './ArvisCalendarIntent';
+import {
+  ArvisEmailDraftIntent,
+  parseArvisEmailDraftIntent,
+} from './ArvisEmailDraftIntent';
 import { looksLikeWorkspaceResetCommand } from './FriendGrab';
-import { SpecsApiClient } from './SpecsApiClient';
+import {
+  SpecsApiClient,
+  SpecsCalendar,
+  SpecsCalendarConfig,
+  SpecsCalendarEvent,
+  SpecsCalendarEventInput,
+} from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
 import { FlowGardenTTS } from './FlowGardenTTS';
@@ -118,10 +132,14 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private dependenciesLogged = false;
   private lastVoiceWakeUtterance = '';
   private lastVoiceWakeAt = 0;
+  private emailDraftStatusPollEvent: DelayedCallbackEvent | null = null;
+  private emailDraftStatusPollCommandId = '';
+  private emailDraftStatusPollAttempts = 0;
 
   private static readonly LISTENING_CUE = 'Listening…';
   private static readonly VOICE_WAKE_DEDUPE_SEC = 2.5;
   private static readonly VOICE_WAKE_STABLE_SEC = 0.55;
+  private static readonly EMAIL_DRAFT_STATUS_MAX_POLLS = 45;
 
   onAwake(): void {
     registerArvisAgentChat(this);
@@ -569,6 +587,8 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     const outbound = this.normalizeAgentPrompt(trimmed);
+    const calendarIntent = parseArvisCalendarIntent(outbound);
+    const emailDraftIntent = parseArvisEmailDraftIntent(outbound);
     this.resolveDependencies();
     if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
       this.updateBoard('error', outbound, 'Missing Specs API wiring');
@@ -616,6 +636,16 @@ export class ArvisAgentChat extends BaseScriptComponent {
         );
         return;
       }
+    }
+
+    if (emailDraftIntent) {
+      this.queueEmailDraft(emailDraftIntent, outbound);
+      return;
+    }
+
+    if (calendarIntent) {
+      this.handleCalendarIntent(calendarIntent, outbound);
+      return;
     }
 
     this.sending = true;
@@ -675,6 +705,342 @@ export class ArvisAgentChat extends BaseScriptComponent {
         this.speakAgentResponse(result.response, label);
       }
     );
+  }
+
+  private queueEmailDraft(emailDraftIntent: ArvisEmailDraftIntent, outbound: string): void {
+    if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+      this.updateBoard('error', outbound, 'Missing Specs API wiring');
+      return;
+    }
+
+    this.sending = true;
+    this.updateBoard('thinking', outbound, 'Sending the draft request to Arvis on your Mac…');
+    this.setStatus('Sending email draft to Arvis on your Mac…');
+    this.specsApi.queueEmailDraft(
+      this.deviceRegistry.getDeviceId(),
+      this.deviceRegistry.getDeviceSecret(),
+      emailDraftIntent.requestId,
+      emailDraftIntent.recipient,
+      emailDraftIntent.subject,
+      emailDraftIntent.body,
+      (result, error) => {
+        this.sending = false;
+        if (isNull(result)) {
+          this.updateBoard('error', outbound, error || 'Could not reach the Arvis Mac bridge');
+          this.setStatus(error || 'Arvis Mac bridge unavailable');
+          return;
+        }
+
+        const waitingResponse =
+          'Draft sent to Arvis on your Mac. Thunderbird will open an unsent draft shortly.';
+        this.pushHistory('user', outbound);
+        this.pushHistory('assistant', waitingResponse);
+        this.activeReplyTranscript = outbound;
+        this.activeReplyText = waitingResponse;
+        this.updateBoard('reply', outbound, waitingResponse, this.agentName);
+        this.speakAgentResponse(waitingResponse, this.agentName);
+        this.watchEmailDraftStatus(outbound, result.commandId);
+      }
+    );
+  }
+
+  private handleCalendarIntent(intent: ArvisCalendarIntent, outbound: string): void {
+    if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+      this.finishCalendarResponse(outbound, 'Missing Specs API wiring', true);
+      return;
+    }
+
+    this.sending = true;
+    const thinkingText =
+      intent.type === 'createEvent' ? 'Adding calendar event…' : 'Checking your calendar…';
+    this.updateBoard('thinking', outbound, thinkingText);
+    this.setStatus(thinkingText);
+
+    const deviceId = this.deviceRegistry.getDeviceId();
+    const deviceSecret = this.deviceRegistry.getDeviceSecret();
+    if (intent.type === 'setCalendarId') {
+      this.specsApi.setCalendarId(
+        deviceId,
+        deviceSecret,
+        intent.calendarId || '',
+        (config, error) => {
+          if (isNull(config)) {
+            this.finishCalendarResponse(outbound, this.formatCalendarError(error), true);
+            return;
+          }
+          this.finishCalendarResponse(outbound, this.formatCalendarConfig(config));
+        }
+      );
+      return;
+    }
+
+    if (intent.type === 'config') {
+      this.specsApi.fetchCalendarConfig(deviceId, deviceSecret, (config, error) => {
+        if (isNull(config)) {
+          this.finishCalendarResponse(outbound, this.formatCalendarError(error), true);
+          return;
+        }
+        this.finishCalendarResponse(outbound, this.formatCalendarConfig(config));
+      });
+      return;
+    }
+
+    if (intent.type === 'availableCalendars') {
+      this.specsApi.fetchAvailableCalendars(deviceId, deviceSecret, (calendars, error) => {
+        if (error) {
+          this.finishCalendarResponse(outbound, this.formatCalendarError(error), true);
+          return;
+        }
+        this.finishCalendarResponse(outbound, this.formatAvailableCalendars(calendars));
+      });
+      return;
+    }
+
+    if (intent.type === 'events') {
+      this.specsApi.fetchCalendarEvents(
+        deviceId,
+        deviceSecret,
+        {
+          timeMin: intent.timeMin,
+          timeMax: intent.timeMax,
+          maxResults: 5,
+        },
+        (events, error) => {
+          if (error) {
+            this.finishCalendarResponse(outbound, this.formatCalendarError(error), true);
+            return;
+          }
+          this.finishCalendarResponse(
+            outbound,
+            this.formatCalendarEvents(events, intent.rangeLabel)
+          );
+        }
+      );
+      return;
+    }
+
+    if (!intent.title || !intent.startAt || !intent.endAt) {
+      this.finishCalendarResponse(
+        outbound,
+        'Tell me the event title and when it starts, for example “schedule design review tomorrow at 3 PM”.'
+      );
+      return;
+    }
+
+    const event: SpecsCalendarEventInput = {
+      title: intent.title,
+      startAt: intent.startAt,
+      endAt: intent.endAt,
+    };
+    this.specsApi.createCalendarEvent(deviceId, deviceSecret, event, (created, error) => {
+      if (isNull(created)) {
+        this.finishCalendarResponse(outbound, this.formatCalendarError(error), true);
+        return;
+      }
+      this.finishCalendarResponse(outbound, this.formatCreatedCalendarEvent(created));
+    });
+  }
+
+  private finishCalendarResponse(
+    transcript: string,
+    response: string,
+    isError = false
+  ): void {
+    this.sending = false;
+    this.pushHistory('user', transcript);
+    this.pushHistory('assistant', response);
+    this.activeReplyTranscript = transcript;
+    this.activeReplyText = response;
+    this.updateBoard(isError ? 'error' : 'reply', transcript, response, this.agentName);
+    if (isError) {
+      this.setStatus(response);
+    } else {
+      this.setStatus('');
+    }
+    if (!isNull(this.speechRecognition)) {
+      this.speechRecognition.clearUtteranceState();
+      this.speechRecognition.markCommandHandled();
+      this.speechRecognition.suppressVoiceCommandsFor(2.5);
+    }
+    this.speakAgentResponse(response, this.agentName);
+  }
+
+  private formatCalendarConfig(config: SpecsCalendarConfig): string {
+    const guidance = this.calendarConnectionGuidance();
+    if (!config.connected) {
+      return `Google Calendar is not connected. ${guidance}`;
+    }
+    if (!config.calendarId) {
+      return `Google Calendar is connected, but no Calendar ID is selected. Say “set calendar id <id>”. ${guidance}`;
+    }
+    const selected = config.calendarName
+      ? `${config.calendarName} (${config.calendarId})`
+      : config.calendarId;
+    return `Using calendar ${selected}. ${guidance}`;
+  }
+
+  private formatAvailableCalendars(calendars: SpecsCalendar[]): string {
+    if (!calendars.length) {
+      return `No calendars are available. ${this.calendarConnectionGuidance()}`;
+    }
+    const entries = calendars.slice(0, 5).map((calendar) => {
+      const label = calendar.name || calendar.id;
+      return `${label} (${calendar.id})${calendar.primary ? ' [primary]' : ''}`;
+    });
+    return (
+      `Available calendars: ${entries.join('; ')}. ` +
+      'Say “use calendar <id>” to select one.'
+    );
+  }
+
+  private formatCalendarEvents(events: SpecsCalendarEvent[], rangeLabel?: string): string {
+    if (!events.length) {
+      const range = rangeLabel ? ` ${rangeLabel}` : '';
+      return `No calendar events found${range}.`;
+    }
+    const label = rangeLabel ? ` ${rangeLabel}` : '';
+    const lines = events
+      .slice(0, 5)
+      .map(
+        (event, index) =>
+          `${index + 1}. ${this.formatCalendarEventDate(event)} — ${event.title || 'Untitled event'}`
+      );
+    return `Your${label} calendar:\n${lines.join('\n')}`;
+  }
+
+  private formatCreatedCalendarEvent(event: SpecsCalendarEvent): string {
+    const title = event.title || 'calendar event';
+    return `Added “${title}” to your calendar for ${this.formatCalendarEventDate(event)}.`;
+  }
+
+  private formatCalendarEventDate(event: SpecsCalendarEvent): string {
+    const value = String(event.startAt || '').trim();
+    const date = new Date(value);
+    if (!value || !Number.isFinite(date.getTime())) {
+      return value || 'the requested time';
+    }
+
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    const month = months[date.getMonth()];
+    if (event.allDay) {
+      return `${month} ${date.getDate()} all day`;
+    }
+
+    const hours = date.getHours();
+    const displayHour = hours % 12 || 12;
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const meridiem = hours >= 12 ? 'PM' : 'AM';
+    return `${month} ${date.getDate()} at ${displayHour}:${minutes} ${meridiem}`;
+  }
+
+  private formatCalendarError(error?: string): string {
+    const detail = String(error || 'Could not reach the calendar service').trim();
+    return `${detail}. ${this.calendarConnectionGuidance()}`;
+  }
+
+  private calendarConnectionGuidance(): string {
+    return 'Google OAuth connection happens in arvis.space Settings.';
+  }
+
+  private watchEmailDraftStatus(transcript: string, commandId: string): void {
+    this.emailDraftStatusPollEvent = null;
+    this.emailDraftStatusPollCommandId = commandId;
+    this.emailDraftStatusPollAttempts = 0;
+    this.pollEmailDraftStatus(transcript, commandId);
+  }
+
+  private pollEmailDraftStatus(transcript: string, commandId: string): void {
+    if (
+      commandId !== this.emailDraftStatusPollCommandId ||
+      isNull(this.specsApi) ||
+      isNull(this.deviceRegistry)
+    ) {
+      return;
+    }
+
+    this.emailDraftStatusPollAttempts += 1;
+    if (
+      this.emailDraftStatusPollAttempts > ArvisAgentChat.EMAIL_DRAFT_STATUS_MAX_POLLS
+    ) {
+      this.setStatus('Draft queued — waiting for Arvis on your Mac');
+      return;
+    }
+
+    this.specsApi.fetchBridgeCommandStatus(
+      this.deviceRegistry.getDeviceId(),
+      this.deviceRegistry.getDeviceSecret(),
+      commandId,
+      (status, error) => {
+        if (commandId !== this.emailDraftStatusPollCommandId) {
+          return;
+        }
+
+        if (isNull(status)) {
+          if (this.debugLogging && error) {
+            print(`[ArvisAgentChat] Email draft status pending: ${error}`);
+          }
+          this.scheduleEmailDraftStatusPoll(transcript, commandId);
+          return;
+        }
+
+        const normalizedStatus = String(status.status || '').toLowerCase();
+        if (normalizedStatus === 'pending' || normalizedStatus === 'claimed') {
+          this.setStatus(
+            normalizedStatus === 'claimed'
+              ? 'Arvis is opening the draft on your Mac…'
+              : 'Waiting for Arvis on your Mac…'
+          );
+          this.scheduleEmailDraftStatusPoll(transcript, commandId);
+          return;
+        }
+
+        this.emailDraftStatusPollCommandId = '';
+        this.emailDraftStatusPollEvent = null;
+        const response =
+          normalizedStatus === 'opened'
+            ? 'Arvis opened the unsent Thunderbird draft on your Mac.'
+            : normalizedStatus === 'declined'
+              ? 'The email draft was declined on the Mac.'
+              : normalizedStatus === 'expired'
+                ? 'The email draft request expired before the Mac handled it.'
+                : String(status.result?.message || 'The Mac could not open the email draft.');
+        this.activeReplyTranscript = transcript;
+        this.activeReplyText = response;
+        this.updateBoard(
+          normalizedStatus === 'opened' ? 'reply' : 'error',
+          transcript,
+          response,
+          this.agentName
+        );
+        this.setStatus(normalizedStatus === 'opened' ? '' : response);
+        this.speakAgentResponse(response, this.agentName);
+      }
+    );
+  }
+
+  private scheduleEmailDraftStatusPoll(transcript: string, commandId: string): void {
+    if (commandId !== this.emailDraftStatusPollCommandId) {
+      return;
+    }
+    this.emailDraftStatusPollEvent = this.createEvent('DelayedCallbackEvent');
+    this.emailDraftStatusPollEvent.bind(() => {
+      this.emailDraftStatusPollEvent = null;
+      this.pollEmailDraftStatus(transcript, commandId);
+    });
+    this.emailDraftStatusPollEvent.reset(2);
   }
 
   private setGhostPhase(phase: 'listening' | 'thinking' | 'reply' | 'error' | 'idle'): void {

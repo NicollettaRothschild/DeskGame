@@ -33,6 +33,61 @@ export type SpecsPairStatus = {
   userEmail: string | null;
 };
 
+export type SpecsCalendarConfig = {
+  calendarId: string | null;
+  calendarName: string | null;
+  connected: boolean;
+};
+
+export type SpecsCalendar = {
+  id: string;
+  name: string;
+  description: string;
+  primary: boolean;
+  timeZone: string;
+};
+
+export type SpecsCalendarEventQuery = {
+  calendarId?: string;
+  timeMin?: string;
+  timeMax?: string;
+  maxResults?: number;
+};
+
+export type SpecsCalendarEvent = {
+  id: string;
+  calendarId: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  description: string;
+  location: string;
+  allDay: boolean;
+};
+
+export type SpecsCalendarEventInput = {
+  calendarId?: string;
+  title: string;
+  startAt: string;
+  endAt: string;
+  description?: string;
+  location?: string;
+};
+
+export type SpecsEmailDraftQueueResult = {
+  commandId: string;
+  requestId: string;
+  status: string;
+  expiresAt: string;
+};
+
+export type SpecsBridgeCommandStatus = {
+  commandId: string;
+  requestId: string;
+  status: string;
+  result: JsonRecord;
+};
+
 export type SpecsSpaceItem = {
   type: string;
   id: string;
@@ -472,6 +527,208 @@ export class SpecsApiClient extends BaseScriptComponent {
     });
   }
 
+  public fetchCalendarConfig(
+    deviceId: string,
+    deviceSecret: string,
+    onDone: (config: SpecsCalendarConfig | null, error?: string) => void
+  ): void {
+    if (this.isEditorMockActive()) {
+      onDone(SpecsEditorMock.fetchCalendarConfig() as unknown as SpecsCalendarConfig);
+      return;
+    }
+
+    this.getJson(
+      '/api/specs/calendar/config' + this.buildCalendarCredentialQuery(deviceId, deviceSecret),
+      (data, err) => {
+        if (err || !data || data.ok === false) {
+          onDone(null, err || String(data?.error || 'calendar config failed'));
+          return;
+        }
+        onDone(this.parseCalendarConfig(data));
+      }
+    );
+  }
+
+  public setCalendarId(
+    deviceId: string,
+    deviceSecret: string,
+    calendarId: string,
+    onDone: (config: SpecsCalendarConfig | null, error?: string) => void
+  ): void {
+    const normalizedCalendarId = String(calendarId || '').trim();
+    if (!normalizedCalendarId) {
+      onDone(null, 'Calendar ID is required');
+      return;
+    }
+
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.setCalendarId(normalizedCalendarId) as unknown as SpecsCalendarConfig
+      );
+      return;
+    }
+
+    this.postJson(
+      '/api/specs/calendar/config',
+      {
+        device_id: deviceId,
+        device_secret: deviceSecret,
+        calendar_id: normalizedCalendarId,
+      },
+      (data, err) => {
+        if (err || !data || data.ok === false) {
+          onDone(null, err || String(data?.error || 'calendar config update failed'));
+          return;
+        }
+        onDone(this.parseCalendarConfig(data));
+      }
+    );
+  }
+
+  public fetchAvailableCalendars(
+    deviceId: string,
+    deviceSecret: string,
+    onDone: (calendars: SpecsCalendar[], error?: string) => void
+  ): void {
+    if (this.isEditorMockActive()) {
+      onDone(SpecsEditorMock.fetchAvailableCalendars() as unknown as SpecsCalendar[]);
+      return;
+    }
+
+    this.getJson(
+      '/api/specs/calendar/calendars' +
+        this.buildCalendarCredentialQuery(deviceId, deviceSecret),
+      (data, err) => {
+        if (err || !data || data.ok === false) {
+          onDone([], err || String(data?.error || 'available calendars failed'));
+          return;
+        }
+        const raw = Array.isArray(data.calendars)
+          ? data.calendars
+          : Array.isArray(data.items)
+            ? data.items
+            : [];
+        onDone(raw.map((entry, index) => this.parseCalendar(entry as JsonRecord, index)));
+      }
+    );
+  }
+
+  public fetchCalendarEvents(
+    deviceId: string,
+    deviceSecret: string,
+    query: SpecsCalendarEventQuery | null,
+    onDone: (events: SpecsCalendarEvent[], error?: string) => void
+  ): void {
+    const normalizedQuery = query || {};
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.fetchCalendarEvents(normalizedQuery) as unknown as SpecsCalendarEvent[]
+      );
+      return;
+    }
+
+    let path =
+      '/api/specs/calendar/events' +
+      this.buildCalendarCredentialQuery(deviceId, deviceSecret);
+    if (normalizedQuery.calendarId) {
+      path += '&calendar_id=' + encodeURIComponent(normalizedQuery.calendarId);
+    }
+    if (normalizedQuery.timeMin) {
+      path += '&time_min=' + encodeURIComponent(normalizedQuery.timeMin);
+    }
+    if (normalizedQuery.timeMax) {
+      path += '&time_max=' + encodeURIComponent(normalizedQuery.timeMax);
+    }
+    if (Number.isFinite(normalizedQuery.maxResults)) {
+      path += '&max_results=' + encodeURIComponent(String(normalizedQuery.maxResults));
+    }
+
+    this.getJson(path, (data, err) => {
+      if (err || !data || data.ok === false) {
+        onDone([], err || String(data?.error || 'calendar events failed'));
+        return;
+      }
+      const raw = Array.isArray(data.events)
+        ? data.events
+        : Array.isArray(data.items)
+          ? data.items
+          : [];
+      const fallbackCalendarId = String(normalizedQuery.calendarId || '');
+      onDone(
+        raw.map((entry, index) =>
+          this.parseCalendarEvent(entry as JsonRecord, index, fallbackCalendarId)
+        )
+      );
+    });
+  }
+
+  public createCalendarEvent(
+    deviceId: string,
+    deviceSecret: string,
+    event: SpecsCalendarEventInput,
+    onDone: (created: SpecsCalendarEvent | null, error?: string) => void
+  ): void {
+    const title = String(event?.title || '').trim().slice(0, 180);
+    const startAt = String(event?.startAt || '').trim();
+    const endAt = String(event?.endAt || '').trim();
+    if (!title || !startAt || !endAt) {
+      onDone(null, 'Calendar event requires a title, start time, and end time');
+      return;
+    }
+
+    const normalizedEvent: SpecsCalendarEventInput = {
+      calendarId: String(event?.calendarId || '').trim() || undefined,
+      title,
+      startAt,
+      endAt,
+      description: String(event?.description || '').trim().slice(0, 800),
+      location: String(event?.location || '').trim().slice(0, 240),
+    };
+
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.createCalendarEvent(normalizedEvent) as unknown as SpecsCalendarEvent
+      );
+      return;
+    }
+
+    const body: JsonRecord = {
+      device_id: deviceId,
+      device_secret: deviceSecret,
+      title: normalizedEvent.title,
+      start: normalizedEvent.startAt,
+      end: normalizedEvent.endAt,
+    };
+    if (normalizedEvent.calendarId) {
+      body.calendar_id = normalizedEvent.calendarId;
+    }
+    if (normalizedEvent.description) {
+      body.description = normalizedEvent.description;
+    }
+    if (normalizedEvent.location) {
+      body.location = normalizedEvent.location;
+    }
+
+    this.postJson('/api/specs/calendar/events', body, (data, err) => {
+      if (err || !data || data.ok === false) {
+        onDone(null, err || String(data?.error || 'calendar event creation failed'));
+        return;
+      }
+      const rawEvent =
+        data.event && typeof data.event === 'object' ? (data.event as JsonRecord) : data;
+      onDone(
+        this.parseCalendarEvent(
+          rawEvent,
+          0,
+          normalizedEvent.calendarId || '',
+          normalizedEvent.title,
+          normalizedEvent.startAt,
+          normalizedEvent.endAt
+        )
+      );
+    });
+  }
+
   public speakAgent(
     deviceId: string,
     deviceSecret: string,
@@ -523,6 +780,110 @@ export class SpecsApiClient extends BaseScriptComponent {
           audioBase64,
           voiceId: String(data?.voice_id || ''),
           contentType: String(data?.content_type || 'audio/mpeg'),
+        });
+      }
+    );
+  }
+
+  /**
+   * Queues an unsent email draft for the paired Arvis Mac host.
+   * This intentionally never uses the editor mock: a successful response must
+   * represent a real bridge request that the Mac can approve or decline.
+   */
+  public queueEmailDraft(
+    deviceId: string,
+    deviceSecret: string,
+    requestId: string,
+    recipient: string,
+    subject: string,
+    body: string,
+    onDone: (result: SpecsEmailDraftQueueResult | null, error?: string) => void
+  ): void {
+    const normalizedRecipient = String(recipient || '').trim();
+    const normalizedSubject = String(subject || '').trim();
+    const normalizedBody = String(body || '').trim();
+    const normalizedRequestId = String(requestId || '').trim();
+    if (!normalizedRequestId || !normalizedRecipient || !normalizedSubject || !normalizedBody) {
+      onDone(null, 'Email draft request is incomplete');
+      return;
+    }
+
+    this.postJson(
+      '/api/specs/bridge/email-draft',
+      {
+        device_id: deviceId,
+        device_secret: deviceSecret,
+        request_id: normalizedRequestId,
+        recipient: normalizedRecipient,
+        subject: normalizedSubject,
+        body: normalizedBody,
+        send: false,
+      },
+      (data, err) => {
+        if (err || !data) {
+          if (this.debugLogging) {
+            print('[SpecsApi] email draft bridge failed: ' + (err || 'empty response'));
+          }
+          onDone(null, err || 'Email draft bridge failed');
+          return;
+        }
+
+        const commandId = String(data.command_id || '').trim();
+        if (!commandId) {
+          onDone(null, 'Email draft bridge returned no command id');
+          return;
+        }
+        if (this.debugLogging) {
+          print(
+            `[SpecsApi] email draft queued command=${commandId} request=${normalizedRequestId}`
+          );
+        }
+        onDone({
+          commandId,
+          requestId: String(data.request_id || normalizedRequestId),
+          status: String(data.status || 'pending'),
+          expiresAt: String(data.expires_at || ''),
+        });
+      },
+      this.requestTimeoutSec
+    );
+  }
+
+  public fetchBridgeCommandStatus(
+    deviceId: string,
+    deviceSecret: string,
+    commandId: string,
+    onDone: (status: SpecsBridgeCommandStatus | null, error?: string) => void
+  ): void {
+    const normalizedCommandId = String(commandId || '').trim();
+    if (!normalizedCommandId) {
+      onDone(null, 'Bridge command id is required');
+      return;
+    }
+
+    this.getJsonWithHeaders(
+      '/api/specs/bridge/commands/' + encodeURIComponent(normalizedCommandId),
+      {
+        'x-specs-device-id': String(deviceId || ''),
+        'x-specs-device-secret': String(deviceSecret || ''),
+      },
+      (data, err) => {
+        if (err || !data) {
+          onDone(null, err || 'Bridge command status failed');
+          return;
+        }
+        const command = data.command as JsonRecord | undefined;
+        if (!command) {
+          onDone(null, 'Bridge command status missing command');
+          return;
+        }
+        onDone({
+          commandId: String(command.id || normalizedCommandId),
+          requestId: String(command.request_id || ''),
+          status: String(command.status || ''),
+          result: command.result && typeof command.result === 'object'
+            ? (command.result as JsonRecord)
+            : {},
         });
       }
     );
@@ -808,8 +1169,133 @@ export class SpecsApiClient extends BaseScriptComponent {
     };
   }
 
+  private buildCalendarCredentialQuery(deviceId: string, deviceSecret: string): string {
+    return (
+      '?device_id=' +
+      encodeURIComponent(String(deviceId || '')) +
+      '&device_secret=' +
+      encodeURIComponent(String(deviceSecret || ''))
+    );
+  }
+
+  private parseCalendarConfig(raw: unknown): SpecsCalendarConfig {
+    const record = raw && typeof raw === 'object' ? (raw as JsonRecord) : {};
+    const nested =
+      record.config && typeof record.config === 'object'
+        ? (record.config as JsonRecord)
+        : record;
+    const calendarId = String(nested.calendarId || nested.calendar_id || '').trim();
+    const connectedValue =
+      record.connected ??
+      nested.connected ??
+      nested.googleConnected ??
+      nested.google_connected ??
+      nested.oauthConnected ??
+      nested.oauth_connected;
+    return {
+      calendarId: calendarId || null,
+      calendarName: nested.calendarName
+        ? String(nested.calendarName)
+        : nested.calendar_name
+          ? String(nested.calendar_name)
+          : null,
+      connected: this.parseBoolean(connectedValue, !!calendarId),
+    };
+  }
+
+  private parseCalendar(raw: JsonRecord, index: number): SpecsCalendar {
+    const record = raw && typeof raw === 'object' ? raw : {};
+    return {
+      id: String(record.id || record.calendar_id || `calendar_${index}`).trim(),
+      name: String(record.name || record.summary || record.summaryOverride || 'Calendar').trim(),
+      description: String(record.description || '').trim(),
+      primary: this.parseBoolean(record.primary ?? record.is_primary, false),
+      timeZone: String(record.timeZone || record.time_zone || '').trim(),
+    };
+  }
+
+  private parseCalendarEvent(
+    raw: JsonRecord,
+    index: number,
+    fallbackCalendarId = '',
+    fallbackTitle = '',
+    fallbackStartAt = '',
+    fallbackEndAt = ''
+  ): SpecsCalendarEvent {
+    const record = raw && typeof raw === 'object' ? raw : {};
+    const start =
+      record.start && typeof record.start === 'object' ? (record.start as JsonRecord) : {};
+    const end =
+      record.end && typeof record.end === 'object' ? (record.end as JsonRecord) : {};
+    const startAt = String(
+      record.startAt ||
+        record.start_at ||
+        record.start_time ||
+        start.dateTime ||
+        start.date ||
+        fallbackStartAt
+    ).trim();
+    const endAt = String(
+      record.endAt ||
+        record.end_at ||
+        record.end_time ||
+        end.dateTime ||
+        end.date ||
+        fallbackEndAt
+    ).trim();
+    const allDay = this.parseBoolean(
+      record.allDay ?? record.all_day,
+      !start.dateTime && !!start.date
+    );
+    return {
+      id: String(record.id || record.event_id || `calendar-event-${index}`).trim(),
+      calendarId: String(
+        record.calendarId || record.calendar_id || fallbackCalendarId
+      ).trim(),
+      title: String(record.title || record.summary || record.name || fallbackTitle).trim(),
+      startAt,
+      endAt,
+      description: String(record.description || '').trim(),
+      location: String(record.location || '').trim(),
+      allDay,
+    };
+  }
+
+  private parseBoolean(value: unknown, fallback: boolean): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+        return true;
+      }
+      if (normalized === 'false' || normalized === '0' || normalized === 'no') {
+        return false;
+      }
+    }
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    return fallback;
+  }
+
   private getJson(path: string, onDone: (data: JsonRecord | null, error?: string) => void): void {
     this.requestJson(this.normalizeBaseUrl() + path, 'GET', null, null, onDone);
+  }
+
+  private getJsonWithHeaders(
+    path: string,
+    headers: Record<string, string>,
+    onDone: (data: JsonRecord | null, error?: string) => void
+  ): void {
+    this.requestJson(
+      this.normalizeBaseUrl() + path,
+      'GET',
+      null,
+      headers,
+      onDone
+    );
   }
 
   private postJson(

@@ -533,6 +533,7 @@
     autoPairPassword: true
     arvisSupabaseUrl: true
     arvisSupabaseAnonKey: true
+    debugLogging: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -552,7 +553,7 @@
       autoPairPassword: test321
       arvisSupabaseUrl: "https://bigsedudegjukszrfyil.supabase.co"
       arvisSupabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo
-      debugLogging: false
+      debugLogging: true
   ScriptTypes:
     "":
       {}
@@ -1827,6 +1828,7 @@
     berryRingRadius: true
     berryHeight: true
     useDemoTasksWhenOffline: true
+    debugLogging: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -1843,7 +1845,7 @@
       berryRingRadius: !<float> 22.000000
       berryHeight: !<float> 2.000000
       useDemoTasksWhenOffline: true
-      debugLogging: false
+      debugLogging: true
   ScriptTypes:
     "":
       {}
@@ -2651,6 +2653,7 @@
     - !<own> 2d41cd42-d30e-42b4-97e8-1d53aadb7b29
   Components:
     - !<own> 338230df-e385-4e3d-bcc3-ecc80ddeaca9
+    - !<own> 6975b509-b841-45a7-b6c8-cf0a4fda629e
 - !<Text/4505208c-2f24-4448-8fd3-c6176bc85ef8>
   PrefabRemaps:
     []
@@ -2919,6 +2922,8 @@
     petPokeColliderSize: true
     petPokeLocalPosition: true
     petDialogueLines: true
+    companionName: true
+    showNameTagWhenMultiple: true
     enableSpeechBubble: true
     enableTts: true
     onboardingStartDelaySec: true
@@ -2988,6 +2993,8 @@
         - That tickles!
         - "Hehe, I like that!"
         - "You're a good friend."
+      companionName: Buddy
+      showNameTagWhenMultiple: true
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: true
@@ -4244,6 +4251,22 @@
     []
   Components:
     - !<own> f56bb208-6918-4dc0-a050-657fe804f614
+- !<ScriptComponent/6975b509-b841-45a7-b6c8-cf0a4fda629e>
+  PrefabRemaps:
+    []
+  Name: ArvisBridgeEditorSmokeTest
+  Enabled: true
+  ScriptAsset: !<reference> 5b681574-629f-435a-aea8-6ddd05a41089
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/6a4eb03b-122c-45dd-990d-e68a97fd9388>
   PrefabRemaps:
     []
@@ -4527,7 +4550,7 @@
   PrefabRemaps:
     []
   Name: Text3D UserID
-  Enabled: false
+  Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 27.054745, y: 0.000000, z: -72.451370}
@@ -6347,7 +6370,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 5.000000, y: 1.500000, z: 5.000000}
+    Position: {x: 2.000000, y: 0.800000, z: 2.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 0.520000, y: 0.520000, z: 0.520000}
     HasSegmentScaleCompensation: false
@@ -9270,6 +9293,8 @@
     enableGrabSounds: true
     enableSpeechBubble: true
     speechBubbleHideDelaySec: true
+    companionName: true
+    showNameTagWhenMultiple: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -9294,6 +9319,8 @@
       enableGrabSounds: true
       enableSpeechBubble: true
       speechBubbleHideDelaySec: !<float> 14.000000
+      companionName: Arvis
+      showNameTagWhenMultiple: true
   ScriptTypes:
     "":
       {}

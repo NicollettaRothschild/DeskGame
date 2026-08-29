@@ -467,3 +467,356 @@ export class ArvisGhostSpeechBubble {
   }
 }
 
+const NAME_TAG_TEXT_SIZE = 30;
+const NAME_TAG_HALF_WIDTH = 5.2;
+const NAME_TAG_HALF_HEIGHT = 1.2;
+const NAME_TAG_DEPTH = 0.16;
+const NAME_TAG_TEXT_COLOR = new vec4(1.0, 1.0, 1.0, 1.0);
+const NAME_TAG_BACKGROUND_COLOR = new vec4(0.025, 0.035, 0.06, 0.86);
+const NAME_TAG_TEXT_COLOR_KEYS = [
+  'frontCapStartingColor',
+  'backCapStartingColor',
+  'outerEdgeStartingColor',
+  'outerEdgeEndingColor',
+  'InnerEdgeStartingColor',
+  'InnerEdgeEndingColor',
+];
+
+export type CompanionNameTagOptions = {
+  name: string;
+  scaleCompensation?: number;
+  heightOffset?: number;
+  showWhenMultiple?: boolean;
+  debugLogging?: boolean;
+};
+
+/**
+ * Small camera-facing label for distinguishing multiple AI companions.
+ * Labels remain hidden while only one enabled companion is present.
+ */
+export class CompanionNameTag {
+  private static readonly instances: CompanionNameTag[] = [];
+
+  private readonly followRoot: SceneObject;
+  private readonly host: BaseScriptComponent;
+  private readonly scaleCompensation: number;
+  private readonly heightOffset: number;
+  private readonly showWhenMultiple: boolean;
+  private readonly debugLogging: boolean;
+  private name: string;
+  private tagRoot: SceneObject | null = null;
+  private tagText: Text3D | null = null;
+  private tagBackground: RenderMeshVisual | null = null;
+  private lookAt: LookAtComponent | null = null;
+  private updateEvent: UpdateEvent | null = null;
+  private disposed = false;
+  private lastVisibleState: boolean | null = null;
+
+  constructor(
+    followRoot: SceneObject,
+    host: BaseScriptComponent,
+    options: CompanionNameTagOptions
+  ) {
+    this.followRoot = followRoot;
+    this.host = host;
+    this.scaleCompensation = Math.max(0.1, options.scaleCompensation ?? 3);
+    this.heightOffset = options.heightOffset ?? 5.4;
+    this.showWhenMultiple = options.showWhenMultiple ?? true;
+    this.debugLogging = options.debugLogging ?? false;
+    this.name = this.normalizeName(options.name);
+
+    this.ensureBuilt();
+    CompanionNameTag.instances.push(this);
+    if (this.debugLogging) {
+      print(`[CompanionNameTag] registered "${this.name}"`);
+    }
+
+    this.updateEvent = this.host.createEvent('UpdateEvent') as UpdateEvent;
+    this.updateEvent.bind(() => {
+      this.ensureLookAt();
+      CompanionNameTag.refreshVisibility();
+    });
+    this.updateEvent.enabled = true;
+    CompanionNameTag.refreshVisibility();
+  }
+
+  public setName(name: string): void {
+    this.name = this.normalizeName(name);
+    if (!isNull(this.tagText)) {
+      this.tagText.text = this.name;
+    }
+    this.updateLayout();
+    CompanionNameTag.refreshVisibility();
+  }
+
+  public dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+
+    if (!isNull(this.updateEvent)) {
+      this.updateEvent.enabled = false;
+      this.updateEvent = null;
+    }
+    if (!isNull(this.tagRoot)) {
+      this.tagRoot.destroy();
+      this.tagRoot = null;
+    }
+
+    const index = CompanionNameTag.instances.indexOf(this);
+    if (index >= 0) {
+      CompanionNameTag.instances.splice(index, 1);
+    }
+    CompanionNameTag.refreshVisibility();
+  }
+
+  private static refreshVisibility(): void {
+    let activeCount = 0;
+    for (let i = 0; i < CompanionNameTag.instances.length; i++) {
+      if (CompanionNameTag.instances[i].isCompanionEnabled()) {
+        activeCount++;
+      }
+    }
+
+    for (let i = 0; i < CompanionNameTag.instances.length; i++) {
+      const tag = CompanionNameTag.instances[i];
+      const shouldShow = tag.showWhenMultiple ? activeCount > 1 : activeCount > 0;
+      tag.setVisible(shouldShow);
+    }
+  }
+
+  private ensureBuilt(): void {
+    if (this.disposed || !isNull(this.tagRoot)) {
+      return;
+    }
+
+    const root = global.scene.createSceneObject('CompanionNameTag');
+    root.enabled = false;
+    root.setParent(this.followRoot);
+    root.layer = this.followRoot.layer;
+    const inverseScale = 1 / this.scaleCompensation;
+    root.getTransform().setLocalPosition(new vec3(0, this.heightOffset, 0));
+    root.getTransform().setLocalRotation(quat.quatIdentity());
+    root.getTransform().setLocalScale(new vec3(inverseScale, inverseScale, inverseScale));
+    this.tagRoot = root;
+
+    this.createBackground(root);
+    this.createText(root);
+    this.ensureLookAt();
+  }
+
+  private createBackground(root: SceneObject): void {
+    let material: Material | null = null;
+    try {
+      const template = requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material;
+      material = template.clone();
+      const pass = material.mainPass as unknown as Record<string, unknown>;
+      this.trySetPassValue(pass, 'depthWrite', false);
+      this.trySetPassValue(pass, 'depthTest', true);
+      this.trySetPassValue(pass, 'blendMode', BlendMode.Normal);
+      this.trySetPassValue(pass, 'baseColor', NAME_TAG_BACKGROUND_COLOR);
+    } catch (_error) {
+      material = null;
+    }
+
+    if (isNull(material)) {
+      return;
+    }
+
+    try {
+      const backgroundObject = global.scene.createSceneObject('CompanionNameTagBackground');
+      backgroundObject.setParent(root);
+      backgroundObject.layer = root.layer;
+      backgroundObject.getTransform().setLocalPosition(new vec3(0, 0, -0.04));
+      backgroundObject.getTransform().setLocalRotation(quat.quatIdentity());
+
+      const background = backgroundObject.createComponent(
+        'Component.RenderMeshVisual'
+      ) as RenderMeshVisual;
+      background.enabled = true;
+      background.mesh = requireAsset('Meshes/StarCatchSphere.mesh') as RenderMesh;
+      background.mainMaterial = material;
+      background.renderOrder = 30;
+      this.tagBackground = background;
+    } catch (_error) {
+      this.tagBackground = null;
+    }
+  }
+
+  private createText(root: SceneObject): void {
+    const textObject = global.scene.createSceneObject('CompanionNameTagText');
+    textObject.setParent(root);
+    textObject.layer = root.layer;
+    textObject.getTransform().setLocalPosition(new vec3(0, 0, 0.08));
+    textObject.getTransform().setLocalRotation(quat.quatIdentity());
+    textObject.getTransform().setLocalScale(vec3.one());
+
+    const text = textObject.createComponent('Component.Text3D') as Text3D;
+    text.enabled = true;
+    text.text = this.name;
+    text.size = NAME_TAG_TEXT_SIZE;
+    text.extrusionDepth = 0.05;
+    text.horizontalAlignment = HorizontalAlignment.Center;
+    text.verticalAlignment = VerticalAlignment.Center;
+    text.horizontalOverflow = HorizontalOverflow.Shrink;
+    text.verticalOverflow = VerticalOverflow.Overflow;
+    text.worldSpaceRect = Rect.create(
+      -NAME_TAG_HALF_WIDTH,
+      NAME_TAG_HALF_WIDTH,
+      -NAME_TAG_HALF_HEIGHT,
+      NAME_TAG_HALF_HEIGHT
+    );
+    text.renderOrder = 31;
+
+    try {
+      const template = requireAsset('Text3D.mat') as Material;
+      const material = template.clone();
+      const pass = material.mainPass as unknown as Record<string, unknown>;
+      for (let i = 0; i < NAME_TAG_TEXT_COLOR_KEYS.length; i++) {
+        this.trySetPassValue(pass, NAME_TAG_TEXT_COLOR_KEYS[i], NAME_TAG_TEXT_COLOR);
+      }
+      this.trySetPassValue(pass, 'depthWrite', false);
+      this.trySetPassValue(pass, 'depthTest', true);
+      text.mainMaterial = material;
+    } catch (_error) {
+      // Text3D keeps its default material if the template is unavailable.
+    }
+
+    this.tagText = text;
+    this.updateLayout();
+  }
+
+  private updateLayout(): void {
+    const labelWidth = Math.max(5.2, Math.min(14.5, this.name.length * 0.82 + 2.8));
+    if (!isNull(this.tagText)) {
+      this.tagText.worldSpaceRect = Rect.create(
+        -labelWidth * 0.5,
+        labelWidth * 0.5,
+        -NAME_TAG_HALF_HEIGHT,
+        NAME_TAG_HALF_HEIGHT
+      );
+    }
+    if (!isNull(this.tagBackground)) {
+      this.tagBackground
+        .getSceneObject()
+        .getTransform()
+        .setLocalScale(new vec3(labelWidth, 2.7, NAME_TAG_DEPTH));
+    }
+  }
+
+  private setVisible(visible: boolean): void {
+    if (this.debugLogging && this.lastVisibleState !== visible) {
+      print(`[CompanionNameTag] "${this.name}" ${visible ? 'visible' : 'hidden'}`);
+    }
+    this.lastVisibleState = visible;
+    if (!isNull(this.tagRoot)) {
+      this.tagRoot.enabled = visible && this.isCompanionEnabled() && !!this.name;
+    }
+  }
+
+  private isCompanionEnabled(): boolean {
+    if (this.disposed || isNull(this.followRoot) || !this.name) {
+      return false;
+    }
+    try {
+      return this.followRoot.isEnabledInHierarchy;
+    } catch (_error) {
+      try {
+        return this.followRoot.enabled;
+      } catch (_fallbackError) {
+        return false;
+      }
+    }
+  }
+
+  private ensureLookAt(): void {
+    if (this.disposed || isNull(this.tagRoot) || !isNull(this.lookAt)) {
+      return;
+    }
+
+    const camera = this.findCameraObject();
+    if (isNull(camera)) {
+      return;
+    }
+
+    try {
+      const lookAt = this.tagRoot.createComponent(
+        'Component.LookAtComponent'
+      ) as LookAtComponent;
+      lookAt.target = camera;
+      lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
+      lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
+      lookAt.worldUpVector = LookAtComponent.WorldUpVector.SceneY;
+      this.lookAt = lookAt;
+    } catch (error) {
+      if (this.debugLogging) {
+        print('[CompanionNameTag] camera-facing label unavailable: ' + error);
+      }
+    }
+  }
+
+  private findCameraObject(): SceneObject | null {
+    const preferredNames = ['Camera Object', 'Device Camera', 'Camera'];
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const found = this.findCameraRecursive(
+        global.scene.getRootObject(i),
+        preferredNames
+      );
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findCameraRecursive(
+    node: SceneObject,
+    preferredNames: string[]
+  ): SceneObject | null {
+    if (isNull(node)) {
+      return null;
+    }
+
+    const nodeName = String(node.name || '');
+    if (preferredNames.indexOf(nodeName) >= 0) {
+      try {
+        if (!isNull(node.getComponent('Component.Camera'))) {
+          return node;
+        }
+      } catch (_error) {
+        // Continue searching if a stale scene object is encountered.
+      }
+    }
+
+    for (let i = 0; i < node.getChildrenCount(); i++) {
+      const found = this.findCameraRecursive(node.getChild(i), preferredNames);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private normalizeName(name: string): string {
+    const value = String(name || '').trim();
+    if (!value) {
+      return 'Companion';
+    }
+    return value.length > 28 ? value.slice(0, 27) + '…' : value;
+  }
+
+  private trySetPassValue(
+    pass: Record<string, unknown>,
+    key: string,
+    value: unknown
+  ): void {
+    try {
+      pass[key] = value;
+    } catch (_error) {
+      // Some material passes expose a restricted property set.
+    }
+  }
+}
+

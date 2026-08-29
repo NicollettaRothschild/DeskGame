@@ -9,6 +9,8 @@ import {
 import { isImageQuery } from './ArvisImageSkill';
 import { isMeshQuery } from './ArvisMeshSkill';
 import { isMusicQuery } from './ArvisMusicSkill';
+import { isArvisCalendarQuery } from './ArvisCalendarIntent';
+import { isArvisEmailDraftQuery } from './ArvisEmailDraftIntent';
 import { isNewsIntentQuery } from './ArvisNewsSkill';
 import {
   getSharedArvisAgentChat,
@@ -205,6 +207,10 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       print(`[VoiceCommands] Processing: ${text}`);
     }
 
+    if (isArvisCalendarQuery(text) && this.tryForwardAgentUtterance(text)) {
+      return;
+    }
+
     if (this.tryTodoCommand(text)) {
       return;
     }
@@ -242,6 +248,8 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       isImageQuery(trimmed) ||
       isMeshQuery(trimmed) ||
       isMusicQuery(trimmed) ||
+      isArvisCalendarQuery(trimmed) ||
+      isArvisEmailDraftQuery(trimmed) ||
       isNewsIntentQuery(trimmed);
     if (!isAgentIntent) {
       return false;
@@ -365,6 +373,9 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   }
 
   private trySyncCommand(text: string): boolean {
+    if (isArvisCalendarQuery(text)) {
+      return false;
+    }
     if (!/\b(sync|refresh)\b/.test(text)) {
       return false;
     }

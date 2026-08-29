@@ -164,7 +164,7 @@
   Enabled: true
   Layers: 1
   LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.750859, z: 0.000000}
+    Position: {x: 0.000000, y: 0.574335, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 0.671170, y: 0.671170, z: 0.671170}
     HasSegmentScaleCompensation: false
@@ -575,7 +575,7 @@
   ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
   ShadowDensity: 1.000000
   Materials:
-    - !<reference> 724b2ce6-4674-48d9-a924-8affaea816ea
+    - !<reference> 40fb6498-fef1-413f-bb78-1270f03528ed
   Mesh: !<reference> 52102d2f-2360-4a1c-99a9-e265613bbca8
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true

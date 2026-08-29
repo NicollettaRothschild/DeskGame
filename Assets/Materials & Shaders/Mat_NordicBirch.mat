@@ -33,7 +33,7 @@
       value: 0
     baseColor:
       typeIdx: 5
-      value: {x: 0.860000, y: 0.750000, z: 0.580000, w: 1.000000}
+      value: {x: 0.680000, y: 0.720000, z: 0.760000, w: 1.000000}
     baseTex:
       typeIdx: 9
       value:
@@ -48,8 +48,8 @@
         type: Texture2D
     metallic:
       typeIdx: 1
-      value: 0.000000
+      value: 0.900000
     roughness:
       typeIdx: 1
-      value: 0.650000
+      value: 0.280000
   Pass: !<reference> 188ccf35-4e86-4d2d-ac3a-5ea6ac2d43de

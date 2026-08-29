@@ -1,6 +1,9 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable';
 import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
-import { ArvisGhostSpeechBubble } from './ArvisGhostSpeechBubble';
+import {
+  ArvisGhostSpeechBubble,
+  CompanionNameTag,
+} from './ArvisGhostSpeechBubble';
 import { estimateSpeechDurationSec, FlowGardenTTS } from './FlowGardenTTS';
 import {
   getSharedFlowGardenTts,
@@ -121,6 +124,16 @@ export class FriendGrab extends BaseScriptComponent {
     'Hehe, I like that!',
     "You're a good friend.",
   ];
+
+  @input
+  @label('Companion Name')
+  @hint('Name shown above this companion when multiple AI companions are active.')
+  companionName: string = 'Buddy';
+
+  @input
+  @label('Show Name Tag With Multiple Companions')
+  @hint('Display this name tag when more than one enabled companion is present.')
+  showNameTagWhenMultiple: boolean = true;
 
   @input
   enableSpeechBubble: boolean = true;
@@ -454,6 +467,7 @@ export class FriendGrab extends BaseScriptComponent {
   private resolvedGrabTrack: AudioTrackAsset | null = null;
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
   private speechBubble: ArvisGhostSpeechBubble | null = null;
+  private companionNameTag: CompanionNameTag | null = null;
   private lookAt: LookAtComponent | null = null;
   private lookAtCamera: SceneObject | null = null;
   private lookAtTargetProxy: SceneObject | null = null;
@@ -491,6 +505,7 @@ export class FriendGrab extends BaseScriptComponent {
       this.captureIdleBasePosition();
       this.ensureFriendSounds();
       this.ensureSpeechBubble();
+      this.ensureCompanionNameTag();
       this.resolveTts();
       this.tryWireMoveInteraction();
       this.wirePetPokeInteraction();
@@ -513,6 +528,13 @@ export class FriendGrab extends BaseScriptComponent {
 
     this.scheduleGrabWireRetry(0.25);
     this.scheduleGrabWireRetry(0.75);
+  }
+
+  onDestroy(): void {
+    if (!isNull(this.companionNameTag)) {
+      this.companionNameTag.dispose();
+      this.companionNameTag = null;
+    }
   }
 
   public showSpeech(
@@ -1010,13 +1032,36 @@ export class FriendGrab extends BaseScriptComponent {
     });
   }
 
+  private ensureCompanionNameTag(): void {
+    if (!isNull(this.companionNameTag)) {
+      return;
+    }
+
+    this.companionNameTag = new CompanionNameTag(this.getSceneObject(), this, {
+      name: this.companionName,
+      scaleCompensation: Math.max(0.1, this.bubbleScaleCompensation),
+      heightOffset: Math.max(0.1, this.bubbleHeightOffset + 0.35),
+      showWhenMultiple: this.showNameTagWhenMultiple,
+      debugLogging: this.debugLogging,
+    });
+  }
+
   private ensureLeaderboardPanel(): SceneObject | null {
+    const anchor = this.findAnchorController() as
+      | (ScriptComponent & {
+          widgetParent?: SceneObject;
+          leaderboardRoot?: SceneObject;
+        })
+      | null;
+
     if (!isNull(this.onboardingLeaderboard)) {
       (this.onboardingLeaderboard as SceneObject).enabled = true;
+      this.ensureLeaderboardGrabOnPanel(this.onboardingLeaderboard, anchor);
       return this.onboardingLeaderboard;
     }
     if (!isNull(this.generatedLeaderboard)) {
       (this.generatedLeaderboard as SceneObject).enabled = true;
+      this.ensureLeaderboardGrabOnPanel(this.generatedLeaderboard, anchor);
       return this.generatedLeaderboard;
     }
 
@@ -1026,6 +1071,10 @@ export class FriendGrab extends BaseScriptComponent {
       existing.enabled = true;
       this.generatedLeaderboard = existing;
       this.onboardingLeaderboard = existing;
+      this.ensureLeaderboardGrabOnPanel(existing, anchor);
+      if (!isNull(anchor)) {
+        anchor.leaderboardRoot = existing;
+      }
       if (shouldReposition) {
         this.placeObjectInFrontOfFriend(existing, 'leaderboard');
       }
@@ -1035,12 +1084,6 @@ export class FriendGrab extends BaseScriptComponent {
       return existing;
     }
 
-    const anchor = this.findAnchorController() as
-      | (ScriptComponent & {
-          widgetParent?: SceneObject;
-          leaderboardRoot?: SceneObject;
-        })
-      | null;
     const panel = global.scene.createSceneObject('Leaderboard');
     panel.enabled = true;
     panel.layer = this.getSceneObject().layer;
@@ -1052,12 +1095,6 @@ export class FriendGrab extends BaseScriptComponent {
     );
     panel.getTransform().setWorldScale(vec3.one());
 
-    const grab = panel.createComponent(
-      LeaderboardGrab.getTypeName()
-    ) as LeaderboardGrab;
-    grab.anchorController = anchor as ScriptComponent;
-    grab.colliderSize = new vec3(72, 56, 14);
-
     const board = panel.createComponent(
       GoalLeaderboardBoard.getTypeName()
     ) as GoalLeaderboardBoard;
@@ -1065,6 +1102,11 @@ export class FriendGrab extends BaseScriptComponent {
     board.leaderboardTtlSec = this.goalLeaderboardTtlSec;
     board.usersLimit = this.leaderboardUsersLimit;
     board.useGlobal = this.leaderboardUseGlobal;
+
+    // Build the native BackPlate/Interactable before adding the movement
+    // helper. LeaderboardGrab defers its wiring until BackPlate's OnStart, but
+    // this ordering also keeps the panel's single interaction target clear.
+    this.ensureLeaderboardGrabOnPanel(panel, anchor);
 
     if (!isNull(anchor)) {
       anchor.leaderboardRoot = panel;
@@ -1074,6 +1116,31 @@ export class FriendGrab extends BaseScriptComponent {
     this.placeObjectInFrontOfFriend(panel, 'leaderboard');
     print('[FriendGrab] created placeable UIKit leaderboard panel');
     return panel;
+  }
+
+  private ensureLeaderboardGrabOnPanel(
+    panel: SceneObject,
+    anchor: ScriptComponent | null
+  ): void {
+    if (isNull(panel)) {
+      return;
+    }
+
+    let grab = panel.getComponent(LeaderboardGrab.getTypeName()) as LeaderboardGrab;
+    if (isNull(grab)) {
+      grab = panel.createComponent(LeaderboardGrab.getTypeName()) as LeaderboardGrab;
+    }
+    if (isNull(grab)) {
+      return;
+    }
+
+    if (!isNull(anchor)) {
+      grab.anchorController = anchor;
+    }
+    // Give the whole panel a generous grab target; the visual itself is much
+    // smaller than this on Specs and has no separate move handle.
+    grab.colliderSize = new vec3(100, 80, 24);
+    grab.requestMoveInteractionWire();
   }
 
   private shouldRepositionLeaderboard(panel: SceneObject): boolean {

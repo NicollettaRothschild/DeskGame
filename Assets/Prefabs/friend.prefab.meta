@@ -206,6 +206,8 @@
     petPokeColliderSize: true
     petPokeLocalPosition: true
     petDialogueLines: true
+    companionName: true
+    showNameTagWhenMultiple: true
     enableSpeechBubble: true
     enableTts: true
     enableOnboarding: true
@@ -293,6 +295,8 @@
         - That tickles!
         - "Hehe, I like that!"
         - "You're a good friend."
+      companionName: Buddy
+      showNameTagWhenMultiple: true
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: false

@@ -32,6 +32,7 @@
     bubbleHeightOffset: false
     bubbleScaleCompensation: false
     colliderSize: false
+    companionName: false
     debugLogging: false
     enableFollowAfterOnboarding: false
     enableGoalLeaderboard: false
@@ -106,6 +107,7 @@
     releaseSoundTrack: false
     releaseSoundVolume: false
     releaseSpeechTrack: false
+    showNameTagWhenMultiple: false
     speechBubbleHideDelaySec: false
     treatAsNewUser: false
     workspaceResetLine: false
@@ -135,6 +137,8 @@
         - That tickles!
         - "Hehe, I like that!"
         - "You're a good friend."
+      companionName: Buddy
+      showNameTagWhenMultiple: true
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: false
@@ -222,6 +226,8 @@
     - '// @input vec3 petPokeColliderSize = {3.4,4.2,3.4} {"label":"Pet Poke Collider Size"}'
     - '// @input vec3 petPokeLocalPosition = {0,0,0.8} {"label":"Pet Poke Local Position"}'
     - "// @input string[] petDialogueLines = {\"Aww, thank you!\",\"That tickles!\",\"Hehe, I like that!\",\"You're a good friend.\"}"
+    - '// @input string companionName = "Buddy" {"label":"Companion Name", "hint":"Name shown above this companion when multiple AI companions are active."}'
+    - '// @input bool showNameTagWhenMultiple = true {"label":"Show Name Tag With Multiple Companions", "hint":"Display this name tag when more than one enabled companion is present."}'
     - // @input bool enableSpeechBubble = true
     - // @input bool enableTts = true
     - '// @input bool enableOnboarding {"label":"Enable Onboarding", "hint":"First launch: guided tour. Later sessions restore anchors unless user asks to reset."}'

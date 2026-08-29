@@ -2,11 +2,12 @@
   ImportedAssetIds:
     .hidden/Seed: !<reference> d46958a1-0ed1-4515-98d3-23ab113a2938
     .hidden/white: !<reference> 95ad6273-f33c-47a0-806f-ac766f70c009
-    10040ffe99c86b43: !<reference> 4915e54d-5a7e-4e04-b007-d4b796ac1e59
-    478b07573ea7c72d: !<reference> 8649fe75-4e27-4abd-974d-ec67dc0e102c
-    769ad7b3648148ec: !<reference> 47e3173f-7f3a-4597-ba0e-0cb882aa77f3
-    79e8604bfd65d432: !<reference> 8a6aa4b3-57f1-4db1-95a2-1d960ab14ef2
-    7a0dd5cd69df73fa: !<reference> f016e0e5-f533-461b-9498-920cd9eeac1c
+    20a774db159f0a3f: !<reference> da87c945-feba-4935-8dc3-039cf06dae5b
+    28cd2e97870a69db: !<reference> ecbb4b1a-fd9a-4a7a-9d60-36561b8df971
+    2ef2e22c9c67be9d: !<reference> b69740a4-1fd0-4edd-86ae-e6cacb766785
+    5cf38af69d3f2719: !<reference> 86b50e14-d90c-4820-8ad7-1a993460e136
+    66780cf3a4dcb2b8: !<reference> f8fd9c0f-8f96-4ea2-81a1-725e588928c3
+    79d0be46bfd2ae6e: !<reference> 875a0ebc-c721-4c7f-ad38-fa4a2a801747
     Materials/Seed: !<reference> c35011d8-594a-4df0-93b8-a8c8461f7666
     Materials/Seed|Seed|GraphPassInfo: !<reference> 48a1a7f0-b166-4098-96fd-c362d4180f54
     Meshes/SeedBase: !<reference> d86984f2-64e6-432a-be58-4b968386986e
@@ -14,8 +15,7 @@
     Meshes/Sphere.002: !<reference> a04a04ff-8802-4888-ba40-b77e444d3148
     Scene: !<reference> 25e821f2-e691-49f6-bcb0-a55e40cf734e
     Textures/SeedColor: !<reference> c4fde058-5ef5-4e53-9f53-5f6179158b70
-    acc12b772da20543: !<reference> dd84436f-da02-424a-aa50-f90b9805e4aa
-    da4e4b6de923e488: !<reference> 22aefcef-9ec8-4640-902a-f4571b9a7b7f
+    f323916416bd7171: !<reference> a772e368-be94-4122-a3eb-ff593458994d
   ImporterName: FbxImporter
   PrimaryAsset: !<reference> 25e821f2-e691-49f6-bcb0-a55e40cf734e
   PackageType: LegacyPackage
@@ -58,25 +58,10 @@
       jpg: Performance Compression
     Overrides:
       {}
-- !<SceneObject/22aefcef-9ec8-4640-6fd5-0ba8e4658480>
+- !<RenderMeshVisual/86b50e14-d90c-4820-7528-e566cb9f1ec9>
   PrefabRemaps:
     []
-  Name: SeedBase
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 47e3173f-7f3a-4597-45f1-f3477d55880c
-- !<RenderMeshVisual/47e3173f-7f3a-4597-45f1-f3477d55880c>
-  PrefabRemaps:
-    []
-  Name: component_0
+  Name: component_1
   Enabled: true
   RenderOrder: 0
   StretchMode: Stretch
@@ -87,28 +72,13 @@
   ShadowDensity: 1.000000
   Materials:
     - !<reference> c35011d8-594a-4df0-93b8-a8c8461f7666
-  Mesh: !<reference> d86984f2-64e6-432a-be58-4b968386986e
+  Mesh: !<reference> ca2461c8-6530-433d-ace5-4991d80e24a5
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/4915e54d-5a7e-4e04-4ff8-2b486953e1a6>
-  PrefabRemaps:
-    []
-  Name: Sphere.002
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
-    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 8a6aa4b3-57f1-4db1-6a5d-e269f54eb10d
-- !<SceneObject/8649fe75-4e27-4abd-68b2-139823f1efd3>
+- !<SceneObject/875a0ebc-c721-4c7f-52c7-05b5d57fe8b8>
   PrefabRemaps:
     []
   Name: SeedBase.003
@@ -122,8 +92,8 @@
   Children:
     []
   Components:
-    - !<own> dd84436f-da02-424a-55af-06f467fa1b55
-- !<RenderMeshVisual/8a6aa4b3-57f1-4db1-6a5d-e269f54eb10d>
+    - !<own> 86b50e14-d90c-4820-7528-e566cb9f1ec9
+- !<RenderMeshVisual/a772e368-be94-4122-5c14-00a6cba766b2>
   PrefabRemaps:
     []
   Name: component_2
@@ -147,11 +117,41 @@
   Prototype: !<ObjectOwner/9fd347fd-7f76-473a-bf3c-16c62d330c2c>
     PackagePath: ""
     objects:
-      - !<own> f016e0e5-f533-461b-6b67-6df3261153e3
-- !<RenderMeshVisual/dd84436f-da02-424a-55af-06f467fa1b55>
+      - !<own> f8fd9c0f-8f96-4ea2-7e5e-8da1a776d73c
+- !<SceneObject/b69740a4-1fd0-4edd-7951-19353489987a>
   PrefabRemaps:
     []
-  Name: component_1
+  Name: SeedBase
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> ecbb4b1a-fd9a-4a7a-629f-c9a9e472068e
+- !<SceneObject/da87c945-feba-4935-723c-fc630f9251a4>
+  PrefabRemaps:
+    []
+  Name: Sphere.002
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: -90.000000, y: -0.000000, z: 0.000000}
+    Scale: {x: 100.000000, y: 100.000000, z: 100.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> a772e368-be94-4122-5c14-00a6cba766b2
+- !<RenderMeshVisual/ecbb4b1a-fd9a-4a7a-629f-c9a9e472068e>
+  PrefabRemaps:
+    []
+  Name: component_0
   Enabled: true
   RenderOrder: 0
   StretchMode: Stretch
@@ -162,13 +162,13 @@
   ShadowDensity: 1.000000
   Materials:
     - !<reference> c35011d8-594a-4df0-93b8-a8c8461f7666
-  Mesh: !<reference> ca2461c8-6530-433d-ace5-4991d80e24a5
+  Mesh: !<reference> d86984f2-64e6-432a-be58-4b968386986e
   Skin: !<reference> 00000000-0000-0000-0000-000000000000
   BlendShapesEnabled: true
   BlendNormals: false
   BlendShapes:
     {}
-- !<SceneObject/f016e0e5-f533-461b-6b67-6df3261153e3>
+- !<SceneObject/f8fd9c0f-8f96-4ea2-7e5e-8da1a776d73c>
   PrefabRemaps:
     []
   Name: Seed
@@ -180,8 +180,8 @@
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
-    - !<own> 22aefcef-9ec8-4640-6fd5-0ba8e4658480
-    - !<own> 8649fe75-4e27-4abd-68b2-139823f1efd3
-    - !<own> 4915e54d-5a7e-4e04-4ff8-2b486953e1a6
+    - !<own> b69740a4-1fd0-4edd-7951-19353489987a
+    - !<own> 875a0ebc-c721-4c7f-52c7-05b5d57fe8b8
+    - !<own> da87c945-feba-4935-723c-fc630f9251a4
   Components:
     []

@@ -8,7 +8,10 @@ import {
   getSharedArvisAgentChat,
   registerArvisGhostBlob,
 } from './FlowGardenServiceRegistry';
-import { ArvisGhostSpeechBubble } from './ArvisGhostSpeechBubble';
+import {
+  ArvisGhostSpeechBubble,
+  CompanionNameTag,
+} from './ArvisGhostSpeechBubble';
 
 export type ArvisGhostPhase = 'idle' | 'listening' | 'thinking' | 'reply' | 'error';
 
@@ -110,6 +113,16 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   @input('float')
   speechBubbleHideDelaySec: number = 14;
 
+  @input
+  @label('Companion Name')
+  @hint('Name shown above this companion when multiple AI companions are active.')
+  companionName: string = 'Arvis';
+
+  @input
+  @label('Show Name Tag With Multiple Companions')
+  @hint('Display this name tag when more than one enabled companion is present.')
+  showNameTagWhenMultiple: boolean = true;
+
   private phase: ArvisGhostPhase = 'idle';
   private baseLocalPosition: vec3 | null = null;
   private material: Material | null = null;
@@ -141,6 +154,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private resolvedGrabTrack: AudioTrackAsset | null = null;
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
   private speechBubble: ArvisGhostSpeechBubble | null = null;
+  private companionNameTag: CompanionNameTag | null = null;
 
   private static readonly EYE_SQUASH_SMOOTH_SPEED = 14.0;
   private static readonly DEFAULT_WATER_SCROLL_SPEED = 2.2;
@@ -167,6 +181,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       this.captureDefaults();
       this.ensureArvisSounds();
       this.ensureSpeechBubble();
+      this.ensureCompanionNameTag();
       this.refreshGrabCollider();
       this.setPhase('idle');
       this.wireMoveInteraction();
@@ -178,6 +193,13 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       this.syncEyesToGhostWorld();
       this.syncSpeechBubbleToGhostWorld();
     });
+  }
+
+  onDestroy(): void {
+    if (!isNull(this.companionNameTag)) {
+      this.companionNameTag.dispose();
+      this.companionNameTag = null;
+    }
   }
 
   public setPhase(phase: ArvisGhostPhase): void {
@@ -248,6 +270,20 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       scaleCompensation: this.baseScale,
       maxCharacters: 88,
       hideDelaySec: this.speechBubbleHideDelaySec,
+      debugLogging: this.debugLogging,
+    });
+  }
+
+  private ensureCompanionNameTag(): void {
+    if (!isNull(this.companionNameTag)) {
+      return;
+    }
+
+    this.companionNameTag = new CompanionNameTag(this.sceneObject, this, {
+      name: this.companionName,
+      scaleCompensation: Math.max(0.1, this.baseScale),
+      heightOffset: 1.35,
+      showWhenMultiple: this.showNameTagWhenMultiple,
       debugLogging: this.debugLogging,
     });
   }
