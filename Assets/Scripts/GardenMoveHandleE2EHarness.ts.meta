@@ -38,13 +38,13 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - runHarness: true
+    - runHarness: false
       startupDelaySec: 1.500000
       runOnce: true
   ScriptTypes:
     -
       {}
   InputLines:
-    - // @input bool runHarness = true
+    - // @input bool runHarness
     - // @input float startupDelaySec = 1.5
     - // @input bool runOnce = true

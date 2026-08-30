@@ -129,7 +129,7 @@
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
-      enablePetReaction: true
+      enablePetReaction: false
       petSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       petReactionCooldownSec: 2.500000
       petPokeColliderSize: !<Vec3> {x: 3.400000, y: 4.200000, z: 3.400000}
@@ -206,7 +206,7 @@
       leaderboardUsersLimit: 5
       leaderboardUseGlobal: true
       announceLeaderboardRank: false
-      enableFollowAfterOnboarding: true
+      enableFollowAfterOnboarding: false
       followDistanceCm: !<float> 55.000000
       followSideOffsetCm: !<float> 18.000000
       followHeightOffsetCm: !<float> -25.000000
@@ -297,7 +297,7 @@
     - '// @input int leaderboardUsersLimit = 5 {"label":"Leaderboard Users Limit"}'
     - '// @input bool leaderboardUseGlobal = true {"label":"Leaderboard Use Global", "hint":"When off, fetches friends leaderboard instead of global."}'
     - '// @input bool announceLeaderboardRank {"label":"Announce Leaderboard Rank", "hint":"Speak the user rank after a successful score submit."}'
-    - '// @input bool enableFollowAfterOnboarding = true {"hint":"Buddy follows the camera until manually placed; say \"hey friend\" to resume"}'
+    - '// @input bool enableFollowAfterOnboarding {"hint":"Optional camera following. Disabled on Spectacles 2024 for stable, predictable placement."}'
     - // @input float followDistanceCm = 45
     - // @input float followSideOffsetCm = 4
     - // @input float followHeightOffsetCm = -18

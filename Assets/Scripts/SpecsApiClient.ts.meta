@@ -54,7 +54,7 @@
       meshRequestTimeoutSec: !<float> 90.000000
       useEditorMockWhenOffline: true
       editorStartPaired: false
-      useMockFallbackWhenUnpaired: true
+      useMockFallbackWhenUnpaired: false
       editorAutoPairDelaySec: !<float> 12.000000
       debugLogging: false
   ScriptTypes:
@@ -69,6 +69,6 @@
     - // @input float meshRequestTimeoutSec = 90
     - // @input bool useEditorMockWhenOffline = true
     - // @input bool editorStartPaired
-    - // @input bool useMockFallbackWhenUnpaired = true
+    - // @input bool useMockFallbackWhenUnpaired
     - // @input float editorAutoPairDelaySec = 12
     - // @input bool debugLogging

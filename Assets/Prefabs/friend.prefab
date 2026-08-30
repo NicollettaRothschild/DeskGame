@@ -517,7 +517,7 @@
       leaderboardUsersLimit: 5
       leaderboardUseGlobal: true
       announceLeaderboardRank: false
-      enableFollowAfterOnboarding: true
+      enableFollowAfterOnboarding: false
       followDistanceCm: !<float> 55.000000
       followSideOffsetCm: !<float> 18.000000
       followHeightOffsetCm: !<float> -25.000000

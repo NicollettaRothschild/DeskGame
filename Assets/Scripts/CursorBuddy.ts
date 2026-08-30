@@ -1,5 +1,4 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable';
-import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
 import {
   getSharedFlowGardenSpacePanel,
   getSharedFlowGardenTts,
@@ -16,29 +15,25 @@ import { FlowGardenTTS } from './FlowGardenTTS';
 import { AgentCenterStateStore } from './AgentCenterStateStore';
 
 type InteractableLike = ScriptComponent & {
-  targetingMode?: number;
+  onTriggerStart?: { add: (cb: () => void) => void };
   onDragStart?: { add: (cb: () => void) => void };
   onDragEnd?: { add: (cb: () => void) => void };
-  onTriggerStart?: { add: (cb: () => void) => void };
   onTriggerEnd?: { add: (cb: () => void) => void };
+  onTriggerEndOutside?: { add: (cb: () => void) => void };
   onTriggerCanceled?: { add: (cb: () => void) => void };
   onInteractorTriggerStart?: { add: (cb: () => void) => void };
   onInteractorTriggerEnd?: { add: (cb: () => void) => void };
+  onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
   onInteractorTriggerCanceled?: { add: (cb: () => void) => void };
 };
 
-type InteractableManipulationLike = ScriptComponent & {
-  onManipulationStart?: { add: (cb: () => void) => void };
-  onManipulationEnd?: { add: (cb: () => void) => void };
-};
-
 /**
- * Cursor's companion avatar.
+ * Companion avatar for a Mac-hosted coding agent.
  *
- * Holding the blue buddy opens a dedicated microphone session. Releasing it
- * submits the transcript to the paired Mac bridge, where the request waits for
- * explicit approval before the safe preparation step. Provider credentials
- * never enter the Lens runtime.
+ * Holding the buddy starts a short speech capture, just like a Post-it note.
+ * Releasing it submits the captured transcript to the paired Mac bridge,
+ * where provider credentials stay outside the Lens. Global
+ * "ask Cursor/Claude to ..." commands are also supported.
  */
 @component
 export class CursorBuddy extends BaseScriptComponent {
@@ -87,19 +82,33 @@ export class CursorBuddy extends BaseScriptComponent {
   debugLogging: boolean = false;
 
   private ghost: ArvisGhostBlob | null = null;
-  private interactable: InteractableLike | null = null;
-  private manipulation: InteractableManipulationLike | null = null;
-  private grabInteractionBound = false;
+  private talkInteractionBound = false;
   private grabbing = false;
   private listening = false;
   private sending = false;
   private dependenciesLogged = false;
   private lastListeningTranscript = '';
+  private capturedTalkTranscript = '';
+  private talkListenerAttached = false;
+  private talkPostItCaptureOwned = false;
   private pollingSessionId = '';
   private pollingAttempts = 0;
   private pollEvent: DelayedCallbackEvent | null = null;
+  private talkStartPending = false;
+  private talkBusyFeedbackPending = false;
+  private talkCaptureEpoch = 0;
+  private talkStartDueAt = 0;
+  private talkUiPending = false;
+  private talkUiDueAt = 0;
+  private talkFinalizationPending = false;
+  private talkFinalizationAttempts = 0;
+  private talkFinalizationDueAt = 0;
+  private talkFinalizationEpoch = 0;
 
   private static readonly LISTENING_CUE = 'Listening…';
+  private static readonly TALK_START_DELAY_SEC = 0.05;
+  private static readonly TALK_FINALIZE_DELAY_SEC = 1.05;
+  private static readonly MAX_TALK_FINALIZATION_ATTEMPTS = 2;
   private static readonly POLL_INTERVAL_SEC = 2;
   private static readonly MAX_STATUS_POLLS = 930;
 
@@ -108,13 +117,51 @@ export class CursorBuddy extends BaseScriptComponent {
     this.createEvent('OnStartEvent').bind(() => {
       this.resolveDependencies();
       this.resolveGhost();
-      this.bindGrabInteraction();
+      this.bindTalkInteraction();
     });
 
     this.createEvent('UpdateEvent').bind(() => {
-      if (!this.grabInteractionBound) {
+      if (this.talkBusyFeedbackPending) {
+        this.talkBusyFeedbackPending = false;
+        if (this.grabbing && this.sending) {
+          this.showBubble(
+            'thinking',
+            '',
+            `${this.getBuddyName()} is still working on the last task.`
+          );
+        }
+      }
+      if (this.talkUiPending && getTime() >= this.talkUiDueAt) {
+        this.talkUiPending = false;
+        this.talkUiDueAt = 0;
+        if (this.grabbing && this.listening) {
+          this.setPhase('listening');
+          this.showBubble('listening', CursorBuddy.LISTENING_CUE, null);
+          this.setStatus(`${this.getBuddyName()} is listening — release to send`);
+        }
+      }
+      if (
+        this.talkStartPending &&
+        this.grabbing &&
+        getTime() >= this.talkStartDueAt
+      ) {
+        const epoch = this.talkCaptureEpoch;
+        this.talkStartPending = false;
+        if (epoch === this.talkCaptureEpoch) {
+          // Start outside SIK's native trigger callback.
+          print(`[CursorBuddy] ${this.getBuddyName()} deferred talk start`);
+          this.beginGrabTalk();
+        }
+      }
+      if (
+        this.talkFinalizationPending &&
+        getTime() >= this.talkFinalizationDueAt
+      ) {
+        this.finalizeTalkCapture(this.talkFinalizationEpoch);
+      }
+      if (!this.talkInteractionBound) {
         this.resolveGhost();
-        this.bindGrabInteraction();
+        this.bindTalkInteraction();
       }
       this.refreshListeningBubble();
     });
@@ -155,10 +202,28 @@ export class CursorBuddy extends BaseScriptComponent {
     return true;
   }
 
+  public requestCodingTask(prompt: string): boolean {
+    const cleaned = String(prompt || '').trim();
+    if (!cleaned || this.listening || this.sending) {
+      return false;
+    }
+    this.submitCodingTask(cleaned);
+    return true;
+  }
+
   onDestroy(): void {
+    this.talkCaptureEpoch++;
+    this.cancelTalkStart();
+    this.cancelTalkFinalization();
     this.cancelStatusPolling();
-    if (this.listening && !isNull(this.speechRecognition)) {
-      this.speechRecognition.cancelAgentSession();
+    this.removeTalkTranscriptListener();
+    if (this.talkPostItCaptureOwned && !isNull(this.speechRecognition)) {
+      try {
+        this.speechRecognition.endPostItCapture();
+      } catch (_error) {
+        // The shared speech component may already be tearing down.
+      }
+      this.talkPostItCaptureOwned = false;
     }
     this.listening = false;
     this.grabbing = false;
@@ -214,8 +279,8 @@ export class CursorBuddy extends BaseScriptComponent {
     }
   }
 
-  private bindGrabInteraction(): void {
-    if (this.grabInteractionBound) {
+  private bindTalkInteraction(): void {
+    if (this.talkInteractionBound) {
       return;
     }
 
@@ -223,85 +288,196 @@ export class CursorBuddy extends BaseScriptComponent {
     const interactable = root.getComponent(
       Interactable.getTypeName()
     ) as unknown as InteractableLike;
-    const manipulation = root.getComponent(
-      InteractableManipulation.getTypeName()
-    ) as unknown as InteractableManipulationLike;
 
     if (isNull(interactable)) {
       return;
     }
 
-    this.interactable = interactable;
-    this.manipulation = isNull(manipulation) ? null : manipulation;
+    const onTalkStart = (): void => this.onTalkStart();
+    const onTalkEnd = (): void => this.onTalkEnd();
+    const startEvent =
+      interactable.onInteractorTriggerStart ||
+      interactable.onTriggerStart ||
+      interactable.onDragStart;
+    let hasStart = false;
+    if (startEvent) {
+      startEvent.add(onTalkStart);
+      hasStart = true;
+    }
 
-    let bound = false;
-    const onGrabStart = (): void => this.onGrabStart();
-    const onGrabEnd = (): void => this.onGrabEnd();
-
-    if (!isNull(manipulation) && manipulation.onManipulationStart) {
-      manipulation.onManipulationStart.add(onGrabStart);
-      bound = true;
-      if (manipulation.onManipulationEnd) {
-        manipulation.onManipulationEnd.add(onGrabEnd);
-      }
-    } else {
-      if (interactable.onTriggerStart) {
-        interactable.onTriggerStart.add(onGrabStart);
-        bound = true;
-      }
-      if (interactable.onTriggerEnd) {
-        interactable.onTriggerEnd.add(onGrabEnd);
-      }
-      if (interactable.onTriggerCanceled) {
-        interactable.onTriggerCanceled.add(onGrabEnd);
+    // Match the Post-it capture pattern: choose one start source, but accept
+    // every possible end/cancel signal so a release outside the target cannot
+    // leave the microphone session open.
+    const endEvents = [
+      interactable.onInteractorTriggerEnd,
+      interactable.onInteractorTriggerEndOutside,
+      interactable.onTriggerEnd,
+      interactable.onTriggerEndOutside,
+      interactable.onDragEnd,
+      interactable.onTriggerCanceled,
+      interactable.onInteractorTriggerCanceled,
+    ];
+    let hasEnd = false;
+    for (let i = 0; i < endEvents.length; i++) {
+      const event = endEvents[i];
+      if (event) {
+        event.add(onTalkEnd);
+        hasEnd = true;
       }
     }
 
-    this.grabInteractionBound = bound;
-    if (this.debugLogging && bound) {
-      print('[CursorBuddy] grab-to-code interaction wired');
+    if (!hasStart || !hasEnd) {
+      if (this.debugLogging) {
+        print(`[CursorBuddy] ${this.getBuddyName()} talk events unavailable`);
+      }
+      return;
+    }
+
+    this.talkInteractionBound = true;
+    if (this.debugLogging) {
+      print(`[CursorBuddy] ${this.getBuddyName()} talk interaction wired`);
     }
   }
 
-  private onGrabStart(): void {
+  private onTalkStart(): void {
     if (this.grabbing) {
       return;
     }
+    if (this.talkFinalizationPending) {
+      return;
+    }
     this.grabbing = true;
+    print(`[CursorBuddy] ${this.getBuddyName()} talk start`);
 
     if (this.sending) {
-      this.showBubble('thinking', '', `${this.getBuddyName()} is still working on the last task.`);
+      this.talkBusyFeedbackPending = true;
       return;
     }
 
-    this.beginGrabTalk();
+    // Clear any stale global-voice utterance before the deferred capture
+    // starts, but never disturb another active owner of the shared microphone.
+    if (
+      !isNull(this.speechRecognition) &&
+      !this.speechRecognition.isAgentSessionActive() &&
+      !this.speechRecognition.isPostItCaptureActive()
+    ) {
+      this.speechRecognition.clearUtteranceState();
+    }
+    this.scheduleTalkStart();
   }
 
-  private onGrabEnd(): void {
+  private onTalkEnd(): void {
     if (!this.grabbing) {
       return;
     }
     this.grabbing = false;
+    this.talkBusyFeedbackPending = false;
+    print(`[CursorBuddy] ${this.getBuddyName()} talk end`);
 
-    if (!this.listening) {
+    if (this.sending || !this.listening) {
+      if (!this.listening) {
+        this.talkCaptureEpoch++;
+        this.cancelTalkStart();
+      }
       return;
     }
 
-    this.listening = false;
+    // ASR can deliver its last interim/final update just after the pinch is
+    // released. Keep the Post-it-style capture owned briefly so the global
+    // command router cannot consume that update, then finalize the latest
+    // transcript.
+    this.scheduleTalkFinalization();
+  }
+
+  private scheduleTalkStart(): void {
+    if (!this.grabbing || this.talkStartPending) {
+      return;
+    }
+
+    // Do not create events or start ASR from inside SIK's native trigger
+    // callback. UpdateEvent consumes this flag after the native interaction
+    // update has had time to complete.
+    this.talkCaptureEpoch++;
+    this.talkStartPending = true;
+    this.talkStartDueAt = getTime() + CursorBuddy.TALK_START_DELAY_SEC;
+  }
+
+  private scheduleTalkFinalization(): void {
+    if (this.talkFinalizationPending || !this.listening) {
+      return;
+    }
+
+    this.talkFinalizationPending = true;
+    this.talkFinalizationAttempts = 0;
+    this.scheduleTalkFinalizationAttempt();
+  }
+
+  private scheduleTalkFinalizationAttempt(): void {
+    if (!this.talkFinalizationPending || !this.listening) {
+      return;
+    }
+
+    this.talkFinalizationEpoch = this.talkCaptureEpoch;
+    this.talkFinalizationDueAt =
+      getTime() + CursorBuddy.TALK_FINALIZE_DELAY_SEC;
+  }
+
+  private finalizeTalkCapture(epoch: number): void {
+    if (
+      epoch !== this.talkCaptureEpoch ||
+      !this.talkFinalizationPending ||
+      !this.listening
+    ) {
+      return;
+    }
+
     this.resolveDependencies();
     if (isNull(this.speechRecognition)) {
+      this.talkFinalizationPending = false;
+      this.listening = false;
       this.finishError('', 'Speech recognition is unavailable.');
       return;
     }
 
-    const transcript = String(this.speechRecognition.endAgentSession() || '').trim();
+    const liveTranscript = String(
+      this.speechRecognition.getLiveTranscript() || ''
+    ).trim();
+    if (
+      !this.capturedTalkTranscript &&
+      !liveTranscript &&
+      this.talkFinalizationAttempts < CursorBuddy.MAX_TALK_FINALIZATION_ATTEMPTS
+    ) {
+      this.talkFinalizationAttempts++;
+      this.scheduleTalkFinalizationAttempt();
+      return;
+    }
+
+    this.talkFinalizationPending = false;
+    this.listening = false;
+    const transcript = String(
+      this.capturedTalkTranscript || liveTranscript
+    ).trim();
+    this.removeTalkTranscriptListener();
+    if (this.talkPostItCaptureOwned) {
+      try {
+        this.speechRecognition.endPostItCapture();
+      } catch (error) {
+        this.talkPostItCaptureOwned = false;
+        this.speechRecognition.clearUtteranceState();
+        this.finishError('', `Could not stop speech recognition: ${String(error)}`);
+        return;
+      }
+      this.talkPostItCaptureOwned = false;
+    }
     this.speechRecognition.clearUtteranceState();
     this.speechRecognition.markCommandHandled();
     this.speechRecognition.suppressVoiceCommandsFor(2.5);
     if (!transcript) {
-      this.showBubble('error', '', 'I did not catch a coding task. Hold me and try again.');
+      const retryMessage =
+        `I did not catch a coding task. Hold ${this.getBuddyName()} and try again.`;
+      this.showBubble('error', '', retryMessage);
       this.setPhase('error');
-      this.speak('I did not catch a coding task. Hold me and try again.');
+      this.speak(retryMessage);
       return;
     }
 
@@ -309,8 +485,12 @@ export class CursorBuddy extends BaseScriptComponent {
   }
 
   private beginGrabTalk(): void {
+    if (!this.grabbing) {
+      return;
+    }
     this.resolveDependencies();
     if (isNull(this.speechRecognition)) {
+      this.grabbing = false;
       this.finishError('', 'Speech recognition is unavailable.');
       return;
     }
@@ -325,25 +505,83 @@ export class CursorBuddy extends BaseScriptComponent {
         `Another voice session is active. Finish it, then hold ${this.getBuddyName()}.`
       );
       this.setPhase('error');
+      this.grabbing = false;
       return;
     }
 
-    this.listening = true;
-    this.lastListeningTranscript = CursorBuddy.LISTENING_CUE;
-    this.speechRecognition.clearUtteranceState();
-    this.speechRecognition.beginAgentSession();
-    this.setPhase('listening');
-    this.showBubble('listening', CursorBuddy.LISTENING_CUE, null);
-    this.setStatus(`${this.getBuddyName()} is listening — release to send`);
+    try {
+      this.cancelTalkFinalization();
+      this.listening = true;
+      this.capturedTalkTranscript = '';
+      this.lastListeningTranscript = CursorBuddy.LISTENING_CUE;
+      print(
+        `[CursorBuddy] ${this.getBuddyName()} starting post-it speech capture`
+      );
+      this.speechRecognition.addTranscriptListener(this.onTalkTranscript);
+      this.talkListenerAttached = true;
+      // Use the same shared capture mode as PostItNoteTranscript. This keeps
+      // the global voice router paused while the buddy is held and avoids
+      // changing the ASR session mode from a native SIK callback.
+      this.speechRecognition.beginPostItCapture();
+      this.talkPostItCaptureOwned = true;
+      this.speechRecognition.clearUtteranceState();
+      this.speechRecognition.requestListening();
+      print(`[CursorBuddy] ${this.getBuddyName()} speech capture started`);
+      this.talkUiPending = true;
+      this.talkUiDueAt = getTime() + CursorBuddy.TALK_START_DELAY_SEC;
+    } catch (error) {
+      this.removeTalkTranscriptListener();
+      if (this.talkPostItCaptureOwned) {
+        this.speechRecognition.endPostItCapture();
+        this.talkPostItCaptureOwned = false;
+      }
+      this.talkUiPending = false;
+      this.talkUiDueAt = 0;
+      this.listening = false;
+      this.grabbing = false;
+      this.finishError('', `Could not start speech recognition: ${String(error)}`);
+    }
+  }
+
+  private readonly onTalkTranscript = (
+    text: string,
+    _isFinal: boolean
+  ): void => {
+    if (!this.listening && !this.talkFinalizationPending) {
+      return;
+    }
+    const cleaned = String(text || '').trim();
+    if (!cleaned) {
+      return;
+    }
+    // Keep the raw display transcript. SpeechRecognition intentionally
+    // filters long non-wake final phrases for global commands, but a held
+    // coding buddy must submit the exact phrase the user spoke.
+    this.capturedTalkTranscript = cleaned;
+  };
+
+  private removeTalkTranscriptListener(): void {
+    if (!this.talkListenerAttached || isNull(this.speechRecognition)) {
+      this.talkListenerAttached = false;
+      return;
+    }
+    this.speechRecognition.removeTranscriptListener(this.onTalkTranscript);
+    this.talkListenerAttached = false;
   }
 
   private refreshListeningBubble(): void {
-    if (!this.listening || isNull(this.speechRecognition)) {
+    if (
+      !this.listening ||
+      this.talkUiPending ||
+      isNull(this.speechRecognition)
+    ) {
       return;
     }
 
     const display = String(
-      this.speechRecognition.getDisplayTranscript() || CursorBuddy.LISTENING_CUE
+      this.capturedTalkTranscript ||
+        this.speechRecognition.getDisplayTranscript() ||
+        CursorBuddy.LISTENING_CUE
     ).trim();
     if (!display || display === this.lastListeningTranscript) {
       return;
@@ -562,6 +800,18 @@ export class CursorBuddy extends BaseScriptComponent {
     this.pollingAttempts = 0;
   }
 
+  private cancelTalkFinalization(): void {
+    this.talkFinalizationPending = false;
+    this.talkFinalizationAttempts = 0;
+    this.talkFinalizationDueAt = 0;
+    this.talkFinalizationEpoch = 0;
+  }
+
+  private cancelTalkStart(): void {
+    this.talkStartPending = false;
+    this.talkStartDueAt = 0;
+  }
+
   private isSuccessStatus(status: string): boolean {
     return status === 'completed' || status === 'opened';
   }
@@ -646,10 +896,18 @@ export class CursorBuddy extends BaseScriptComponent {
   }
 
   private getBuddyName(): string {
+    const providerName = this.getProviderId() === 'claude_code' ? 'Claude' : 'Cursor';
     const configured = String(this.buddyName || '').trim();
-    if (configured) {
-      return configured;
+    const normalized = configured.toLowerCase();
+    if (
+      !configured ||
+      normalized === 'cursor' ||
+      normalized === 'claude' ||
+      normalized === 'claude code'
+    ) {
+      // Provider identity wins over stale duplicated-scene input values.
+      return providerName;
     }
-    return this.getProviderId() === 'claude_code' ? 'Claude' : 'Cursor';
+    return configured;
   }
 }

@@ -10,7 +10,7 @@ const MAX_TRASH_HANDLE_DISTANCE_CM = 12;
 @component
 export class GardenMoveHandleE2EHarness extends BaseScriptComponent {
   @input
-  runHarness: boolean = true;
+  runHarness: boolean = false;
 
   @input
   startupDelaySec: number = 1.5;

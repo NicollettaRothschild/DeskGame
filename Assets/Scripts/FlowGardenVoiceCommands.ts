@@ -38,6 +38,12 @@ type SpacePanelLike = {
   nextItem?: () => void;
   previousItem?: () => void;
   showAgentCenter?: (tab?: 'agents' | 'chats' | 'settings') => void;
+  getAgentCenterState?: () => {
+    provider: string;
+    repository: string;
+    model: string;
+  };
+  showAgentPairing?: (pairingUrl?: string, pairingCode?: string) => void;
   showAgentCenterDemo?: (summary?: string, detail?: string) => void;
   showAgentProviderSelection?: (providers: string[], selected?: string) => void;
   showAgentRepositorySelection?: (repositories: string[], selected?: string) => void;
@@ -324,11 +330,40 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
     }
 
     if (/\b(start|show|open)\s+demo\b/.test(normalized)) {
+      this.specsApi?.setExplicitDemoMode(true);
       panel.showAgentCenterDemo?.(
         'Cursor and Claude workflow',
-        'Choose a provider, repository, and model. Demo responses are simulated and never edit files.'
+        'Say “ask Cursor to inspect the repository” or “ask Claude to explain this project.” Responses are simulated and never edit files.'
       );
       this.setStatus('Agent Center Demo');
+      return true;
+    }
+
+    if (/\b(pair|connect)\s+(?:my\s+)?mac\b/.test(normalized)) {
+      this.specsApi?.setExplicitDemoMode(false);
+      const pairingCode = this.deviceRegistry?.getDeviceId() || '';
+      panel.showAgentPairing?.('https://arvis.space/specs/', pairingCode);
+      this.setStatus('Open arvis.space/specs and enter the pairing code');
+      return true;
+    }
+
+    const directAgentRequest = String(text || '').trim().match(
+      /\bask\s+(cursor|claude)(?:\s+code)?\s+(?:to\s+)?(.+)$/i
+    );
+    if (directAgentRequest && directAgentRequest[2]) {
+      const providerId =
+        directAgentRequest[1].toLowerCase() === 'claude'
+          ? 'claude_code'
+          : 'cursor_sdk';
+      const accepted =
+        getSharedCodingBuddy(providerId)?.requestCodingTask?.(
+          directAgentRequest[2].trim()
+        ) === true;
+      this.setStatus(
+        accepted
+          ? `Sent to ${providerId === 'claude_code' ? 'Claude' : 'Cursor'}`
+          : `${providerId === 'claude_code' ? 'Claude' : 'Cursor'} is busy or unavailable`
+      );
       return true;
     }
 
@@ -336,9 +371,9 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       /\b(?:use|select|ask)\s+(cursor|claude)(?:\s+code)?\b/
     );
     if (providerMatch) {
-      const provider = providerMatch[1] === 'claude' ? 'Claude Code' : 'Cursor';
-      panel.showAgentProviderSelection?.(['Cursor', 'Claude Code'], provider);
-      this.setStatus(`${provider} selected — hold that buddy to talk`);
+      const provider = providerMatch[1] === 'claude' ? 'Claude' : 'Cursor';
+      panel.showAgentProviderSelection?.(['Cursor', 'Claude'], provider);
+      this.setStatus(`${provider} selected — say “ask ${provider} to…”`);
       return true;
     }
 
@@ -363,6 +398,33 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
             )
           );
           this.setStatus(`${workspaces.length} approved repositories`);
+        }
+      );
+      return true;
+    }
+
+    if (/\b(show|list)\s+models\b/.test(normalized)) {
+      if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+        this.setStatus('Agent model service unavailable');
+        return true;
+      }
+      const state = panel.getAgentCenterState?.();
+      const providerId =
+        state?.provider === 'claude_code' ? 'claude_code' : 'cursor_sdk';
+      this.specsApi.fetchAgentModels(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        providerId,
+        (models, error) => {
+          if (models.length === 0) {
+            panel.showAgentModelSelection?.([]);
+            this.setStatus(error || 'No models available');
+            return;
+          }
+          panel.showAgentModelSelection?.(
+            models.map((model) => `${model.displayName} · ${model.id}`)
+          );
+          this.setStatus(`${models.length} models available`);
         }
       );
       return true;
@@ -400,6 +462,38 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
             selected.id
           );
           this.setStatus(`Repository selected: ${selected.repositoryName}`);
+        }
+      );
+      return true;
+    }
+
+    const modelMatch = normalized.match(/\b(?:use|select)\s+model\s+(.+)$/);
+    if (modelMatch && modelMatch[1]) {
+      const requestedModel = modelMatch[1].trim().toLowerCase();
+      if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+        this.setStatus('Agent model service unavailable');
+        return true;
+      }
+      const state = panel.getAgentCenterState?.();
+      const providerId =
+        state?.provider === 'claude_code' ? 'claude_code' : 'cursor_sdk';
+      this.specsApi.fetchAgentModels(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        providerId,
+        (models, error) => {
+          const selected = models.find((model) => {
+            return (
+              model.id.toLowerCase() === requestedModel ||
+              model.displayName.toLowerCase() === requestedModel
+            );
+          });
+          if (!selected) {
+            this.setStatus(error || `Model is not available: ${requestedModel}`);
+            return;
+          }
+          panel.showAgentModelSelection?.([selected.displayName], selected.id);
+          this.setStatus(`Model selected: ${selected.displayName}`);
         }
       );
       return true;

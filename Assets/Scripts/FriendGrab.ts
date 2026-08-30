@@ -444,8 +444,8 @@ export class FriendGrab extends BaseScriptComponent {
   announceLeaderboardRank: boolean = false;
 
   @input
-  @hint('Buddy follows the camera until manually placed; say "hey friend" to resume')
-  enableFollowAfterOnboarding: boolean = true;
+  @hint('Optional camera following. Disabled on Spectacles 2024 for stable, predictable placement.')
+  enableFollowAfterOnboarding: boolean = false;
 
   /** How far ahead of the user Buddy stays (cm, along look direction). */
   @input('float')
@@ -532,6 +532,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.ensureAnchorGrabComponents();
     this.createEvent('OnStartEvent').bind(() => {
       registerFriendGrab(this);
+      this.setFriendVisualState(true);
       this.captureIdleBasePosition();
       this.ensureFriendSounds();
       this.ensureSpeechBubble();
@@ -542,6 +543,10 @@ export class FriendGrab extends BaseScriptComponent {
       this.ensureGoalCompletionListening();
       this.startFollowingUser('always-on');
       this.scheduleOnboarding();
+      const startPosition = this.getSceneObject().getTransform().getWorldPosition();
+      print(
+        `[FriendGrab] yellow Buddy visible at {x:${startPosition.x.toFixed(1)}, y:${startPosition.y.toFixed(1)}, z:${startPosition.z.toFixed(1)}} follow=${this.enableFollowAfterOnboarding}`
+      );
       if (this.debugLogging) {
         print(
           `[FriendGrab] ready tts=${!isNull(this.resolveTts())} bubble=${this.enableSpeechBubble} lookAt=${this.enableLookAt} bob=${this.enableIdleBob} onboarding=${this.enableOnboarding} completed=${isFriendOnboardingCompletedInStorage()}`
@@ -966,11 +971,10 @@ export class FriendGrab extends BaseScriptComponent {
     if (!this.moveActive) {
       return;
     }
-    this.companionTalkActive =
-      !this.onboardingActive && this.beginCompanionGrabTalk();
-    // Keep the physical SFX, but never speak a grab quip. Grabbing is now the
-    // companion's hold-to-talk gesture, so "Whee!" would pollute the mic and
-    // can repeat when SIK reports more than one end/start event.
+    // Starting ASR while SIK owns an active manipulation crashes Lens Studio
+    // 5.15 on Spectacles. Keep physical grabs movement-only; normal voice
+    // commands remain available without holding Buddy.
+    this.companionTalkActive = false;
     this.playFriendSound(this.resolvedGrabTrack, this.grabSoundVolume, 'grab');
     if (this.debugLogging) {
       print(
@@ -3010,9 +3014,10 @@ export class FriendGrab extends BaseScriptComponent {
     if (isNull(forward)) {
       forward = new vec3(0, 0, -1);
     }
-    // Lens world forward is -Z; invert camera forward so Buddy stays in front of the user.
-    let fx = -forward.x;
-    let fz = -forward.z;
+    // Transform.forward already points toward the camera's viewing direction
+    // (-Z for an unrotated Lens camera). Negating it places Buddy behind the user.
+    let fx = forward.x;
+    let fz = forward.z;
     let flatLen = Math.sqrt(fx * fx + fz * fz);
     if (flatLen < 0.001) {
       fx = 0;

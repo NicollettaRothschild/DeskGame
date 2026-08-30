@@ -246,11 +246,14 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     }
     this.agentCenterState.tab = 'settings';
     this.agentCenterState.phase = 'pairing';
+    const code = !isNull(this.deviceRegistry)
+      ? this.deviceRegistry.getDeviceId()
+      : '';
     this.presentAgentCenter(
       'Agent Center · Welcome',
-      'Pair Mac at arvis.space/specs',
-      'Or say “start demo” for a credential-free preview. Demo never edits files.',
-      'Choose Pair Mac or Demo'
+      `Say “pair my Mac”${code ? `\nCode: ${code}` : ''}`,
+      'Or say “start demo”, then hold Cursor or Claude and speak. You can also say “ask Cursor to inspect the repository”. Demo never edits files.',
+      'Say “pair my Mac” or “start demo”'
     );
   }
 
@@ -317,6 +320,12 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.agentCenterState.phase = 'demo';
     this.agentCenterState.demoMode = true;
     this.agentCenterState.retryable = false;
+    this.agentCenterState.repository = 'demo-workspace';
+    this.agentCenterState.model = 'auto';
+    AgentCenterStateStore.setWorkspace('cursor_sdk', 'demo-workspace');
+    AgentCenterStateStore.setWorkspace('claude_code', 'demo-workspace');
+    AgentCenterStateStore.setModel('cursor_sdk', 'auto');
+    AgentCenterStateStore.setModel('claude_code', 'auto');
     this.presentAgentCenter(
       'Agent Center · DEMO',
       `DEMO — ${safeSummary}`,
@@ -1016,10 +1025,13 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
   private presentAgentSelection(kind: string, options: string[], selected: string): void {
     const list = options.length > 0 ? options.join('\n') : '(none available)';
+    const instruction = selected
+      ? list
+      : `Say “use ${kind.toLowerCase()} …”\n${list}`;
     this.presentAgentCenter(
       `Agent Center · ${kind}`,
       selected ? `Selected: ${selected}` : `Select a ${kind.toLowerCase()}`,
-      this.truncateBody(list),
+      this.truncateBody(instruction),
       selected ? `${kind} selected` : `Waiting for ${kind.toLowerCase()}`
     );
   }
@@ -1060,9 +1072,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       return 'Agent activity, approvals, and results appear here.';
     }
     if (tab === 'settings') {
-      return 'Choose a provider, repository, and model.';
+      return 'Say “use Cursor”, “show repositories”, and “show models”.';
     }
-    return 'Choose an agent or say “start demo”.';
+    return 'Hold Cursor or Claude and speak, or say “ask Cursor/Claude to …”.';
   }
 
   private formatAgentCenterConfiguration(): string {

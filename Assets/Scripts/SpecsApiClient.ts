@@ -199,9 +199,9 @@ export class SpecsApiClient extends BaseScriptComponent {
   @input
   editorStartPaired: boolean = false;
 
-  /** When live arvis.space rejects chat/TTS because the device is unpaired, answer via SpecsEditorMock in preview. */
+  /** Legacy preview-only fallback. Keep disabled in release scenes so live devices never receive simulated replies. */
   @input
-  useMockFallbackWhenUnpaired: boolean = true;
+  useMockFallbackWhenUnpaired: boolean = false;
 
   @input('float')
   editorAutoPairDelaySec: number = 12;
@@ -214,6 +214,7 @@ export class SpecsApiClient extends BaseScriptComponent {
   private editorAutoPairEvent: DelayedCallbackEvent | null = null;
   private editorAutoPairScheduled = false;
   private simulatedPlatformWarned = false;
+  private explicitDemoMode = false;
 
   onAwake(): void {
     registerSpecsApi(this);
@@ -306,10 +307,21 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   public isEditorMockActive(): boolean {
+    if (this.explicitDemoMode) {
+      return true;
+    }
     if (!this.useEditorMockWhenOffline) {
       return false;
     }
     return !this.isNetworkAvailable();
+  }
+
+  public setExplicitDemoMode(enabled: boolean): void {
+    this.explicitDemoMode = enabled === true;
+  }
+
+  public isExplicitDemoMode(): boolean {
+    return this.explicitDemoMode;
   }
 
   /** When true, editor mock registration auto-marks the device paired (offline preview only). */

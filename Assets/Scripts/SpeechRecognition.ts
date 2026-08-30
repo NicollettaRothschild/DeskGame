@@ -155,6 +155,8 @@ export class SpeechRecognition extends BaseScriptComponent {
   private asrModule: AsrModuleLike | null = null;
   private asrOptions: AsrTranscriptionOptions | null = null;
   private asrActive = false;
+  private asrStopPending = false;
+  private asrRestartAfterStop = false;
   private asrRestartPending = false;
 
   private lastCommandTime = 0;
@@ -181,6 +183,7 @@ export class SpeechRecognition extends BaseScriptComponent {
   private lastAsrErrorLogAt = -Infinity;
   private lastVoiceMlErrorLogAt = -Infinity;
   private resumeAfterTts = false;
+  private shuttingDown = false;
 
   onAwake(): void {
     if (this.startupDisabled) {
@@ -200,6 +203,7 @@ export class SpeechRecognition extends BaseScriptComponent {
     registerSpeechRecognition(this);
 
     this.createEvent('OnDestroyEvent').bind(() => {
+      this.shuttingDown = true;
       this.resumeAfterTts = false;
       this.stopListeningNow();
       const current = (global as unknown as Record<string, unknown>)[GLOBAL_SPEECH_OWNER];
@@ -378,7 +382,14 @@ export class SpeechRecognition extends BaseScriptComponent {
   }
 
   private startAsrIfNeeded(): void {
-    if (!this.asrModule || !this.asrOptions || this.asrActive) {
+    if (this.shuttingDown || !this.asrModule || !this.asrOptions) {
+      return;
+    }
+    if (this.asrStopPending) {
+      this.asrRestartAfterStop = true;
+      return;
+    }
+    if (this.asrActive) {
       return;
     }
 
@@ -422,11 +433,11 @@ export class SpeechRecognition extends BaseScriptComponent {
     if (!this.asrModule || !this.asrActive) {
       return;
     }
+    this.asrRestartAfterStop = false;
+
+    let stopResult: Promise<void> | void;
     try {
-      const result = this.asrModule.stopTranscribing();
-      if (result && typeof (result as Promise<void>).then === 'function') {
-        (result as Promise<void>).catch(() => {});
-      }
+      stopResult = this.asrModule.stopTranscribing();
     } catch (e) {
       if (this.debugLogging) {
         print('[SpeechRecognition] ASR stopTranscribing failed: ' + e);
@@ -434,6 +445,26 @@ export class SpeechRecognition extends BaseScriptComponent {
     }
     this.asrActive = false;
     this.isListening = false;
+
+    if (!stopResult || typeof stopResult.then !== 'function') {
+      return;
+    }
+
+    this.asrStopPending = true;
+    const finishStop = (): void => {
+      this.asrStopPending = false;
+      const shouldRestart =
+        !this.shuttingDown &&
+        (this.asrRestartAfterStop ||
+          this.agentSessionActive ||
+          this.autoStartListening ||
+          this.postItCaptureDepth > 0);
+      this.asrRestartAfterStop = false;
+      if (shouldRestart) {
+        this.startAsrIfNeeded();
+      }
+    };
+    (stopResult as Promise<void>).then(finishStop).catch(finishStop);
   }
 
   public clearFinalTranscript(): void {

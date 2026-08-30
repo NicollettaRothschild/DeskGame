@@ -46,7 +46,7 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - runHarness: true
+    - runHarness: false
       startupDelaySec: !<float> 2.000000
       runOnce: true
       goalText: I want to walk 20 meters

@@ -23,6 +23,7 @@ export type FriendGrabLike = {
 
 export type CodingBuddyLike = {
   cancelCurrentSession?: () => boolean;
+  requestCodingTask?: (prompt: string) => boolean;
 };
 
 export function registerCodingBuddy(

@@ -15,21 +15,43 @@ import {
 
 export type ArvisGhostPhase = 'idle' | 'listening' | 'thinking' | 'reply' | 'error';
 
+type InteractorLike = {
+  activeTargetingMode?: number;
+  startPoint?: vec3 | null;
+  direction?: vec3 | null;
+  distanceToTarget?: number | null;
+  targetHitPosition?: vec3 | null;
+  isActive?: () => boolean;
+};
+
+type InteractorEventLike = {
+  interactor?: InteractorLike | null;
+};
+
+type InteractableEventLike = {
+  add: (cb: (event?: InteractorEventLike) => void) => void;
+};
+
 type InteractableLike = ScriptComponent & {
   targetingMode?: number;
   ignoreInteractionPlane?: boolean;
   keepHoverOnTrigger?: boolean;
   enableInstantDrag?: boolean;
-  onDragStart?: { add: (cb: () => void) => void };
-  onDragEnd?: { add: (cb: () => void) => void };
-  onTriggerStart?: { add: (cb: () => void) => void };
-  onTriggerEnd?: { add: (cb: () => void) => void };
-  onTriggerEndOutside?: { add: (cb: () => void) => void };
-  onInteractorTriggerStart?: { add: (cb: () => void) => void };
-  onInteractorTriggerEnd?: { add: (cb: () => void) => void };
-  onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
-  onHoverEnter?: { add: (cb: () => void) => void };
-  onInteractorHoverEnter?: { add: (cb: () => void) => void };
+  onDragStart?: InteractableEventLike;
+  onDragUpdate?: InteractableEventLike;
+  onDragEnd?: InteractableEventLike;
+  onTriggerStart?: InteractableEventLike;
+  onTriggerUpdate?: InteractableEventLike;
+  onTriggerEnd?: InteractableEventLike;
+  onTriggerEndOutside?: InteractableEventLike;
+  onTriggerCanceled?: InteractableEventLike;
+  onInteractorTriggerStart?: InteractableEventLike;
+  onInteractorTriggerUpdate?: InteractableEventLike;
+  onInteractorTriggerEnd?: InteractableEventLike;
+  onInteractorTriggerEndOutside?: InteractableEventLike;
+  onInteractorTriggerCanceled?: InteractableEventLike;
+  onHoverEnter?: InteractableEventLike;
+  onInteractorHoverEnter?: InteractableEventLike;
 };
 
 type InteractableManipulationLike = ScriptComponent & {
@@ -176,6 +198,9 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private lastEyePulse = 1;
   private moveInteractionWired = false;
   private moveActive = false;
+  private moveInteractionEpoch = 0;
+  private manualMoveInteractor: InteractorLike | null = null;
+  private manualMoveRayDistance = 0;
   private moveBindAttempts = 0;
   private talkBindAttempts = 0;
   private talkTapDownTime = 0;
@@ -243,6 +268,10 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   onDestroy(): void {
+    this.moveInteractionEpoch++;
+    this.moveActive = false;
+    this.manualMoveInteractor = null;
+    this.manualMoveRayDistance = 0;
     if (!isNull(this.companionNameTag)) {
       this.companionNameTag.dispose();
       this.companionNameTag = null;
@@ -392,14 +421,22 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       return;
     }
 
-    this.material = template.clone();
-    this.usingWaterMaterial = this.isWaterLikeMaterial(template);
-    if (this.usingWaterMaterial) {
-      this.configureWaterGhostMaterial(this.material);
-      print('[ArvisGhostBlob] material applied from water template');
+    const deviceSafeTemplate = this.resolveDeviceSafeMaterialTemplate();
+    if (this.shouldUseDeviceSafeMaterial() && !isNull(deviceSafeTemplate)) {
+      this.material = deviceSafeTemplate.clone();
+      this.usingWaterMaterial = false;
+      this.configureDeviceSafeAccentMaterial(this.material);
+      print('[ArvisGhostBlob] device-safe accent material applied');
     } else {
-      this.applyFallbackGhostMaterial(this.material);
-      print('[ArvisGhostBlob] material applied from fallback template');
+      this.material = template.clone();
+      this.usingWaterMaterial = this.isWaterLikeMaterial(template);
+      if (this.usingWaterMaterial) {
+        this.configureWaterGhostMaterial(this.material);
+        print('[ArvisGhostBlob] material applied from water template');
+      } else {
+        this.applyFallbackGhostMaterial(this.material);
+        print('[ArvisGhostBlob] material applied from fallback template');
+      }
     }
 
     this.ghostVisual.mainMaterial = this.material;
@@ -637,6 +674,37 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     return null;
   }
 
+  private resolveDeviceSafeMaterialTemplate(): Material | null {
+    try {
+      return requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material;
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  private shouldUseDeviceSafeMaterial(): boolean {
+    try {
+      return (
+        !global.deviceInfoSystem.isEditor() &&
+        global.deviceInfoSystem.isSpectacles() &&
+        !this.registerAsSharedArvis
+      );
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  private configureDeviceSafeAccentMaterial(material: Material): void {
+    const pass = material.mainPass;
+    pass.depthWrite = false;
+    if (typeof pass.depthTest !== 'undefined') {
+      pass.depthTest = true;
+    }
+    if (typeof pass.blendMode !== 'undefined') {
+      pass.blendMode = BlendMode.PremultipliedAlphaAuto;
+    }
+  }
+
   private isWaterLikeMaterial(material: Material): boolean {
     const pass = material.mainPass as unknown as Record<string, unknown>;
     return pass['scrollSpeed'] !== undefined || pass['opacityTextureA'] !== undefined;
@@ -734,7 +802,6 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
   private wireMoveInteraction(): void {
     if (this.moveInteractionWired) {
-      this.refreshGrabCollider();
       return;
     }
 
@@ -749,52 +816,29 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     retryEvent.bind(() => {
       if (!this.moveInteractionWired) {
         this.tryWireMoveInteraction();
-      } else {
-        this.refreshGrabCollider();
       }
     });
     retryEvent.reset(delaySec);
   }
 
-  private ensureAnchorGrabComponents(): void {
+  private ensureAnchorGrabComponents(): boolean {
     const anchor = this.sceneObject;
-    this.refreshGrabCollider();
-
-    let interactable = this.grabInteractable;
-    if (isNull(interactable)) {
-      interactable = this.findExistingInteractable(anchor);
-    }
-    if (isNull(interactable)) {
-      interactable = anchor.createComponent(Interactable.getTypeName()) as InteractableLike;
-    }
-
-    let manipulation = this.grabManipulation;
-    if (isNull(manipulation)) {
-      manipulation = this.findExistingManipulation(anchor);
-    }
-    if (isNull(manipulation)) {
-      manipulation = anchor.createComponent(
-        InteractableManipulation.getTypeName()
-      ) as unknown as InteractableManipulationLike;
+    const interactable =
+      this.grabInteractable || this.findExistingInteractable(anchor);
+    const manipulation =
+      this.grabManipulation || this.findExistingManipulation(anchor);
+    const collider =
+      this.grabCollider ||
+      (anchor.getComponent('Physics.ColliderComponent') as ColliderComponent) ||
+      (anchor.getComponent('Component.ColliderComponent') as ColliderComponent);
+    if (isNull(interactable) || isNull(manipulation) || isNull(collider)) {
+      return false;
     }
 
-    // InteractableManipulation does not support Poke targeting. Hold-to-talk
-    // still works through direct/indirect pinch events on the same target.
-    (interactable as ScriptComponent).enabled = false;
-    (manipulation as ScriptComponent).enabled = false;
-    interactable.targetingMode = 3;
-    interactable.ignoreInteractionPlane = true;
-    interactable.keepHoverOnTrigger = true;
-    interactable.enableInstantDrag = true;
-
-    manipulation.manipulateRootSceneObject = anchor;
-    manipulation.enableTranslation = true;
-    manipulation.enableRotation = false;
-    manipulation.enableScale = false;
-    manipulation.useFilter = false;
-
+    this.grabCollider = collider;
     this.grabInteractable = interactable;
     this.grabManipulation = manipulation;
+    return true;
   }
 
   private findExistingInteractable(root: SceneObject): InteractableLike | null {
@@ -839,7 +883,17 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       return;
     }
 
-    this.ensureAnchorGrabComponents();
+    if (!this.ensureAnchorGrabComponents()) {
+      this.moveBindAttempts++;
+      if (this.moveBindAttempts >= 30) {
+        print('[ArvisGhostBlob] authored grab components missing on anchor');
+        return;
+      }
+      const retryEvent = this.createEvent('DelayedCallbackEvent');
+      retryEvent.bind(() => this.tryWireMoveInteraction());
+      retryEvent.reset(0.1);
+      return;
+    }
     const interactable = this.grabInteractable;
     const manipulation = this.grabManipulation;
     if (isNull(interactable) || isNull(manipulation)) {
@@ -855,8 +909,15 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       return;
     }
 
-    this.refreshGrabCollider();
-    this.bindManipulationRoot(manipulation, this.sceneObject);
+    if (!(manipulation as ScriptComponent).enabled) {
+      // Coding buddies keep the native manipulation component disabled for
+      // Specs stability. Move them with the same trigger/update pattern as
+      // PostItNoteTranscript instead of mixing ASR with native manipulation.
+      this.bindTriggerMoveInteraction(interactable);
+      this.moveInteractionWired = true;
+      this.bindGhostTalkInteraction(interactable);
+      return;
+    }
 
     const onGrabStart = (): void => {
       this.onGhostGrabStart();
@@ -865,31 +926,25 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       this.onGhostGrabRelease();
     };
 
-    if (manipulation.onManipulationStart) {
+    const hasManipulationEvents = !!manipulation.onManipulationStart;
+    if (hasManipulationEvents) {
       manipulation.onManipulationStart.add(onGrabStart);
-    }
-    if (manipulation.onManipulationEnd) {
-      manipulation.onManipulationEnd.add(onGrabRelease);
-    }
-
-    if (interactable.onDragStart) {
-      interactable.onDragStart.add(onGrabStart);
-    }
-
-    if (interactable.onDragEnd) {
-      interactable.onDragEnd.add(onGrabRelease);
-    }
-    if (interactable.onTriggerEnd) {
-      interactable.onTriggerEnd.add(onGrabRelease);
-    }
-    if (interactable.onTriggerEndOutside) {
-      interactable.onTriggerEndOutside.add(onGrabRelease);
-    }
-    if (interactable.onInteractorTriggerEnd) {
-      interactable.onInteractorTriggerEnd.add(onGrabRelease);
-    }
-    if (interactable.onInteractorTriggerEndOutside) {
-      interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
+      if (manipulation.onManipulationEnd) {
+        manipulation.onManipulationEnd.add(onGrabRelease);
+      }
+    } else {
+      if (interactable.onDragStart) {
+        interactable.onDragStart.add(onGrabStart);
+      }
+      if (interactable.onDragEnd) {
+        interactable.onDragEnd.add(onGrabRelease);
+      }
+      if (interactable.onTriggerEnd) {
+        interactable.onTriggerEnd.add(onGrabRelease);
+      }
+      if (interactable.onTriggerEndOutside) {
+        interactable.onTriggerEndOutside.add(onGrabRelease);
+      }
     }
 
     if (this.debugLogging) {
@@ -901,15 +956,138 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       }
     }
 
-    (manipulation as ScriptComponent).enabled = true;
-    (interactable as ScriptComponent).enabled = true;
-
     this.moveInteractionWired = true;
     this.bindGhostTalkInteraction(interactable);
 
     if (this.debugLogging) {
       print('[ArvisGhostBlob] grab interaction wired on anchor');
     }
+  }
+
+  private bindTriggerMoveInteraction(interactable: InteractableLike): void {
+    const start =
+      interactable.onInteractorTriggerStart ||
+      interactable.onTriggerStart ||
+      interactable.onDragStart;
+    const update =
+      interactable.onTriggerUpdate ||
+      interactable.onDragUpdate ||
+      interactable.onInteractorTriggerUpdate;
+
+    if (start) {
+      start.add((event?: InteractorEventLike) => {
+        this.onTriggerMoveStart(event);
+      });
+    }
+    if (update) {
+      update.add((event?: InteractorEventLike) => {
+        this.onTriggerMoveUpdate(event);
+      });
+    }
+
+    const endEvents = [
+      interactable.onInteractorTriggerEnd,
+      interactable.onInteractorTriggerEndOutside,
+      interactable.onTriggerEnd,
+      interactable.onTriggerEndOutside,
+      interactable.onDragEnd,
+      interactable.onTriggerCanceled,
+      interactable.onInteractorTriggerCanceled,
+    ];
+    for (let i = 0; i < endEvents.length; i++) {
+      const event = endEvents[i];
+      if (event) {
+        event.add(() => this.onGhostGrabRelease());
+      }
+    }
+
+    if (this.debugLogging) {
+      print(
+        `[ArvisGhostBlob] trigger move wired start=${!!start} update=${!!update}`
+      );
+    }
+  }
+
+  private onTriggerMoveStart(event?: InteractorEventLike): void {
+    if (this.moveActive) {
+      return;
+    }
+
+    const interactor = event && event.interactor ? event.interactor : null;
+    this.manualMoveInteractor = interactor;
+    this.manualMoveRayDistance = this.getTriggerMoveDistance(interactor);
+    this.onGhostGrabStart();
+    this.updateTriggerMovePosition();
+  }
+
+  private onTriggerMoveUpdate(event?: InteractorEventLike): void {
+    if (!this.moveActive) {
+      return;
+    }
+    if (event && event.interactor) {
+      this.manualMoveInteractor = event.interactor;
+    }
+    this.updateTriggerMovePosition();
+  }
+
+  private updateTriggerMovePosition(): void {
+    if (!this.moveActive) {
+      return;
+    }
+
+    const interactor = this.manualMoveInteractor;
+    if (
+      interactor &&
+      typeof interactor.isActive === 'function' &&
+      !interactor.isActive()
+    ) {
+      this.onGhostGrabRelease();
+      return;
+    }
+
+    const position = this.getTriggerMovePosition(
+      interactor,
+      this.manualMoveRayDistance
+    );
+    if (!isNull(position)) {
+      this.sceneObject.getTransform().setWorldPosition(position);
+    }
+  }
+
+  private getTriggerMoveDistance(interactor: InteractorLike | null): number {
+    if (
+      interactor &&
+      interactor.distanceToTarget !== null &&
+      interactor.distanceToTarget !== undefined
+    ) {
+      return Math.max(0, interactor.distanceToTarget);
+    }
+    return 35;
+  }
+
+  private getTriggerMovePosition(
+    interactor: InteractorLike | null,
+    rayDistance: number
+  ): vec3 | null {
+    if (interactor) {
+      const startPoint = interactor.startPoint || null;
+      const direction = interactor.direction || null;
+      const targetHitPosition = interactor.targetHitPosition || null;
+
+      if (interactor.activeTargetingMode === 1 && startPoint) {
+        return startPoint;
+      }
+      if (startPoint && direction) {
+        return startPoint.add(direction.uniformScale(rayDistance));
+      }
+      if (targetHitPosition) {
+        return targetHitPosition;
+      }
+      if (startPoint) {
+        return startPoint;
+      }
+    }
+    return this.sceneObject.getTransform().getWorldPosition();
   }
 
   private bindGhostTalkInteraction(interactable: InteractableLike): void {
@@ -970,12 +1148,6 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     this.setPhase('listening');
   }
 
-  private getGrabColliderSize(): vec3 {
-    // Collider lives on the scaled anchor, so keep local size near the unit mesh bounds.
-    const padding = 1.08;
-    return new vec3(padding, padding, padding);
-  }
-
   private refreshGrabCollider(): void {
     this.ensureAnchorGrabCollider(this.sceneObject);
   }
@@ -987,38 +1159,8 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       if (isNull(collider)) {
         collider = anchor.getComponent('Component.ColliderComponent') as ColliderComponent;
       }
-      if (isNull(collider)) {
-        collider = anchor.createComponent('Physics.ColliderComponent') as ColliderComponent;
-      }
-      if (isNull(collider)) {
-        collider = anchor.createComponent('Component.ColliderComponent') as ColliderComponent;
-      }
       this.grabCollider = collider;
     }
-    if (isNull(collider)) {
-      return null;
-    }
-
-    const colliderLike = collider as unknown as {
-      enabled?: boolean;
-      intangible?: boolean;
-      forceCompound?: boolean;
-      fitVisual?: boolean;
-      debugDrawEnabled?: boolean;
-      shape?: { size?: vec3; radius?: number; FitVisual?: boolean };
-    };
-
-    colliderLike.enabled = true;
-    colliderLike.intangible = false;
-    colliderLike.forceCompound = false;
-    colliderLike.fitVisual = false;
-    colliderLike.debugDrawEnabled = false;
-
-    const size = this.getGrabColliderSize();
-    const shape = Shape.createBoxShape();
-    shape.size = size;
-    colliderLike.shape = shape;
-
     return collider;
   }
 
@@ -1054,9 +1196,19 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
 
     this.moveActive = true;
-    this.refreshGhostColor();
-    this.applyMaterialColor(1);
-    this.playArvisSound(this.resolvedGrabTrack, this.grabSoundVolume, 'grab');
+    const epoch = ++this.moveInteractionEpoch;
+    this.setLookAtActive(false);
+    this.setLookAtEnabled(false);
+    const deferredStart = this.createEvent('DelayedCallbackEvent') as DelayedCallbackEvent;
+    deferredStart.bind(() => {
+      if (!this.moveActive || epoch !== this.moveInteractionEpoch) {
+        return;
+      }
+      this.refreshGhostColor();
+      this.applyMaterialColor(1);
+      this.playArvisSound(this.resolvedGrabTrack, this.grabSoundVolume, 'grab');
+    });
+    deferredStart.reset(0.05);
   }
 
   private onGhostGrabRelease(): void {
@@ -1065,6 +1217,9 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
 
     this.moveActive = false;
+    this.moveInteractionEpoch++;
+    this.manualMoveInteractor = null;
+    this.manualMoveRayDistance = 0;
     this.refreshGhostColor();
     this.applyMaterialColor(1);
     this.captureCurrentAnchorPosition();
@@ -1266,10 +1421,11 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
 
     if (typeof pass.baseColor !== 'undefined') {
+      const rgbScale = this.usingWaterMaterial ? alpha : 1;
       pass.baseColor = new vec4(
-        tint.x * alpha,
-        tint.y * alpha,
-        tint.z * alpha,
+        tint.x * rgbScale,
+        tint.y * rgbScale,
+        tint.z * rgbScale,
         alpha
       );
     }
@@ -1339,6 +1495,10 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private tick(): void {
     if (isNull(this.baseLocalPosition)) {
       return;
+    }
+
+    if (this.moveActive && !isNull(this.manualMoveInteractor)) {
+      this.updateTriggerMovePosition();
     }
 
     const motion = this.ensureMotionRoot();
@@ -1425,6 +1585,11 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private updateLookAt(): void {
     if (!this.enableLookAt) {
       this.setLookAtActive(false);
+      return;
+    }
+    if (this.moveActive) {
+      this.setLookAtActive(false);
+      this.setLookAtEnabled(false);
       return;
     }
 

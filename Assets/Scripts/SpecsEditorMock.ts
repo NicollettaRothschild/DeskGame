@@ -856,7 +856,7 @@ export class SpecsEditorMock {
     return String(value || '')
       .replace(/(?:\/Users|\/home|[A-Za-z]:\\)[^\s"'<>]+/g, '[local path hidden]')
       .replace(
-        /\b(?:secret|token|password|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
+        /\b(secret|token|password|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
         '$1=[hidden]'
       )
       .replace(/\s+/g, ' ')
