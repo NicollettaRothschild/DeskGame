@@ -28,12 +28,12 @@ export function formatSpecsPairingText3D(
   const code = String(deviceId || 'SPEC-????').trim() || 'SPEC-????';
   if (options?.editorMock) {
     if (paired) {
-      return `Editor mock paired\n${code}\nDeploy to Specs for web pairing`;
+      return code;
     }
     return `Editor preview\n${code}\nWebsite pairing needs Specs`;
   }
   if (paired) {
-    return `Paired\n${code}`;
+    return code;
   }
   return `Go to ${SPECS_PAIRING_URL}\n${code}`;
 }

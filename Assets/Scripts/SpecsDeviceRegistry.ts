@@ -126,13 +126,15 @@ export class SpecsDeviceRegistry extends BaseScriptComponent {
     }
 
     if (!isNull(this.statusText)) {
-      let pairHint = this.paired ? 'paired' : SPECS_PAIRING_URL;
-      if (editorMock) {
-        pairHint = this.paired
-          ? 'editor mock paired (not on arvis.space)'
-          : 'editor preview — deploy to Specs to register';
+      if (this.paired) {
+        this.statusText.text = `Specs ID: ${displayId}`;
+      } else {
+        let pairHint = SPECS_PAIRING_URL;
+        if (editorMock) {
+          pairHint = 'editor preview — deploy to Specs to register';
+        }
+        this.statusText.text = `Specs ID: ${displayId}\n${pairHint}`;
       }
-      this.statusText.text = `Specs ID: ${displayId}\n${pairHint}`;
     }
 
     if (this.debugLogging) {

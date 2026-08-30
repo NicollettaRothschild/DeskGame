@@ -8,6 +8,7 @@ import {
 } from '../Assets/Scripts/ArvisEmailDraftIntent';
 import { SpecsEditorMock } from '../Assets/Scripts/SpecsEditorMock';
 import { AgentCenterStateStore } from '../Assets/Scripts/AgentCenterStateStore';
+import { formatSpecsPairingText3D } from '../Assets/Scripts/SpecsPairingDisplay';
 
 type MockStorageData = Record<string, string | boolean>;
 const mockStorageData: MockStorageData = {};
@@ -58,6 +59,8 @@ assert.equal(
   'Visual Studio Code'
 );
 assert.equal(parseArvisMacOpenAppIntent('open Safari'), null);
+assert.equal(formatSpecsPairingText3D('SPEC-TEST', true), 'SPEC-TEST');
+assert.match(formatSpecsPairingText3D('SPEC-TEST', false), /arvis\.space/);
 
 SpecsEditorMock.clearPaired();
 SpecsEditorMock.markPaired();

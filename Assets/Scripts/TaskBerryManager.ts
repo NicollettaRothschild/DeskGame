@@ -210,10 +210,15 @@ export class TaskBerryManager extends BaseScriptComponent {
 
   private registerDevice(): void {
     const deviceId = this.deviceRegistry.getDeviceId();
+    const wasAlreadyPaired = this.deviceRegistry.isPaired();
     const mockHint = this.specsApi.isEditorMockActive()
       ? '\n(Editor preview — device is NOT on arvis.space; deploy to Specs to pair on website)'
       : '';
-    this.setStatus(`Pair at arvis.space/specs\nDevice: ${deviceId}${mockHint}`);
+    this.setStatus(
+      wasAlreadyPaired
+        ? ''
+        : `Pair at arvis.space/specs\nDevice: ${deviceId}${mockHint}`
+    );
 
     this.specsApi.registerDevice(deviceId, (registration, error) => {
       if (!registration) {
@@ -232,7 +237,7 @@ export class TaskBerryManager extends BaseScriptComponent {
       );
 
       if (registration.paired) {
-        this.onPaired();
+        this.onPaired(null, !wasAlreadyPaired);
         return;
       }
 
@@ -270,14 +275,15 @@ export class TaskBerryManager extends BaseScriptComponent {
         }
 
         if (status.paired) {
+          const wasAlreadyPaired = this.deviceRegistry.isPaired();
           this.deviceRegistry.setPaired(true);
-          this.onPaired(status.userEmail || null);
+          this.onPaired(status.userEmail || null, !wasAlreadyPaired);
           return;
         }
 
         this.deviceRegistry.syncPairingFromStorage();
         if (this.deviceRegistry.isPaired()) {
-          this.onPaired(null);
+          this.onPaired(null, false);
           return;
         }
 
@@ -286,9 +292,9 @@ export class TaskBerryManager extends BaseScriptComponent {
     );
   }
 
-  private onPaired(userEmail: string | null = null): void {
+  private onPaired(userEmail: string | null = null, announce = true): void {
     const emailHint = userEmail ? `\n${userEmail}` : '';
-    this.setStatus(`Paired${emailHint}`);
+    this.setStatus(announce ? `Connected${emailHint}` : '');
     this.notifySpacePanelPaired();
     this.syncTasks();
     this.scheduleTaskPoll();

@@ -296,19 +296,15 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.showAgentPairing(pairingUrl, pairingCode);
   }
 
-  public showAgentPaired(accountLabel?: string): void {
-    const label = String(accountLabel || '').trim();
+  public showAgentPaired(_accountLabel?: string): void {
     this.agentCenterState.tab = 'settings';
     this.agentCenterState.phase = 'idle';
     this.agentCenterState.paired = true;
     this.agentCenterState.demoMode = false;
     this.agentCenterState.retryable = false;
-    this.presentAgentCenter(
-      'Agent Center · Paired',
-      label ? `Connected as ${label}` : 'Connected',
-      this.formatAgentCenterConfiguration(),
-      'Ready'
-    );
+    // A returning device already knows its pairing state. Open the normal
+    // agent view instead of flashing a redundant “Paired” confirmation.
+    this.showAgentCenter('agents');
   }
 
   public showAgentDemo(summary?: string, detail?: string): void {
