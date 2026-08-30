@@ -198,10 +198,18 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       return;
     }
 
+    // Keep interaction disabled while changing the serialized component from
+    // any stale Poke mode to the supported direct/indirect pinch path.
+    (interactable as ScriptComponent).enabled = false;
+    (manipulation as ScriptComponent).enabled = false;
     this.bindManipulationRoot(manipulation, sourceRoot);
     manipulation.enableTranslation = true;
     manipulation.enableRotation = true;
     manipulation.enableScale = false;
+    // Configure targeting before enabling either SIK component. Enabling an
+    // Interactable first leaves its serialized Poke mode active for one frame.
+    interactable.targetingMode = 3;
+    interactable.ignoreInteractionPlane = true;
     const manipulationLike = manipulation as ScriptComponent & {
       useFilter?: boolean;
       onManipulationStart?: { add: (cb: (arg: unknown) => void) => void };
@@ -214,8 +222,6 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     this.handleManipulation = manipulation;
     // Collider before enabling Interactable — trash needs independent (non-compound) collider.
     this.configureHandleCollider(handle);
-    (manipulation as ScriptComponent).enabled = true;
-    (interactable as ScriptComponent).enabled = true;
 
     if (manipulationLike.onManipulationStart) {
       manipulationLike.onManipulationStart.add(() => {
@@ -285,9 +291,8 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       interactable.onInteractorTriggerEndOutside.add(onRelease);
     }
 
-    interactable.targetingMode = 7;
-    interactable.ignoreInteractionPlane = true;
-
+    (manipulation as ScriptComponent).enabled = true;
+    (interactable as ScriptComponent).enabled = true;
     this.sourceSpawner = this.findSourceSpawner(sourceRoot);
     this.wireContainerHover(sourceRoot);
     this.wireHandleHover(interactable, sourceRoot);

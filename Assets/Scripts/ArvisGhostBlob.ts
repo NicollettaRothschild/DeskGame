@@ -197,6 +197,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private lookAtLoggedSetup = false;
   private lastLookAtInvalidTargetLogAt = -9999;
   private nextLookAtRetryAt = 0;
+  private nextCameraLookupAt = 0;
 
   private static readonly EYE_SQUASH_SMOOTH_SPEED = 14.0;
   private static readonly DEFAULT_WATER_SCROLL_SPEED = 2.2;
@@ -245,6 +246,14 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     if (!isNull(this.companionNameTag)) {
       this.companionNameTag.dispose();
       this.companionNameTag = null;
+    }
+    if (!isNull(this.lookAtTargetProxy)) {
+      try {
+        this.lookAtTargetProxy.destroy();
+      } catch (_e) {
+        // The scene may already be tearing down during a hot reimport.
+      }
+      this.lookAtTargetProxy = null;
     }
   }
 
@@ -769,7 +778,11 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       ) as unknown as InteractableManipulationLike;
     }
 
-    interactable.targetingMode = this.enablePinchToTalk ? 7 : 3;
+    // InteractableManipulation does not support Poke targeting. Hold-to-talk
+    // still works through direct/indirect pinch events on the same target.
+    (interactable as ScriptComponent).enabled = false;
+    (manipulation as ScriptComponent).enabled = false;
+    interactable.targetingMode = 3;
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
     interactable.enableInstantDrag = true;
@@ -1441,7 +1454,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
     if (this.lookAtAlwaysActive && !this.moveActive) {
       this.setLookAtActive(true);
-      lookAt.enabled = true;
+      this.setLookAtEnabled(true);
       return;
     }
 
@@ -1472,40 +1485,36 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       if (distanceCm > exitCm) {
         this.setLookAtActive(false);
       } else {
-        lookAt.enabled = true;
+        this.setLookAtEnabled(true);
       }
     } else if (distanceCm <= enterCm) {
       this.setLookAtActive(true);
     } else {
-      lookAt.enabled = false;
+      this.setLookAtEnabled(false);
     }
   }
 
   private setLookAtActive(active: boolean): void {
     if (this.lookAtActive === active) {
-      if (!isNull(this.lookAt)) {
-        const lookAt = this.lookAt as LookAtComponent;
-        lookAt.enabled = active;
-      }
       return;
     }
 
     this.lookAtActive = active;
     if (active) {
-      if (!isNull(this.lookAt)) {
-        const lookAt = this.lookAt as LookAtComponent;
-        lookAt.enabled = true;
-      }
+      this.setLookAtEnabled(true);
       print('[ArvisGhostBlob] look-at ON');
       return;
     }
 
     // Keep the last facing direction when proximity look-at turns off.
-    if (!isNull(this.lookAt)) {
-      const lookAt = this.lookAt as LookAtComponent;
-      lookAt.enabled = false;
-    }
+    this.setLookAtEnabled(false);
     print('[ArvisGhostBlob] look-at OFF');
+  }
+
+  private setLookAtEnabled(enabled: boolean): void {
+    if (!isNull(this.lookAt) && this.lookAt.enabled !== enabled) {
+      this.lookAt.enabled = enabled;
+    }
   }
 
   private findCameraObject(): SceneObject | null {
@@ -1518,6 +1527,24 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
     const fallback = this.findObjectWithCameraComponent();
     return this.isUsableCameraObject(fallback) ? fallback : null;
+  }
+
+  private resolveCameraObject(forceSearch: boolean = false): SceneObject | null {
+    const now = getTime();
+    if (!forceSearch && this.isValidSceneObject(this.lookAtCamera)) {
+      return this.lookAtCamera;
+    }
+    if (!forceSearch && now < this.nextCameraLookupAt) {
+      return null;
+    }
+
+    const camera = this.findCameraObject();
+    this.nextCameraLookupAt = now + (isNull(camera) ? 1.0 : 5.0);
+    if (this.isValidSceneObject(camera)) {
+      this.lookAtCamera = camera;
+      return camera;
+    }
+    return null;
   }
 
   private ensureLookAtTargetProxy(): SceneObject | null {
@@ -1552,10 +1579,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
     const targetProxy = proxy as SceneObject;
 
-    const preferred = this.findCameraObject();
-    if (this.isValidSceneObject(preferred)) {
-      this.lookAtCamera = preferred;
-    }
+    this.resolveCameraObject();
 
     if (this.isValidSceneObject(this.lookAtCamera)) {
       const camera = this.lookAtCamera as SceneObject;
@@ -1565,6 +1589,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
         return;
       } catch (_e) {
         this.lookAtCamera = null;
+        this.nextCameraLookupAt = getTime() + 0.5;
       }
     }
 

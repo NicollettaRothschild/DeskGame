@@ -27,7 +27,7 @@ const TRASH_BIN_SCALE_MULTIPLIER = 2.0;
 const GARDEN_SPAWN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'PostItNotes'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAMES = GARDEN_SPAWN_SOURCE_NAMES.concat(['palette']);
 /** Desk props that already have grab scripts — persist/reparent like garden sources. */
-const DESK_PROP_NAMES = ['palette', 'Clock', 'Leaderboard'];
+const DESK_PROP_NAMES = ['palette', 'Clock'];
 const GARDEN_SOURCE_MOVE_HANDLE_NAME = 'MoveHandle';
 const TRASH_BIN_SOURCE_NAME = 'TrashBin';
 const GARDEN_MOVE_HANDLE_REFERENCE_SOURCE = 'Water Source';
@@ -106,6 +106,7 @@ const ANCHOR_BIND_TIMEOUT_SEC = 12;
 const PLANT_LIFECYCLE_SAVE_VERSION = 4;
 const OBJECT_KIND_PLANT = 'plant';
 const OBJECT_KIND_POT = 'pot';
+const OBJECT_KIND_STICKY_NOTE = 'sticky_note';
 const WORLD_PREVIEW_FALLBACK_SEC = 1;
 const ANCHOR_SCAN_REMINDER_SEC = 3;
 // Plant collider is 300 units tall, centered on root, with 0.1 scale → 15 cm to desk contact.
@@ -274,6 +275,7 @@ export class AnchorController extends BaseScriptComponent {
   private objs: SceneObject[] = [];
   private objectKinds: string[] = [];
   private objectPrefabIndices: number[] = [];
+  private stickyNotePrefab: ObjectPrefab | null = null;
   private currentAnchor?: Anchor;
   private floatingRoot?: SceneObject;
   private hasRestored = false;
@@ -1372,6 +1374,51 @@ export class AnchorController extends BaseScriptComponent {
     this.applyPlantConfig(obj, config);
     this.persistPlantTransforms();
     return obj;
+  }
+
+  public setStickyNotePrefab(prefab: ObjectPrefab): void {
+    if (!isNull(prefab)) {
+      this.stickyNotePrefab = prefab;
+    }
+  }
+
+  public registerStickyNoteObject(noteRoot: SceneObject, prefab: ObjectPrefab): boolean {
+    if (isNull(noteRoot) || isNull(prefab)) {
+      return false;
+    }
+
+    this.stickyNotePrefab = prefab;
+    if (this.findTrackedObjectIndex(noteRoot) >= 0) {
+      return true;
+    }
+
+    const index = this.wrappers.length;
+    const transform = noteRoot.getTransform();
+    const worldPos = transform.getWorldPosition();
+    const worldRot = transform.getWorldRotation();
+    const worldScale = transform.getWorldScale();
+    const wrapper = global.scene.createSceneObject(`StickyNote_${index}`);
+    wrapper.setParent(this.getSpawnParent());
+    wrapper.getTransform().setWorldPosition(worldPos);
+    wrapper.getTransform().setWorldRotation(worldRot);
+    wrapper.getTransform().setWorldScale(vec3.one());
+
+    noteRoot.setParent(wrapper);
+    transform.setWorldPosition(worldPos);
+    transform.setWorldRotation(worldRot);
+    transform.setWorldScale(worldScale);
+
+    this.wrappers.push(wrapper);
+    this.objs.push(noteRoot);
+    this.objectKinds.push(OBJECT_KIND_STICKY_NOTE);
+    this.objectPrefabIndices.push(-1);
+    this.enforceTrackedObjectManipulationSettings(noteRoot, wrapper);
+    this.wireTrashReleaseTracking(noteRoot, wrapper);
+
+    const store = global.persistentStorageSystem.store;
+    store.putInt('widget_count', this.wrappers.length);
+    this.persistPlantTransforms();
+    return true;
   }
 
   /**
@@ -4665,6 +4712,12 @@ export class AnchorController extends BaseScriptComponent {
     );
     store.putInt(`w${storageSlot}_prefab`, this.objectPrefabIndices[memoryIndex]);
     this.persistPlantState(store, storageSlot, obj);
+    this.persistStickyNoteState(
+      store,
+      storageSlot,
+      obj,
+      this.objectKinds[memoryIndex] || OBJECT_KIND_PLANT
+    );
 
     if (!silent) {
       print(
@@ -4678,7 +4731,7 @@ export class AnchorController extends BaseScriptComponent {
     const objectKind = store.has(`w${index}_object_kind`)
       ? store.getString(`w${index}_object_kind`)
       : OBJECT_KIND_PLANT;
-    if (objectKind === OBJECT_KIND_POT) {
+    if (objectKind === OBJECT_KIND_POT || objectKind === OBJECT_KIND_STICKY_NOTE) {
       return true;
     }
 
@@ -4691,7 +4744,7 @@ export class AnchorController extends BaseScriptComponent {
     }
 
     const objectKind = this.objectKinds[index] || OBJECT_KIND_PLANT;
-    if (objectKind === OBJECT_KIND_POT) {
+    if (objectKind === OBJECT_KIND_POT || objectKind === OBJECT_KIND_STICKY_NOTE) {
       return true;
     }
 
@@ -4820,6 +4873,7 @@ export class AnchorController extends BaseScriptComponent {
     const floatKeys = [
       'plant_baby_remaining',
       'plant_growth_elapsed',
+      'plant_walked_meters',
       'plant_base_y',
       'plant_align_cx',
       'plant_align_cz',
@@ -4869,6 +4923,14 @@ export class AnchorController extends BaseScriptComponent {
       store.putString(targetPendingGoalKey, store.getString(sourcePendingGoalKey));
     } else {
       store.remove(targetPendingGoalKey);
+    }
+
+    const sourceNoteTextKey = `w${fromIndex}_note_text`;
+    const targetNoteTextKey = `w${toIndex}_note_text`;
+    if (store.has(sourceNoteTextKey)) {
+      store.putString(targetNoteTextKey, store.getString(sourceNoteTextKey));
+    } else {
+      store.remove(targetNoteTextKey);
     }
   }
 
@@ -4945,6 +5007,9 @@ export class AnchorController extends BaseScriptComponent {
     if (store.has(`w${index}_pot_pending_goal`)) {
       snapshot.strings.pot_pending_goal = store.getString(`w${index}_pot_pending_goal`);
     }
+    if (store.has(`w${index}_note_text`)) {
+      snapshot.strings.note_text = store.getString(`w${index}_note_text`);
+    }
 
     return snapshot;
   }
@@ -4980,6 +5045,9 @@ export class AnchorController extends BaseScriptComponent {
     }
     if (snapshot.strings.pot_pending_goal !== undefined) {
       store.putString(`w${index}_pot_pending_goal`, snapshot.strings.pot_pending_goal);
+    }
+    if (snapshot.strings.note_text !== undefined) {
+      store.putString(`w${index}_note_text`, snapshot.strings.note_text);
     }
   }
 
@@ -5130,18 +5198,22 @@ export class AnchorController extends BaseScriptComponent {
       }
 
       const wrapper = global.scene.createSceneObject(
-        objectKind === OBJECT_KIND_POT ? `Pot_${i}` : `Plant_${i}`
+        objectKind === OBJECT_KIND_POT
+          ? `Pot_${i}`
+          : objectKind === OBJECT_KIND_STICKY_NOTE
+            ? `StickyNote_${i}`
+            : `Plant_${i}`
       );
       wrapper.setParent(this.getSpawnParent());
-      wrapper
-        .getTransform()
-        .setLocalScale(
-          new vec3(
-            GLOBAL_OBJECT_SCALE_MULTIPLIER,
-            GLOBAL_OBJECT_SCALE_MULTIPLIER,
-            GLOBAL_OBJECT_SCALE_MULTIPLIER
-          )
-        );
+      const wrapperScale =
+        objectKind === OBJECT_KIND_STICKY_NOTE
+          ? vec3.one()
+          : new vec3(
+              GLOBAL_OBJECT_SCALE_MULTIPLIER,
+              GLOBAL_OBJECT_SCALE_MULTIPLIER,
+              GLOBAL_OBJECT_SCALE_MULTIPLIER
+            );
+      wrapper.getTransform().setLocalScale(wrapperScale);
 
       let obj: SceneObject;
       try {
@@ -5151,7 +5223,12 @@ export class AnchorController extends BaseScriptComponent {
         wrapper.destroy();
         continue;
       }
-      obj.name = objectKind === OBJECT_KIND_POT ? `PotContent_${i}` : `PlantContent_${i}`;
+      obj.name =
+        objectKind === OBJECT_KIND_POT
+          ? `PotContent_${i}`
+          : objectKind === OBJECT_KIND_STICKY_NOTE
+            ? `StickyNoteContent_${i}`
+            : `PlantContent_${i}`;
 
       if (useWorldSpace) {
         const worldPos = new vec3(
@@ -5196,6 +5273,7 @@ export class AnchorController extends BaseScriptComponent {
 
       this.wirePotPersistence(obj);
       this.restorePlantState(store, i, obj);
+      this.restoreStickyNoteState(store, i, obj, objectKind);
       this.wirePlantLifecycle(obj);
       this.wireTrashReleaseTracking(obj, wrapper);
       restoredCount++;
@@ -5339,6 +5417,48 @@ export class AnchorController extends BaseScriptComponent {
     restoreControlsEvent.reset(0.2);
   }
 
+  private persistStickyNoteState(
+    store: GeneralDataStore,
+    index: number,
+    obj: SceneObject,
+    objectKind: string
+  ): void {
+    if (objectKind !== OBJECT_KIND_STICKY_NOTE) {
+      store.remove(`w${index}_note_text`);
+      return;
+    }
+
+    const transcript = this.findStickyNoteTranscript(obj);
+    const noteText =
+      !isNull(transcript) && typeof transcript.getNoteText === 'function'
+        ? String(transcript.getNoteText() || '')
+        : '';
+    if (noteText) {
+      store.putString(`w${index}_note_text`, noteText);
+    } else {
+      store.remove(`w${index}_note_text`);
+    }
+  }
+
+  private restoreStickyNoteState(
+    store: GeneralDataStore,
+    index: number,
+    obj: SceneObject,
+    objectKind: string
+  ): void {
+    if (
+      objectKind !== OBJECT_KIND_STICKY_NOTE ||
+      !store.has(`w${index}_note_text`)
+    ) {
+      return;
+    }
+
+    const transcript = this.findStickyNoteTranscript(obj);
+    if (!isNull(transcript) && typeof transcript.setNoteText === 'function') {
+      transcript.setNoteText(store.getString(`w${index}_note_text`));
+    }
+  }
+
   private persistPlantState(store: GeneralDataStore, index: number, obj: SceneObject) {
     const pot = this.findPotScript(obj);
     const pendingGoal =
@@ -5366,6 +5486,7 @@ export class AnchorController extends BaseScriptComponent {
     store.putInt(`w${index}_plant_stage`, state.stage);
     store.putFloat(`w${index}_plant_baby_remaining`, state.babyTimerRemaining);
     store.putFloat(`w${index}_plant_growth_elapsed`, state.growthElapsed);
+    store.putFloat(`w${index}_plant_walked_meters`, state.walkedMeters ?? 0);
     store.putBool(`w${index}_plant_watered`, state.hasBeenWatered);
     store.putBool(`w${index}_plant_planted`, state.isPlanted);
     if (state.isPlanted) {
@@ -5493,6 +5614,9 @@ export class AnchorController extends BaseScriptComponent {
       growthElapsed: store.has(`w${index}_plant_growth_elapsed`)
         ? store.getFloat(`w${index}_plant_growth_elapsed`)
         : 0,
+      walkedMeters: store.has(`w${index}_plant_walked_meters`)
+        ? store.getFloat(`w${index}_plant_walked_meters`)
+        : undefined,
       hasBeenWatered:
         store.has(`w${index}_plant_watered`) && store.getBool(`w${index}_plant_watered`),
       isPlanted: isPlanted,
@@ -5555,6 +5679,7 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_stage`);
     store.remove(`w${index}_plant_baby_remaining`);
     store.remove(`w${index}_plant_growth_elapsed`);
+    store.remove(`w${index}_plant_walked_meters`);
     store.remove(`w${index}_plant_watered`);
     store.remove(`w${index}_plant_planted`);
     store.remove(`w${index}_plant_wrw`);
@@ -5572,6 +5697,7 @@ export class AnchorController extends BaseScriptComponent {
     store.remove(`w${index}_plant_goal_required`);
     store.remove(`w${index}_plant_goal_done`);
     store.remove(`w${index}_pot_pending_goal`);
+    store.remove(`w${index}_note_text`);
   }
 
   private getActivePlantConfigs(): PlantSpawnConfig[] {
@@ -5798,6 +5924,10 @@ export class AnchorController extends BaseScriptComponent {
       return null as unknown as ObjectPrefab;
     }
 
+    if (objectKind === OBJECT_KIND_STICKY_NOTE) {
+      return this.stickyNotePrefab as ObjectPrefab;
+    }
+
     return this.plantPrefab;
   }
 
@@ -5830,6 +5960,40 @@ export class AnchorController extends BaseScriptComponent {
       current = current.getParent();
     }
     return false;
+  }
+
+  private findStickyNoteTranscript(root: SceneObject): {
+    getNoteText?: () => string;
+    setNoteText?: (value: string) => void;
+  } | null {
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+
+      const scripts = current.getComponents('Component.ScriptComponent');
+      for (let i = 0; i < scripts.length; i++) {
+        const candidate = scripts[i] as unknown as {
+          getNoteText?: () => string;
+          setNoteText?: (value: string) => void;
+        };
+        if (
+          !isNull(candidate) &&
+          (typeof candidate.getNoteText === 'function' ||
+            typeof candidate.setNoteText === 'function')
+        ) {
+          return candidate;
+        }
+      }
+
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
   }
 
   private findPotScript(root: SceneObject): {

@@ -13,6 +13,7 @@ export type PlantLifecycleSaveState = {
   stage: number;
   babyTimerRemaining: number;
   growthElapsed: number;
+  walkedMeters?: number;
   hasBeenWatered: boolean;
   isPlanted: boolean;
   plantedWorldRotation?: quat | null;
@@ -86,6 +87,8 @@ export class PlantLifecycle extends BaseScriptComponent {
   private currentStage: PlantStage = PlantStage.Seed;
   private babyTimerRemaining = 0;
   private growthElapsed = 0;
+  private growthPersistenceElapsed = 0;
+  private lastPersistedGrowthElapsed = 0;
   private seedInstance: SceneObject | null = null;
   private babyInstance: SceneObject | null = null;
   private adultInstance: SceneObject | null = null;
@@ -109,6 +112,7 @@ export class PlantLifecycle extends BaseScriptComponent {
   private seedWaterScaleOutStartScale: vec3 | null = null;
   private static readonly DEFAULT_CONTAINER_WORLD_SCALE = 0.1;
   private static readonly GROWTH_SIZE_DIVISOR = 3;
+  private static readonly GROWTH_PERSIST_INTERVAL_SECONDS = 5;
   /** Goal plants pause ~60% grown until the player finishes the goal. */
   private static readonly GOAL_GROWTH_CAP_RATIO = 0.6;
   /** Goal labels are compact world-space tags positioned below the planter. */
@@ -815,6 +819,7 @@ export class PlantLifecycle extends BaseScriptComponent {
       stage: this.currentStage,
       babyTimerRemaining: this.babyTimerRemaining,
       growthElapsed: this.growthElapsed,
+      walkedMeters: this.walkedMeters,
       hasBeenWatered: this.hasBeenWatered,
       isPlanted: this.isPlanted,
       goalText: this.goalText,
@@ -856,6 +861,8 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.hasBeenWatered = state.hasBeenWatered;
     this.babyTimerRemaining = Math.max(0, state.babyTimerRemaining);
     this.growthElapsed = Math.max(0, state.growthElapsed);
+    this.growthPersistenceElapsed = 0;
+    this.lastPersistedGrowthElapsed = this.growthElapsed;
     this.currentStage = this.normalizeStage(state.stage);
     this.isPlanted = state.isPlanted;
     this.goalText = String(state.goalText || '').trim();
@@ -864,7 +871,8 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.walkGoalMeters = this.requiresGoalCompletion
       ? PlantLifecycle.parseWalkGoalMeters(this.goalText)
       : 0;
-    this.walkedMeters = 0;
+    this.walkedMeters =
+      typeof state.walkedMeters === 'number' ? Math.max(0, state.walkedMeters) : 0;
     this.walkTrackingActive =
       this.requiresGoalCompletion && !this.goalCompleted && this.walkGoalMeters > 0;
     if (this.walkTrackingActive) {
@@ -934,7 +942,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     }
 
     if (this.currentStage === PlantStage.Growing) {
-      this.growthElapsed += getDeltaTime();
+      const deltaTime = getDeltaTime();
+      this.growthElapsed += deltaTime;
+      this.growthPersistenceElapsed += deltaTime;
 
       if (this.requiresGoalCompletion && !this.goalCompleted) {
         const cap = Math.max(0.5, this.growthTime * PlantLifecycle.GOAL_GROWTH_CAP_RATIO);
@@ -942,6 +952,7 @@ export class PlantLifecycle extends BaseScriptComponent {
           this.growthElapsed = cap;
         }
         this.applyGrowthScale();
+        this.persistGrowthProgressIfDue();
         return;
       }
 
@@ -949,8 +960,26 @@ export class PlantLifecycle extends BaseScriptComponent {
 
       if (this.growthTime <= 0 || this.growthElapsed >= this.growthTime) {
         this.finishGrowthToAdult();
+        return;
       }
+      this.persistGrowthProgressIfDue();
     }
+  }
+
+  private persistGrowthProgressIfDue(): void {
+    if (
+      this.growthPersistenceElapsed < PlantLifecycle.GROWTH_PERSIST_INTERVAL_SECONDS
+    ) {
+      return;
+    }
+
+    this.growthPersistenceElapsed = 0;
+    if (this.growthElapsed <= this.lastPersistedGrowthElapsed + 0.001) {
+      return;
+    }
+
+    this.lastPersistedGrowthElapsed = this.growthElapsed;
+    this.notifyAnchorStateChanged();
   }
 
   private finishGrowthToAdult(): void {
@@ -1015,6 +1044,8 @@ export class PlantLifecycle extends BaseScriptComponent {
   private startGrowth(): void {
     this.currentStage = PlantStage.Growing;
     this.growthElapsed = 0;
+    this.growthPersistenceElapsed = 0;
+    this.lastPersistedGrowthElapsed = 0;
     this.showAdultAtGrowthScale();
     this.notifyAnchorStateChanged();
     playInteractionSound((sounds) => sounds.playGrowthStart());

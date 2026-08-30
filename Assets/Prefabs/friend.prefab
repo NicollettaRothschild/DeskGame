@@ -354,7 +354,6 @@
     grabSoundVolume: true
     releaseSoundVolume: true
     enableGrabSounds: true
-    enablePetReaction: true
     petSoundTrack: true
     petReactionCooldownSec: true
     petPokeColliderSize: true
@@ -382,6 +381,7 @@
     onboardingClock: true
     onboardingClockLine: true
     onboardingPalette: true
+    onboardingIncludePalette: true
     onboardingPaletteLine: true
     onboardingPlanter: true
     onboardingPlanterLine: true
@@ -391,6 +391,7 @@
     onboardingTrashLine: true
     onboardingLeaderboard: true
     onboardingLeaderboardLine: true
+    enableLeaderboardPanel: true
     onboardingGoalPromptLine: true
     onboardingGoalSeedLine: true
     onboardingGoalListenTimeoutSec: true
@@ -439,7 +440,7 @@
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
-      enablePetReaction: true
+      enablePetReaction: false
       petSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       petReactionCooldownSec: 2.500000
       petPokeColliderSize: !<Vec3> {x: 3.400000, y: 4.200000, z: 3.400000}
@@ -471,6 +472,7 @@
       onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
       onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingIncludePalette: false
       onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
       onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
@@ -480,6 +482,7 @@
       onboardingTrashLine: "Here's the trash. Drop things into it to clean up."
       onboardingLeaderboard: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
+      enableLeaderboardPanel: false
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
       onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
@@ -649,6 +652,101 @@
       BlendMode: Additive
       ScaleMode: Multiply
       PlaybackMode: Loop
+- !<ColliderComponent/a1b2c3d4-e5f6-4789-a012-000000000201>
+  PrefabRemaps:
+    []
+  Name: Buddy Grab Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 1.500000, y: 2.200000, z: 1.500000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<ScriptComponent/a1b2c3d4-e5f6-4789-a012-000000000202>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    isScrollable: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: true
+      keepHoverOnTrigger: true
+      enableInstantDrag: true
+      isScrollable: false
+      allowMultipleInteractors: false
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: true
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/a1b2c3d4-e5f6-4789-a012-000000000203>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: true
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> fe380c20-2825-4760-986d-dc5b1a31a186
+      enableTranslation: true
+      enableRotation: false
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: false
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: false
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
 - !<RenderMeshVisual/a5a99346-39c7-46a1-b4c6-d0b0a1abc1db>
   PrefabRemaps:
     []
@@ -917,3 +1015,6 @@
     - !<own> 22023803-e2e9-48f1-a28a-03e56f251242
   Components:
     - !<own> 81f01e5b-60d1-4f18-8bae-ea3cac06637f
+    - !<own> a1b2c3d4-e5f6-4789-a012-000000000201
+    - !<own> a1b2c3d4-e5f6-4789-a012-000000000202
+    - !<own> a1b2c3d4-e5f6-4789-a012-000000000203

@@ -92,6 +92,12 @@ export class PostItNoteTranscript extends BaseScriptComponent {
     return this.noteText;
   }
 
+  public setNoteText(value: string): void {
+    const cleaned = this.truncate(String(value || '').trim());
+    this.noteText = cleaned;
+    this.writeText(this.formatDisplayText(cleaned));
+  }
+
   private setCapturing(active: boolean): void {
     if (active) {
       if (!this.capturing) {

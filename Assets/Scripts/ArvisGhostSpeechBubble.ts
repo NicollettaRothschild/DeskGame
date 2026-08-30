@@ -418,6 +418,7 @@ export class ArvisGhostSpeechBubble {
 
   private setVisible(visible: boolean): void {
     this.visible = visible;
+    CompanionNameTag.setSpeechBubbleVisible(this.host, visible);
     if (!isNull(this.bubbleRoot)) {
       this.bubbleRoot.enabled = visible;
     }
@@ -509,6 +510,7 @@ export class CompanionNameTag {
   private readonly showWhenMultiple: boolean;
   private readonly debugLogging: boolean;
   private name: string;
+  private speechBubbleVisible = false;
   private tagRoot: SceneObject | null = null;
   private tagText: Text3D | null = null;
   private tagBackground: RenderMeshVisual | null = null;
@@ -589,6 +591,19 @@ export class CompanionNameTag {
       const shouldShow = tag.showWhenMultiple ? activeCount > 1 : activeCount > 0;
       tag.setVisible(shouldShow);
     }
+  }
+
+  public static setSpeechBubbleVisible(
+    host: BaseScriptComponent,
+    visible: boolean
+  ): void {
+    for (let i = 0; i < CompanionNameTag.instances.length; i++) {
+      const tag = CompanionNameTag.instances[i];
+      if (tag.host === host) {
+        tag.speechBubbleVisible = visible;
+      }
+    }
+    CompanionNameTag.refreshVisibility();
   }
 
   private ensureBuilt(): void {
@@ -711,12 +726,19 @@ export class CompanionNameTag {
   }
 
   private setVisible(visible: boolean): void {
-    if (this.debugLogging && this.lastVisibleState !== visible) {
-      print(`[CompanionNameTag] "${this.name}" ${visible ? 'visible' : 'hidden'}`);
+    const shouldEnable =
+      visible &&
+      !this.speechBubbleVisible &&
+      this.isCompanionEnabled() &&
+      !!this.name;
+    if (this.debugLogging && this.lastVisibleState !== shouldEnable) {
+      print(
+        `[CompanionNameTag] "${this.name}" ${shouldEnable ? 'visible' : 'hidden'}`
+      );
     }
-    this.lastVisibleState = visible;
+    this.lastVisibleState = shouldEnable;
     if (!isNull(this.tagRoot)) {
-      this.tagRoot.enabled = visible && this.isCompanionEnabled() && !!this.name;
+      this.tagRoot.enabled = shouldEnable;
     }
   }
 

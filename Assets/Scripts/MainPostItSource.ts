@@ -42,6 +42,8 @@ type InteractableLike = ScriptComponent & {
 };
 
 type AnchorNoteSpawner = {
+  setStickyNotePrefab?: (prefab: ObjectPrefab) => void;
+  registerStickyNoteObject?: (noteRoot: SceneObject, prefab: ObjectPrefab) => boolean;
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
   syncTrackedWrapperToContent?: (content: SceneObject) => void;
@@ -144,6 +146,7 @@ export class MainPostItSource extends BaseScriptComponent {
   private sharedSpeech: SpeechRecognition | null = null;
 
   onAwake(): void {
+    this.provideStickyNotePrefab();
     this.createEvent('OnStartEvent').bind(() => {
       this.ensureLayeredStackVisual();
       this.ensureSourceGrabCollider();
@@ -356,6 +359,7 @@ export class MainPostItSource extends BaseScriptComponent {
       return null;
     }
 
+    this.provideStickyNotePrefab();
     const parent = this.getSpawnParent();
     const noteObject = this.notePrefab.instantiate(parent);
     this.noteSerial += 1;
@@ -532,6 +536,9 @@ export class MainPostItSource extends BaseScriptComponent {
     const anchorSpawner = this.getAnchorNoteSpawner();
     if (!isNull(anchorSpawner)) {
       const spawner = anchorSpawner as AnchorNoteSpawner;
+      if (typeof spawner.registerStickyNoteObject === 'function') {
+        spawner.registerStickyNoteObject(releasedNote, this.notePrefab);
+      }
       const worldPos = releasedNote.getTransform().getWorldPosition();
       if (typeof spawner.placeTrackedContentAtWorld === 'function') {
         spawner.placeTrackedContentAtWorld(releasedNote, worldPos);
@@ -609,8 +616,31 @@ export class MainPostItSource extends BaseScriptComponent {
     }
     const noteRef = noteObject;
     const done = this.createEvent('DelayedCallbackEvent');
-    done.bind(() => this.endNoteTranscriptCapture(noteRef));
+    done.bind(() => {
+      this.endNoteTranscriptCapture(noteRef);
+      const anchorSpawner = this.getAnchorNoteSpawner();
+      if (
+        !isNull(anchorSpawner) &&
+        typeof (anchorSpawner as AnchorNoteSpawner).saveObjectPosition === 'function'
+      ) {
+        (anchorSpawner as AnchorNoteSpawner).saveObjectPosition!();
+      }
+    });
     done.reset(delaySec);
+  }
+
+  private provideStickyNotePrefab(): void {
+    if (isNull(this.notePrefab)) {
+      return;
+    }
+
+    const anchorSpawner = this.getAnchorNoteSpawner();
+    if (
+      !isNull(anchorSpawner) &&
+      typeof (anchorSpawner as AnchorNoteSpawner).setStickyNotePrefab === 'function'
+    ) {
+      (anchorSpawner as AnchorNoteSpawner).setStickyNotePrefab!(this.notePrefab);
+    }
   }
 
   private findNoteTranscript(noteObject: SceneObject): NoteTranscriptLike | null {

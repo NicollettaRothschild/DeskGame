@@ -125,7 +125,15 @@ export class ClockGrab extends BaseScriptComponent {
       ) as unknown as InteractableManipulationLike;
     }
 
-    interactable.targetingMode = 7;
+    // Do not let SIK initialize a newly-created or stale serialized Poke
+    // target before the supported pinch configuration is ready.
+    (interactable as ScriptComponent).enabled = false;
+    (manipulation as ScriptComponent).enabled = false;
+
+    // Poke targeting is incompatible with InteractableManipulation. Keep
+    // Clock on the same direct/indirect pinch path as the other movable
+    // companions and anchors.
+    interactable.targetingMode = 3;
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
     interactable.enableInstantDrag = true;

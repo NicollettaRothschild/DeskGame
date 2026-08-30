@@ -50,6 +50,8 @@ type InteractableLike = ScriptComponent & {
   keepHoverOnTrigger?: boolean;
   enableInstantDrag?: boolean;
   useFilteredPinch?: boolean;
+  allowMultipleInteractors?: boolean;
+  enablePokeDirectionality?: boolean;
   onTriggerStart?: { add: (cb: () => void) => void };
   onInteractorTriggerStart?: { add: (cb: () => void) => void };
   onDragStart?: { add: (cb: () => void) => void };
@@ -59,6 +61,7 @@ type InteractableLike = ScriptComponent & {
   onTriggerCanceled?: { add: (cb: () => void) => void };
   onInteractorTriggerEnd?: { add: (cb: () => void) => void };
   onInteractorTriggerEndOutside?: { add: (cb: () => void) => void };
+  colliders?: ColliderComponent[];
   onHoverEnter?: { add: (cb: () => void) => void };
   onInteractorHoverEnter?: { add: (cb: () => void) => void };
 };
@@ -103,7 +106,8 @@ export class FriendGrab extends BaseScriptComponent {
   enableGrabSounds: boolean = true;
 
   @input
-  enablePetReaction: boolean = true;
+  @hint('Temporarily disabled: the nested poke target conflicts with Buddy manipulation on device.')
+  enablePetReaction: boolean = false;
 
   @input
   @allowUndefined
@@ -292,6 +296,11 @@ export class FriendGrab extends BaseScriptComponent {
     "And here's your distance leaderboard. Grab it to place it anywhere in your space.";
 
   @input
+  @label('Enable Leaderboard Panel')
+  @hint('Archived while disabled; re-enable when the leaderboard returns.')
+  enableLeaderboardPanel: boolean = false;
+
+  @input
   @label('Goal Prompt Line')
   @hint('Spoken after the tour; Friend waits for the player to say a goal')
   onboardingGoalPromptLine: string =
@@ -471,8 +480,12 @@ export class FriendGrab extends BaseScriptComponent {
   private moveInteractionWired = false;
   private moveBindAttempts = 0;
   private moveActive = false;
+  private grabStartDeferred = false;
+  private grabReleaseDeferred = false;
+  private grabInteractionEpoch = 0;
   private grabStartWorldPosition: vec3 | null = null;
   private companionTalkActive = false;
+  private grabCollider: ColliderComponent | null = null;
   private grabAudioPlayer: AudioComponent | null = null;
   private resolvedGrabTrack: AudioTrackAsset | null = null;
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
@@ -487,6 +500,7 @@ export class FriendGrab extends BaseScriptComponent {
   private lookAtLoggedSetup = false;
   private lastLookAtInvalidTargetLogAt = -9999;
   private nextLookAtRetryAt = 0;
+  private nextCameraLookupAt = 0;
   private onboardingActive = false;
   private onboardingToken = 0;
   private onboardingStepRunId = 0;
@@ -512,6 +526,10 @@ export class FriendGrab extends BaseScriptComponent {
   onAwake(): void {
     this.ensureLeaderboardPanel();
     this.ensurePetPokeTarget();
+    // Register Buddy's SIK target during scene awakening. Creating the
+    // Interactable/Manipulation pair from OnStart can race the first hand
+    // tracking frame on Specs and leave SIK with a temporary target.
+    this.ensureAnchorGrabComponents();
     this.createEvent('OnStartEvent').bind(() => {
       registerFriendGrab(this);
       this.captureIdleBasePosition();
@@ -546,6 +564,21 @@ export class FriendGrab extends BaseScriptComponent {
     if (!isNull(this.companionNameTag)) {
       this.companionNameTag.dispose();
       this.companionNameTag = null;
+    }
+    if (!this.enableLeaderboardPanel && !isNull(this.generatedLeaderboard)) {
+      try {
+        this.generatedLeaderboard.enabled = false;
+      } catch (_e) {
+        // Ignore stale generated panels during a hot reimport.
+      }
+    }
+    if (!isNull(this.lookAtTargetProxy)) {
+      try {
+        this.lookAtTargetProxy.destroy();
+      } catch (_e) {
+        // The scene may already be tearing down during a hot reimport.
+      }
+      this.lookAtTargetProxy = null;
     }
   }
 
@@ -637,43 +670,43 @@ export class FriendGrab extends BaseScriptComponent {
     retryEvent.reset(delaySec);
   }
 
-  private ensureAnchorGrabComponents(): void {
+  private ensureAnchorGrabComponents(): boolean {
     const anchor = this.getSceneObject();
     this.refreshGrabCollider();
 
-    let interactable = this.findExistingInteractable(anchor);
-    if (isNull(interactable)) {
-      interactable = anchor.createComponent(Interactable.getTypeName()) as InteractableLike;
+    // Buddy's SIK components must be authored on the scene/prefab root. Creating
+    // Interactable or InteractableManipulation here registers a half-configured
+    // target with SIK before this script can finish setting it up; on Specs 2024
+    // that path can crash as soon as the target starts moving. Fail closed until
+    // the authored components are present instead of creating a runtime target.
+    const interactable = this.findExistingInteractable(anchor);
+    const manipulation = this.findExistingManipulation(anchor);
+    if (isNull(interactable) || isNull(manipulation) || isNull(this.grabCollider)) {
+      this.grabInteractable = interactable;
+      this.grabManipulation = manipulation;
+      if (this.debugLogging) {
+        print(
+          `[FriendGrab] authored grab components missing interactable=${!isNull(interactable)} ` +
+            `manipulation=${!isNull(manipulation)} collider=${!isNull(this.grabCollider)}`
+        );
+      }
+      return false;
     }
 
-    let manipulation = this.findExistingManipulation(anchor);
-    if (isNull(manipulation)) {
-      manipulation = anchor.createComponent(
-        InteractableManipulation.getTypeName()
-      ) as unknown as InteractableManipulationLike;
-    }
-
-    // A movable object should use pinch/ray targeting. Poke is reserved for
-    // the separate pet target because SIK disables Poke on manipulated objects.
-    interactable.targetingMode = 3;
-    interactable.ignoreInteractionPlane = true;
-    interactable.keepHoverOnTrigger = true;
-    interactable.enableInstantDrag = true;
-    if (interactable.useFilteredPinch !== undefined) {
-      interactable.useFilteredPinch = true;
-    }
-
-    manipulation.manipulateRootSceneObject = anchor;
-    manipulation.enableTranslation = true;
-    manipulation.enableRotation = false;
-    manipulation.enableScale = false;
-    manipulation.useFilter = false;
-
+    // The authored components already contain the complete, device-safe
+    // configuration. Do not mutate SIK properties after registration; changing
+    // targeting or manipulation-root fields at runtime can invalidate native
+    // state while the first hand frame is being processed.
     this.grabInteractable = interactable;
     this.grabManipulation = manipulation;
+    return true;
   }
 
   private findExistingInteractable(root: SceneObject): InteractableLike | null {
+    const direct = root.getComponent(Interactable.getTypeName()) as InteractableLike;
+    if (!isNull(direct)) {
+      return direct;
+    }
     const scripts = root.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
       const candidate = scripts[i] as unknown as InteractableLike;
@@ -691,6 +724,12 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private findExistingManipulation(root: SceneObject): InteractableManipulationLike | null {
+    const direct = root.getComponent(
+      InteractableManipulation.getTypeName()
+    ) as unknown as InteractableManipulationLike;
+    if (!isNull(direct)) {
+      return direct;
+    }
     const scripts = root.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
       const candidate = scripts[i] as unknown as InteractableManipulationLike;
@@ -704,57 +743,49 @@ export class FriendGrab extends BaseScriptComponent {
   private ensurePetPokeTarget(): void {
     const friend = this.getSceneObject();
     let target = this.findObjectByName(friend, 'FriendPetPokeTarget');
+    if (!this.enablePetReaction) {
+      if (!isNull(target) && target !== friend) {
+        target.enabled = false;
+      }
+      this.petPokeTarget = null;
+      this.petPokeInteractable = null;
+      print('[FriendGrab] pet poke disabled for manipulation stability');
+      return;
+    }
     if (isNull(target) || target === friend) {
-      target = global.scene.createSceneObject('FriendPetPokeTarget');
-      target.setParent(friend);
+      this.petPokeTarget = null;
+      this.petPokeInteractable = null;
+      print('[FriendGrab] authored pet target missing; pet reaction disabled');
+      return;
     }
     target.layer = friend.layer;
     target.enabled = this.enablePetReaction;
-    target.getTransform().setLocalPosition(this.petPokeLocalPosition);
-    target.getTransform().setLocalRotation(quat.quatIdentity());
-    target.getTransform().setLocalScale(vec3.one());
 
-    let collider = target.getComponent('Component.ColliderComponent') as ColliderComponent;
+    // SIK's InteractionManager indexes Physics.ColliderComponent instances
+    // when it registers an Interactable. Require both SIK components to be
+    // authored too; never create a second temporary interaction target here.
+    let collider = target.getComponent('Physics.ColliderComponent') as ColliderComponent;
     if (isNull(collider)) {
-      collider = target.createComponent('Component.ColliderComponent') as ColliderComponent;
+      collider = target.getComponent('Component.ColliderComponent') as ColliderComponent;
     }
-    const colliderLike = collider as unknown as {
-      enabled?: boolean;
-      intangible?: boolean;
-      fitVisual?: boolean;
-      debugDrawEnabled?: boolean;
-      shape?: { size?: vec3 };
-    };
-    colliderLike.enabled = this.enablePetReaction;
-    // Keep this as a real overlap target so the tracked hand collider can
-    // make contact with the pet zone without affecting the companion's grab
-    // collider.
-    colliderLike.intangible = false;
-    colliderLike.fitVisual = false;
-    colliderLike.debugDrawEnabled = false;
-    const shape = Shape.createBoxShape();
-    shape.size = this.petPokeColliderSize;
-    colliderLike.shape = shape;
+    if (isNull(collider)) {
+      target.enabled = false;
+      this.petPokeTarget = null;
+      this.petPokeInteractable = null;
+      print('[FriendGrab] authored pet collider missing; pet reaction disabled');
+      return;
+    }
 
-    let interactable = target.getComponent(
+    const interactable = target.getComponent(
       Interactable.getTypeName()
     ) as unknown as InteractableLike;
     if (isNull(interactable)) {
-      interactable = target.createComponent(Interactable.getTypeName()) as InteractableLike;
+      target.enabled = false;
+      this.petPokeTarget = null;
+      this.petPokeInteractable = null;
+      print('[FriendGrab] authored pet interactable missing; pet reaction disabled');
+      return;
     }
-    // Poke is the open-hand/index-finger contact path. Direct would require a
-    // pinch, which makes the pet interaction feel like another grab.
-    interactable.targetingMode = 4;
-    interactable.ignoreInteractionPlane = true;
-    interactable.keepHoverOnTrigger = false;
-    interactable.enableInstantDrag = false;
-    const interactableOptions = interactable as unknown as {
-      allowMultipleInteractors?: boolean;
-      enablePokeDirectionality?: boolean;
-    };
-    interactableOptions.allowMultipleInteractors = true;
-    interactableOptions.enablePokeDirectionality = false;
-    (interactable as ScriptComponent).enabled = this.enablePetReaction;
 
     this.petPokeTarget = target;
     this.petPokeInteractable = interactable;
@@ -785,10 +816,15 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
 
-    this.ensureAnchorGrabComponents();
+    const authoredComponentsReady = this.ensureAnchorGrabComponents();
     const interactable = this.grabInteractable;
     const manipulation = this.grabManipulation;
-    if (isNull(interactable) || isNull(manipulation)) {
+    if (
+      !authoredComponentsReady ||
+      isNull(interactable) ||
+      isNull(manipulation) ||
+      isNull(this.grabCollider)
+    ) {
       this.moveBindAttempts++;
       if (this.moveBindAttempts >= 30) {
         print('[FriendGrab] could not bind grab interaction');
@@ -801,54 +837,93 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
 
-    this.refreshGrabCollider();
-    this.bindManipulationRoot(manipulation, this.getSceneObject());
-
-    const onGrabStart = (): void => {
-      this.onFriendGrabStart();
-    };
-    const onGrabRelease = (): void => {
-      this.onFriendGrabRelease();
-    };
-
+    // Use the manipulation lifecycle as the single source of truth. Listening
+    // to both Interactable and Manipulation events lets a child pet target
+    // bubble into Buddy's root and re-enter movement while SIK is transitioning.
     if (manipulation.onManipulationStart) {
-      manipulation.onManipulationStart.add(onGrabStart);
+      manipulation.onManipulationStart.add(() => {
+        this.deferFriendGrabStart();
+      });
     }
     if (manipulation.onManipulationEnd) {
-      manipulation.onManipulationEnd.add(onGrabRelease);
+      manipulation.onManipulationEnd.add(() => {
+        this.deferFriendGrabRelease();
+      });
     }
-    if (interactable.onDragStart) {
-      interactable.onDragStart.add(onGrabStart);
-    }
-    if (interactable.onTriggerStart) {
-      interactable.onTriggerStart.add(onGrabStart);
-    }
-    if (interactable.onInteractorTriggerStart) {
-      interactable.onInteractorTriggerStart.add(onGrabStart);
-    }
-    if (interactable.onDragEnd) {
-      interactable.onDragEnd.add(onGrabRelease);
-    }
-    if (interactable.onTriggerEnd) {
-      interactable.onTriggerEnd.add(onGrabRelease);
-    }
-    if (interactable.onTriggerEndOutside) {
-      interactable.onTriggerEndOutside.add(onGrabRelease);
-    }
-    if (interactable.onInteractorTriggerEnd) {
-      interactable.onInteractorTriggerEnd.add(onGrabRelease);
-    }
-    if (interactable.onInteractorTriggerEndOutside) {
-      interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
-    }
-    if (interactable.onTriggerCanceled) {
-      interactable.onTriggerCanceled.add(onGrabRelease);
-    }
-    (manipulation as ScriptComponent).enabled = true;
-    (interactable as ScriptComponent).enabled = true;
-
     this.moveInteractionWired = true;
-    print('[FriendGrab] grab interaction wired');
+    const readyInteractable = interactable as InteractableLike;
+    const readyManipulation = manipulation as InteractableManipulationLike;
+    const registeredColliders = readyInteractable.colliders;
+    let usesConfiguredCollider = false;
+    if (!isNull(registeredColliders) && !isNull(this.grabCollider)) {
+      for (let i = 0; i < registeredColliders.length; i++) {
+        if (registeredColliders[i] === this.grabCollider) {
+          usesConfiguredCollider = true;
+          break;
+        }
+      }
+    }
+    print(
+      `[FriendGrab] grab interaction wired targetMode=${String(readyInteractable.targetingMode)} ` +
+        `collider=${!isNull(this.grabCollider)} ` +
+        `registeredColliders=${isNull(registeredColliders) ? '?' : registeredColliders.length} ` +
+        `usesConfiguredCollider=${usesConfiguredCollider} ` +
+        `manipRoot=${!isNull(readyManipulation.manipulateRootSceneObject)}`
+    );
+  }
+
+  private deferFriendGrabStart(): void {
+    if (this.grabStartDeferred || this.moveActive) {
+      return;
+    }
+    // Block every custom transform writer immediately. Waiting until the next
+    // frame lets follow/look-at write Buddy's root while SIK is beginning its
+    // manipulation, which is unsafe on device.
+    this.moveActive = true;
+    this.grabInteractionEpoch += 1;
+    const epoch = this.grabInteractionEpoch;
+    const startPosition = this.getSceneObject().getTransform().getWorldPosition();
+    this.grabStartWorldPosition = new vec3(
+      startPosition.x,
+      startPosition.y,
+      startPosition.z
+    );
+    this.setLookAtActive(false);
+    this.setLookAtEnabled(false);
+    print('[FriendGrab] manipulation start guard engaged');
+
+    this.grabStartDeferred = true;
+    const deferred = this.createEvent('DelayedCallbackEvent');
+    deferred.bind(() => {
+      this.grabStartDeferred = false;
+      if (
+        epoch === this.grabInteractionEpoch &&
+        this.moveActive &&
+        this.isValidSceneObject(this.getSceneObject())
+      ) {
+        this.onFriendGrabStart();
+      }
+    });
+    // Leave SIK's state transition and transform cache on the current stack.
+    deferred.reset(0);
+  }
+
+  private deferFriendGrabRelease(): void {
+    if (this.grabReleaseDeferred || !this.moveActive) {
+      return;
+    }
+    // Invalidate any not-yet-run grab-start side effects before submitting
+    // release work on the next frame.
+    this.grabInteractionEpoch += 1;
+    this.grabReleaseDeferred = true;
+    const deferred = this.createEvent('DelayedCallbackEvent');
+    deferred.bind(() => {
+      this.grabReleaseDeferred = false;
+      if (this.isValidSceneObject(this.getSceneObject())) {
+        this.onFriendGrabRelease();
+      }
+    });
+    deferred.reset(0);
   }
 
   private onFriendPet(): void {
@@ -888,19 +963,11 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private onFriendGrabStart(): void {
-    if (this.moveActive) {
+    if (!this.moveActive) {
       return;
     }
-    this.moveActive = true;
-    const startPosition = this.getSceneObject().getTransform().getWorldPosition();
-    this.grabStartWorldPosition = new vec3(
-      startPosition.x,
-      startPosition.y,
-      startPosition.z
-    );
     this.companionTalkActive =
       !this.onboardingActive && this.beginCompanionGrabTalk();
-    this.resetIdleBobOffset();
     // Keep the physical SFX, but never speak a grab quip. Grabbing is now the
     // companion's hold-to-talk gesture, so "Whee!" would pollute the mic and
     // can repeat when SIK reports more than one end/start event.
@@ -1124,6 +1191,17 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private ensureLeaderboardPanel(): SceneObject | null {
+    if (!this.enableLeaderboardPanel) {
+      const archivedPanel = !isNull(this.onboardingLeaderboard)
+        ? (this.onboardingLeaderboard as SceneObject)
+        : this.findObjectByNameInScene('Leaderboard');
+      if (!isNull(archivedPanel)) {
+        archivedPanel.enabled = false;
+      }
+      this.generatedLeaderboard = null;
+      return null;
+    }
+
     const anchor = this.findAnchorController() as
       | (ScriptComponent & {
           widgetParent?: SceneObject;
@@ -1269,16 +1347,19 @@ export class FriendGrab extends BaseScriptComponent {
         line: this.onboardingTrashLine,
         requirePractice: true,
       },
-      {
+      // Planter stack is skipped — a planted goal pot is gifted after the goal prompt.
+    ];
+
+    if (this.enableLeaderboardPanel) {
+      steps.push({
         key: 'leaderboard',
         object:
           resolve(this.onboardingLeaderboard, 'Leaderboard') ||
           this.ensureLeaderboardPanel(),
         line: this.onboardingLeaderboardLine,
         requirePractice: true,
-      },
-      // Planter stack is skipped — a planted goal pot is gifted after the goal prompt.
-    ];
+      });
+    }
 
     if (this.onboardingIncludePalette) {
       steps.splice(1, 0, {
@@ -1355,7 +1436,7 @@ export class FriendGrab extends BaseScriptComponent {
     let dirX = 0;
     let dirZ = -1; // Lens forward default when no camera yet
     if (isNull(this.lookAtCamera)) {
-      this.lookAtCamera = this.findCameraObject();
+      this.lookAtCamera = this.resolveCameraObject();
     }
     if (!isNull(this.lookAtCamera)) {
       const camPos = this.lookAtCamera.getTransform().getWorldPosition();
@@ -1917,7 +1998,7 @@ export class FriendGrab extends BaseScriptComponent {
     let dirX = 0;
     let dirZ = -1;
     if (isNull(this.lookAtCamera)) {
-      this.lookAtCamera = this.findCameraObject();
+      this.lookAtCamera = this.resolveCameraObject();
     }
     if (!isNull(this.lookAtCamera)) {
       const camPos = this.lookAtCamera.getTransform().getWorldPosition();
@@ -2292,7 +2373,7 @@ export class FriendGrab extends BaseScriptComponent {
     this.setFriendVisualState(true);
     this.startFollowingUser('voice-resume');
     this.followActive = true;
-    this.lookAtCamera = this.findCameraObject();
+    this.lookAtCamera = this.resolveCameraObject(true);
     this.showSpeech("I'm back.", true, null);
     print('[FriendGrab] follow resumed by voice');
   }
@@ -2440,7 +2521,7 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private submitGoalToLeaderboard(plant: PlantLifecycle | null): void {
-    if (!this.enableGoalLeaderboard || isNull(plant)) {
+    if (!this.enableLeaderboardPanel || !this.enableGoalLeaderboard || isNull(plant)) {
       return;
     }
     const leaderboardModule = this.resolveGoalLeaderboardModule();
@@ -2906,7 +2987,7 @@ export class FriendGrab extends BaseScriptComponent {
       self.enabled = true;
     }
 
-    const preferredCamera = this.findCameraObject();
+    const preferredCamera = this.resolveCameraObject();
     if (!isNull(preferredCamera)) {
       this.lookAtCamera = preferredCamera;
     }
@@ -2915,10 +2996,17 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
 
-    const camTransform = (this.lookAtCamera as SceneObject).getTransform();
-    const camPos = camTransform.getWorldPosition();
-
-    let forward = camTransform.forward;
+    let camPos: vec3;
+    let forward: vec3 | null;
+    try {
+      const camTransform = (this.lookAtCamera as SceneObject).getTransform();
+      camPos = camTransform.getWorldPosition();
+      forward = camTransform.forward;
+    } catch (_e) {
+      this.lookAtCamera = null;
+      this.nextCameraLookupAt = getTime() + 0.5;
+      return;
+    }
     if (isNull(forward)) {
       forward = new vec3(0, 0, -1);
     }
@@ -3094,6 +3182,15 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private updateProximityLookAt(): void {
+    // LookAtComponent is another native transform writer. Never let it
+    // re-enable during SIK manipulation; the manipulation callback is deferred
+    // by one frame, so this guard must live in the per-frame look-at path too.
+    if (this.moveActive) {
+      this.setLookAtActive(false);
+      this.setLookAtEnabled(false);
+      return;
+    }
+
     if (!this.enableLookAt) {
       this.setLookAtActive(false);
       return;
@@ -3129,7 +3226,7 @@ export class FriendGrab extends BaseScriptComponent {
       !this.moveActive;
     if (forceFollowLookAt) {
       this.setLookAtActive(true);
-      this.lookAt.enabled = true;
+      this.setLookAtEnabled(true);
       return;
     }
 
@@ -3161,39 +3258,37 @@ export class FriendGrab extends BaseScriptComponent {
       if (distanceCm > exitCm) {
         this.setLookAtActive(false);
       } else {
-        // Re-assert enabled every frame while in range.
-        this.lookAt.enabled = true;
+        this.setLookAtEnabled(true);
       }
     } else if (distanceCm <= enterCm) {
       this.setLookAtActive(true);
     } else {
-      this.lookAt.enabled = false;
+      this.setLookAtEnabled(false);
     }
   }
 
   private setLookAtActive(active: boolean): void {
     if (this.lookAtActive === active) {
-      if (!isNull(this.lookAt)) {
-        this.lookAt.enabled = active;
-      }
       return;
     }
 
     this.lookAtActive = active;
 
     if (active) {
-      if (!isNull(this.lookAt)) {
-        this.lookAt.enabled = true;
-      }
+      this.setLookAtEnabled(true);
       print('[FriendGrab] look-at ON');
       return;
     }
 
     // Freeze at the last facing — do not snap back to the original pose.
-    if (!isNull(this.lookAt)) {
-      this.lookAt.enabled = false;
-    }
+    this.setLookAtEnabled(false);
     print('[FriendGrab] look-at OFF');
+  }
+
+  private setLookAtEnabled(enabled: boolean): void {
+    if (!isNull(this.lookAt) && this.lookAt.enabled !== enabled) {
+      this.lookAt.enabled = enabled;
+    }
   }
 
   private findCameraObject(): SceneObject | null {
@@ -3213,6 +3308,24 @@ export class FriendGrab extends BaseScriptComponent {
     }
     const fallback = this.findObjectWithCameraComponent();
     return this.isUsableCameraObject(fallback) ? fallback : null;
+  }
+
+  private resolveCameraObject(forceSearch: boolean = false): SceneObject | null {
+    const now = getTime();
+    if (!forceSearch && this.isValidSceneObject(this.lookAtCamera)) {
+      return this.lookAtCamera;
+    }
+    if (!forceSearch && now < this.nextCameraLookupAt) {
+      return null;
+    }
+
+    const camera = this.findCameraObject();
+    this.nextCameraLookupAt = now + (isNull(camera) ? 1.0 : 5.0);
+    if (this.isValidSceneObject(camera)) {
+      this.lookAtCamera = camera;
+      return camera;
+    }
+    return null;
   }
 
   private findAnchorControllerCamera(): SceneObject | null {
@@ -3293,10 +3406,7 @@ export class FriendGrab extends BaseScriptComponent {
     if (isNull(proxy)) {
       return;
     }
-    const preferred = this.findCameraObject();
-    if (this.isValidSceneObject(preferred)) {
-      this.lookAtCamera = preferred as SceneObject;
-    }
+    this.resolveCameraObject();
 
     if (this.isValidSceneObject(this.lookAtCamera)) {
       try {
@@ -3305,6 +3415,7 @@ export class FriendGrab extends BaseScriptComponent {
         return;
       } catch (_e) {
         this.lookAtCamera = null;
+        this.nextCameraLookupAt = getTime() + 0.5;
       }
     }
 
@@ -3388,72 +3499,21 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private refreshGrabCollider(): void {
-    this.ensureAnchorGrabCollider(this.getSceneObject());
+    this.grabCollider = this.ensureAnchorGrabCollider(this.getSceneObject());
   }
 
   private ensureAnchorGrabCollider(anchor: SceneObject): ColliderComponent | null {
+    // InteractionManager.findOrCreateColliderForInteractable scans
+    // Physics.ColliderComponent. Only use the authored collider here. Creating
+    // one during onAwake creates the same registration race as a dynamic SIK
+    // component and can leave InteractionManager holding stale native state.
     let collider = anchor.getComponent('Physics.ColliderComponent') as ColliderComponent;
     if (isNull(collider)) {
       collider = anchor.getComponent('Component.ColliderComponent') as ColliderComponent;
     }
     if (isNull(collider)) {
-      collider = anchor.createComponent('Physics.ColliderComponent') as ColliderComponent;
+      return null;
     }
-    if (isNull(collider)) {
-      collider = anchor.createComponent('Component.ColliderComponent') as ColliderComponent;
-    }
-
-    const colliderLike = collider as unknown as {
-      enabled?: boolean;
-      intangible?: boolean;
-      forceCompound?: boolean;
-      fitVisual?: boolean;
-      debugDrawEnabled?: boolean;
-      shape?: { size?: vec3 };
-    };
-
-    colliderLike.enabled = true;
-    colliderLike.intangible = false;
-    colliderLike.forceCompound = false;
-    colliderLike.fitVisual = false;
-    colliderLike.debugDrawEnabled = false;
-
-    const shape = Shape.createBoxShape();
-    shape.size = this.getEffectiveColliderSize();
-    colliderLike.shape = shape;
-
     return collider;
-  }
-
-  private getEffectiveColliderSize(): vec3 {
-    const configured = this.colliderSize || new vec3(0, 0, 0);
-    const min = FriendGrab.MIN_COLLIDER_SIZE;
-    return new vec3(
-      Math.max(min.x, configured.x),
-      Math.max(min.y, configured.y),
-      Math.max(min.z, configured.z)
-    );
-  }
-
-  private bindManipulationRoot(
-    manipulation: InteractableManipulationLike,
-    anchor: SceneObject
-  ): void {
-    manipulation.manipulateRootSceneObject = anchor;
-
-    const manipRecord = manipulation as unknown as Record<string, unknown>;
-    const setRoot = manipRecord['setManipulateRoot'];
-    if (typeof setRoot === 'function') {
-      (setRoot as (this: unknown, root: Transform) => void).call(
-        manipulation,
-        anchor.getTransform()
-      );
-      return;
-    }
-
-    const component = manipulation as ScriptComponent;
-    const wasEnabled = component.enabled;
-    component.enabled = false;
-    component.enabled = wasEnabled;
   }
 }

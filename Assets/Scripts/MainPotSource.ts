@@ -363,18 +363,17 @@ export class MainPotSource extends BaseScriptComponent {
   }
 
   private schedulePotGoalFinalization(potObject: SceneObject): void {
-    this.finalizePotGoal(potObject);
-
     const delaySec = Math.max(0, this.postReleaseCaptureSec);
     if (delaySec <= 0.001) {
+      this.finalizePotGoal(potObject);
       this.endPotGoalCapture(potObject);
       return;
     }
 
     const finalizeEvent = this.createEvent('DelayedCallbackEvent');
     finalizeEvent.bind(() => {
-      this.finalizePotGoal(potObject);
       this.endPotGoalCapture(potObject);
+      this.finalizePotGoal(potObject);
     });
     finalizeEvent.reset(delaySec);
   }

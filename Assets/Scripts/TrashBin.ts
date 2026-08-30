@@ -482,12 +482,18 @@ export class TrashBin extends BaseScriptComponent {
       return;
     }
 
+    // Prevent SIK from processing the serialized Poke mode while this
+    // manipulated target is being configured for pinch interaction.
+    (manipulation as ScriptComponent).enabled = false;
+    (interactable as ScriptComponent).enabled = false;
     manipulation.manipulateRootSceneObject = root;
     manipulation.enableTranslation = true;
     manipulation.enableRotation = true;
     manipulation.enableScale = false;
-    (manipulation as ScriptComponent).enabled = true;
-    (interactable as ScriptComponent).enabled = true;
+    // Configure targeting before enabling SIK components so the serialized
+    // Poke mode is never observed alongside InteractableManipulation.
+    interactable.targetingMode = 3;
+    interactable.ignoreInteractionPlane = true;
 
     const onGrabStart = (): void => {
       this.onTrashGrabStart(root);
@@ -523,9 +529,8 @@ export class TrashBin extends BaseScriptComponent {
       interactable.onInteractorTriggerEndOutside.add(onRelease);
     }
 
-    interactable.targetingMode = 7;
-    interactable.ignoreInteractionPlane = true;
-
+    (manipulation as ScriptComponent).enabled = true;
+    (interactable as ScriptComponent).enabled = true;
     this.moveInteractionWired = true;
     const grabCollider = this.getGrabCollider();
     const grabScale = !isNull(grabCollider)
@@ -1633,7 +1638,9 @@ export class TrashBin extends BaseScriptComponent {
         }
 
         if (script.targetingMode !== undefined) {
-          script.targetingMode = 7;
+          // Pulled items use InteractableManipulation, so keep them on the
+          // direct/indirect pinch path rather than the unsupported Poke path.
+          script.targetingMode = 3;
         }
         if (script.ignoreInteractionPlane !== undefined) {
           script.ignoreInteractionPlane = true;

@@ -228,6 +228,7 @@
     onboardingClock: true
     onboardingClockLine: true
     onboardingPalette: true
+    onboardingIncludePalette: true
     onboardingPaletteLine: true
     onboardingPlanter: true
     onboardingPlanterLine: true
@@ -237,6 +238,7 @@
     onboardingTrashLine: true
     onboardingLeaderboard: true
     onboardingLeaderboardLine: true
+    enableLeaderboardPanel: true
     onboardingGoalPromptLine: true
     onboardingGoalSeedLine: true
     onboardingGoalListenTimeoutSec: true
@@ -285,7 +287,7 @@
       grabSoundVolume: 0.850000
       releaseSoundVolume: 0.800000
       enableGrabSounds: true
-      enablePetReaction: true
+      enablePetReaction: false
       petSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       petReactionCooldownSec: 2.500000
       petPokeColliderSize: !<Vec3> {x: 3.400000, y: 4.200000, z: 3.400000}
@@ -317,6 +319,7 @@
       onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
       onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingIncludePalette: false
       onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
       onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
@@ -326,6 +329,7 @@
       onboardingTrashLine: "Here's the trash. Drop things into it to clean up."
       onboardingLeaderboard: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
+      enableLeaderboardPanel: false
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
       onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
