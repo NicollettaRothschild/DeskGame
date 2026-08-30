@@ -14,11 +14,31 @@ let agentTts: FlowGardenTTS | null = null;
 let arvisAgentChat: ArvisAgentChat | null = null;
 let arvisGhostBlob: ArvisGhostBlob | null = null;
 let friendGrab: FriendGrabLike | null = null;
+const codingBuddies: { [providerId: string]: CodingBuddyLike } = {};
 
 export type FriendGrabLike = {
   restartOnboardingTour?: (reason?: string) => boolean;
   showSpeech?: (text: string, speak?: boolean) => void;
 };
+
+export type CodingBuddyLike = {
+  cancelCurrentSession?: () => boolean;
+};
+
+export function registerCodingBuddy(
+  providerId: string,
+  instance: CodingBuddyLike
+): void {
+  const key = String(providerId || '').trim().toLowerCase();
+  if (key) {
+    codingBuddies[key] = instance;
+  }
+}
+
+export function getSharedCodingBuddy(providerId: string): CodingBuddyLike | null {
+  const key = String(providerId || '').trim().toLowerCase();
+  return key && codingBuddies[key] ? codingBuddies[key] : null;
+}
 
 export function registerSpeechRecognition(instance: SpeechRecognition): void {
   speechRecognition = instance;

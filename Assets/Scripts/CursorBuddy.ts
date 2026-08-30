@@ -1,16 +1,19 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable';
 import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
 import {
+  getSharedFlowGardenSpacePanel,
   getSharedFlowGardenTts,
   getSharedSpecsApi,
   getSharedSpecsDeviceRegistry,
   getSharedSpeechRecognition,
+  registerCodingBuddy,
 } from './FlowGardenServiceRegistry';
 import { ArvisGhostBlob } from './ArvisGhostBlob';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
 import { FlowGardenTTS } from './FlowGardenTTS';
+import { AgentCenterStateStore } from './AgentCenterStateStore';
 
 type InteractableLike = ScriptComponent & {
   targetingMode?: number;
@@ -60,13 +63,22 @@ export class CursorBuddy extends BaseScriptComponent {
   agentTts!: FlowGardenTTS;
 
   @input
-  @label('Cursor Workspace')
-  @hint('Mac folder that Cursor SDK is allowed to edit.')
-  cursorWorkspacePath: string = '/Users/allanyde/Documents/GitHub/DeskGame';
+  @label('Provider ID')
+  @hint('Bridge provider: cursor_sdk or claude_code.')
+  providerId: string = 'cursor_sdk';
 
   @input
-  @label('Cursor Model')
-  cursorModel: string = 'auto';
+  @label('Buddy Name')
+  buddyName: string = 'Cursor';
+
+  @input
+  @label('Approved Workspace ID')
+  @hint('Bridge-issued allowlisted workspace ID. Never store a personal path here.')
+  workspaceId: string = '';
+
+  @input
+  @label('Agent Model')
+  agentModel: string = 'auto';
 
   @input
   enableSpeechOutput: boolean = true;
@@ -83,17 +95,16 @@ export class CursorBuddy extends BaseScriptComponent {
   private sending = false;
   private dependenciesLogged = false;
   private lastListeningTranscript = '';
-  private pollingCommandId = '';
+  private pollingSessionId = '';
   private pollingAttempts = 0;
   private pollEvent: DelayedCallbackEvent | null = null;
 
-  private static readonly AGENT_NAME = 'Cursor';
-  private static readonly BRIDGE_AGENT = 'cursor_sdk';
   private static readonly LISTENING_CUE = 'Listening…';
   private static readonly POLL_INTERVAL_SEC = 2;
   private static readonly MAX_STATUS_POLLS = 930;
 
   onAwake(): void {
+    registerCodingBuddy(this.getProviderId(), this);
     this.createEvent('OnStartEvent').bind(() => {
       this.resolveDependencies();
       this.resolveGhost();
@@ -107,6 +118,41 @@ export class CursorBuddy extends BaseScriptComponent {
       }
       this.refreshListeningBubble();
     });
+  }
+
+  public cancelCurrentSession(): boolean {
+    this.resolveDependencies();
+    const sessionId = this.pollingSessionId;
+    if (
+      !this.sending ||
+      !sessionId ||
+      isNull(this.specsApi) ||
+      isNull(this.deviceRegistry)
+    ) {
+      return false;
+    }
+
+    this.specsApi.cancelAgentSession(
+      this.deviceRegistry.getDeviceId(),
+      this.deviceRegistry.getDeviceSecret(),
+      sessionId,
+      (_session, error) => {
+        if (sessionId !== this.pollingSessionId) {
+          return;
+        }
+        if (error) {
+          this.finishError('', error);
+          return;
+        }
+        this.sending = false;
+        this.cancelStatusPolling();
+        this.setPhase('error');
+        this.showBubble('error', '', 'Session cancelled.');
+        getSharedFlowGardenSpacePanel()?.showAgentCancelled(this.getBuddyName());
+        this.setStatus(`${this.getBuddyName()} session cancelled`);
+      }
+    );
+    return true;
   }
 
   onDestroy(): void {
@@ -188,10 +234,6 @@ export class CursorBuddy extends BaseScriptComponent {
     this.interactable = interactable;
     this.manipulation = isNull(manipulation) ? null : manipulation;
 
-    // Cursor is hold-to-talk, so use pinch/ray targeting and avoid the
-    // Poke + InteractableManipulation combination that SIK rejects.
-    interactable.targetingMode = 3;
-
     let bound = false;
     const onGrabStart = (): void => this.onGrabStart();
     const onGrabEnd = (): void => this.onGrabEnd();
@@ -199,43 +241,20 @@ export class CursorBuddy extends BaseScriptComponent {
     if (!isNull(manipulation) && manipulation.onManipulationStart) {
       manipulation.onManipulationStart.add(onGrabStart);
       bound = true;
-    }
-    if (!isNull(manipulation) && manipulation.onManipulationEnd) {
-      manipulation.onManipulationEnd.add(onGrabEnd);
-      bound = true;
-    }
-
-    if (interactable.onDragStart) {
-      interactable.onDragStart.add(onGrabStart);
-      bound = true;
-    }
-    if (interactable.onDragEnd) {
-      interactable.onDragEnd.add(onGrabEnd);
-      bound = true;
-    }
-    if (interactable.onTriggerStart) {
-      interactable.onTriggerStart.add(onGrabStart);
-      bound = true;
-    }
-    if (interactable.onTriggerEnd) {
-      interactable.onTriggerEnd.add(onGrabEnd);
-      bound = true;
-    }
-    if (interactable.onTriggerCanceled) {
-      interactable.onTriggerCanceled.add(onGrabEnd);
-      bound = true;
-    }
-    if (interactable.onInteractorTriggerStart) {
-      interactable.onInteractorTriggerStart.add(onGrabStart);
-      bound = true;
-    }
-    if (interactable.onInteractorTriggerEnd) {
-      interactable.onInteractorTriggerEnd.add(onGrabEnd);
-      bound = true;
-    }
-    if (interactable.onInteractorTriggerCanceled) {
-      interactable.onInteractorTriggerCanceled.add(onGrabEnd);
-      bound = true;
+      if (manipulation.onManipulationEnd) {
+        manipulation.onManipulationEnd.add(onGrabEnd);
+      }
+    } else {
+      if (interactable.onTriggerStart) {
+        interactable.onTriggerStart.add(onGrabStart);
+        bound = true;
+      }
+      if (interactable.onTriggerEnd) {
+        interactable.onTriggerEnd.add(onGrabEnd);
+      }
+      if (interactable.onTriggerCanceled) {
+        interactable.onTriggerCanceled.add(onGrabEnd);
+      }
     }
 
     this.grabInteractionBound = bound;
@@ -251,7 +270,7 @@ export class CursorBuddy extends BaseScriptComponent {
     this.grabbing = true;
 
     if (this.sending) {
-      this.showBubble('thinking', '', 'Cursor is still working on the last task.');
+      this.showBubble('thinking', '', `${this.getBuddyName()} is still working on the last task.`);
       return;
     }
 
@@ -303,7 +322,7 @@ export class CursorBuddy extends BaseScriptComponent {
       this.showBubble(
         'error',
         '',
-        'Another voice session is active. Finish it, then hold Cursor.'
+        `Another voice session is active. Finish it, then hold ${this.getBuddyName()}.`
       );
       this.setPhase('error');
       return;
@@ -315,7 +334,7 @@ export class CursorBuddy extends BaseScriptComponent {
     this.speechRecognition.beginAgentSession();
     this.setPhase('listening');
     this.showBubble('listening', CursorBuddy.LISTENING_CUE, null);
-    this.setStatus('Cursor is listening — release to send');
+    this.setStatus(`${this.getBuddyName()} is listening — release to send`);
   }
 
   private refreshListeningBubble(): void {
@@ -342,19 +361,14 @@ export class CursorBuddy extends BaseScriptComponent {
     }
 
     this.sending = true;
-    this.showBubble('thinking', prompt, 'Sending this task to Cursor on your Mac…');
+    this.showBubble('thinking', prompt, `Sending this task to ${this.getBuddyName()} on your Mac…`);
+    getSharedFlowGardenSpacePanel()?.showAgentStatus(
+      this.getBuddyName(),
+      'starting',
+      'Validating the selected repository and model.'
+    );
     this.setPhase('thinking');
-    this.setStatus('Sending coding task to Cursor SDK…');
-
-    // The editor mock intentionally does not execute local code. This prevents
-    // a successful-looking Preview interaction from claiming that files changed.
-    if (this.specsApi.isEditorMockActive()) {
-      this.finishError(
-        prompt,
-        'Preview cannot change Mac files. Set the device type to Spectacles and pair the Mac bridge.'
-      );
-      return;
-    }
+    this.setStatus(`Sending coding task to ${this.getBuddyName()}…`);
 
     this.queueAfterPair(prompt);
   }
@@ -364,21 +378,40 @@ export class CursorBuddy extends BaseScriptComponent {
       return;
     }
 
+    const isDemo = this.specsApi.isEditorMockActive();
     const deviceSecret = this.deviceRegistry.getDeviceSecret();
-    if (!deviceSecret) {
-      this.finishError(prompt, 'Pair this device at arvis.space/specs before using Cursor.');
+    if (!isDemo && !deviceSecret) {
+      this.finishError(
+        prompt,
+        `Pair this device at arvis.space/specs before using ${this.getBuddyName()}.`
+      );
       return;
     }
 
     const requestId =
-      `specs-cursor-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-    const workspace = String(this.cursorWorkspacePath || '').trim();
-    const model = String(this.cursorModel || '').trim();
-    this.specsApi.queueCodingTask(
+      `specs-${this.getProviderId()}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const selection = AgentCenterStateStore.get(this.getProviderId());
+    const workspace =
+      String(this.workspaceId || '').trim() ||
+      selection.workspaceId ||
+      (isDemo ? 'demo-workspace' : '');
+    if (!workspace) {
+      this.finishError(
+        prompt,
+        `Choose an approved repository for ${this.getBuddyName()} in Agent Center first.`
+      );
+      return;
+    }
+    const configuredModel = String(this.agentModel || '').trim();
+    const model =
+      configuredModel && configuredModel !== 'auto'
+        ? configuredModel
+        : selection.modelId || configuredModel || 'auto';
+    this.specsApi.startAgentSession(
       this.deviceRegistry.getDeviceId(),
       deviceSecret,
       requestId,
-      CursorBuddy.BRIDGE_AGENT,
+      this.getProviderId(),
       workspace,
       prompt,
       model,
@@ -391,14 +424,28 @@ export class CursorBuddy extends BaseScriptComponent {
           return;
         }
 
-        this.pollingCommandId = result.commandId;
+        this.pollingSessionId = result.sessionId;
         this.pollingAttempts = 0;
         this.showBubble(
           'thinking',
           prompt,
-          'Waiting for your approval on the Mac panel…'
+          isDemo
+            ? 'Demo/Preview simulation running — no files will change.'
+            : 'Waiting for your approval on the Mac panel…'
         );
-        this.setStatus('Waiting for Cursor approval on your Mac…');
+        this.setStatus(
+          isDemo
+            ? `${this.getBuddyName()} Demo/Preview session`
+            : `Waiting for ${this.getBuddyName()} approval on your Mac…`
+        );
+        getSharedFlowGardenSpacePanel()?.showAgentProgress(
+          this.getBuddyName(),
+          isDemo
+            ? 'Demo/Preview simulation — no files will change.'
+            : 'Session received. Waiting for approval on the Mac bridge.',
+          0,
+          0
+        );
         this.pollBridgeStatus(prompt);
       }
     );
@@ -407,7 +454,7 @@ export class CursorBuddy extends BaseScriptComponent {
   private pollBridgeStatus(prompt: string): void {
     if (
       !this.sending ||
-      !this.pollingCommandId ||
+      !this.pollingSessionId ||
       isNull(this.specsApi) ||
       isNull(this.deviceRegistry)
     ) {
@@ -420,13 +467,13 @@ export class CursorBuddy extends BaseScriptComponent {
     }
 
     this.pollingAttempts++;
-    const commandId = this.pollingCommandId;
-    this.specsApi.fetchBridgeCommandStatus(
+    const sessionId = this.pollingSessionId;
+    this.specsApi.fetchAgentSessionStatus(
       this.deviceRegistry.getDeviceId(),
       this.deviceRegistry.getDeviceSecret(),
-      commandId,
+      sessionId,
       (status, error) => {
-        if (!this.sending || commandId !== this.pollingCommandId) {
+        if (!this.sending || sessionId !== this.pollingSessionId) {
           return;
         }
 
@@ -440,27 +487,34 @@ export class CursorBuddy extends BaseScriptComponent {
 
         const normalizedStatus = String(status.status || '').trim().toLowerCase();
         if (this.isSuccessStatus(normalizedStatus)) {
-          const message = this.formatBridgeResult(
-            status.result,
-            'The Cursor workspace is ready for manual work.'
-          );
+          const message =
+            String(status.result || '').trim() ||
+            `${this.getBuddyName()} finished without a response.`;
           this.finishSuccess(prompt, message);
           return;
         }
         if (this.isFailureStatus(normalizedStatus)) {
-          const message = this.formatBridgeResult(
-            status.result,
-            `Cursor ended with status: ${normalizedStatus || 'failed'}.`
-          );
+          const message =
+            String(status.result || '').trim() ||
+            `${this.getBuddyName()} ended with status: ${normalizedStatus || 'failed'}.`;
           this.finishError(prompt, message);
           return;
         }
 
-        if (normalizedStatus === 'claimed') {
+        const progress = String(status.progress || '').trim();
+        if (progress) {
+          this.showBubble('thinking', prompt, progress);
+          getSharedFlowGardenSpacePanel()?.showAgentProgress(
+            this.getBuddyName(),
+            progress,
+            0,
+            0
+          );
+        } else if (normalizedStatus === 'claimed' || normalizedStatus === 'awaiting_approval') {
           this.showBubble(
             'thinking',
             prompt,
-            'Cursor request received — approve it in the Mac panel…'
+            `${this.getBuddyName()} request received — approve it in the Mac panel…`
           );
         } else if (normalizedStatus === 'approved') {
           this.showBubble(
@@ -504,7 +558,7 @@ export class CursorBuddy extends BaseScriptComponent {
       pollEvent.enabled = false;
       this.pollEvent = null;
     }
-    this.pollingCommandId = '';
+    this.pollingSessionId = '';
     this.pollingAttempts = 0;
   }
 
@@ -522,25 +576,16 @@ export class CursorBuddy extends BaseScriptComponent {
     );
   }
 
-  private formatBridgeResult(result: Record<string, unknown>, fallback: string): string {
-    const message = String(result?.message || '').trim();
-    if (message) {
-      return message;
-    }
-
-    const output = String(result?.output || '').trim();
-    if (output) {
-      return output.slice(0, 220);
-    }
-    return fallback;
-  }
-
   private finishSuccess(prompt: string, response: string): void {
     this.sending = false;
     this.cancelStatusPolling();
     this.setPhase('reply');
     this.showBubble('reply', prompt, response);
-    this.setStatus('Cursor prepared programming work on your Mac');
+    getSharedFlowGardenSpacePanel()?.showAgentFinal(
+      this.getBuddyName(),
+      response
+    );
+    this.setStatus(`${this.getBuddyName()} finished the coding request`);
     this.speak(response);
   }
 
@@ -549,6 +594,10 @@ export class CursorBuddy extends BaseScriptComponent {
     this.cancelStatusPolling();
     this.setPhase('error');
     this.showBubble('error', prompt, response);
+    getSharedFlowGardenSpacePanel()?.showAgentError(
+      this.getBuddyName(),
+      response
+    );
     this.setStatus(response);
     this.speak(response);
   }
@@ -563,7 +612,7 @@ export class CursorBuddy extends BaseScriptComponent {
     if (!ghost) {
       return;
     }
-    ghost.showSpeechBubble(phase, transcript, response, CursorBuddy.AGENT_NAME);
+    ghost.showSpeechBubble(phase, transcript, response, this.getBuddyName());
   }
 
   private setPhase(phase: 'idle' | 'listening' | 'thinking' | 'reply' | 'error'): void {
@@ -587,7 +636,20 @@ export class CursorBuddy extends BaseScriptComponent {
 
   private setStatus(text: string): void {
     if (this.debugLogging && text) {
-      print(`[CursorBuddy] ${text}`);
+      print(`[CodingBuddy:${this.getProviderId()}] ${text}`);
     }
+  }
+
+  private getProviderId(): string {
+    const normalized = String(this.providerId || '').trim().toLowerCase();
+    return normalized === 'claude_code' ? 'claude_code' : 'cursor_sdk';
+  }
+
+  private getBuddyName(): string {
+    const configured = String(this.buddyName || '').trim();
+    if (configured) {
+      return configured;
+    }
+    return this.getProviderId() === 'claude_code' ? 'Claude' : 'Cursor';
   }
 }

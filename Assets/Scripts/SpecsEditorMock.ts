@@ -38,6 +38,30 @@ export type MockBridgeCommandStatus = {
   result: Record<string, unknown>;
 };
 
+export type MockAgentSession = {
+  sessionId: string;
+  providerId: string;
+  workspaceId: string;
+  modelId: string;
+  status: string;
+  progress: string;
+  result: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MockAgentHistoryEntry = {
+  id: string;
+  role: string;
+  text: string;
+  createdAt: string;
+};
+
+type MockStoredAgentSession = MockAgentSession & {
+  pollCount: number;
+  history: MockAgentHistoryEntry[];
+};
+
 export type MockCalendarConfig = {
   calendarId: string | null;
   calendarName: string | null;
@@ -87,6 +111,9 @@ const STORAGE_MOCK_SPACE = 'specs_editor_mock_space_panel';
 const STORAGE_MOCK_CALENDAR_CONFIG = 'specs_editor_mock_calendar_config';
 const STORAGE_MOCK_CALENDAR_EVENTS = 'specs_editor_mock_calendar_events';
 const STORAGE_MOCK_BRIDGE_COMMANDS = 'specs_editor_mock_bridge_commands';
+const STORAGE_MOCK_AGENT_SESSIONS = 'specs_editor_mock_agent_sessions';
+const STORAGE_MOCK_SEQUENCE = 'specs_editor_mock_sequence';
+const DEMO_TIMESTAMP = '2026-01-01T12:00:00.000Z';
 
 const DEFAULT_MOCK_TASKS: MockTask[] = [
   { id: 'mock-1', text: 'Water the focus tree', deadline: null, source: 'editor', done: false },
@@ -112,6 +139,13 @@ const DEFAULT_MOCK_CALENDARS: MockCalendar[] = [
 ];
 
 export class SpecsEditorMock {
+  private static nextSequence(): number {
+    const store = global.persistentStorageSystem.store;
+    const next = Math.max(1, Number(store.getInt(STORAGE_MOCK_SEQUENCE) || 0) + 1);
+    store.putInt(STORAGE_MOCK_SEQUENCE, next);
+    return next;
+  }
+
   public static register(deviceId: string): MockRegistration {
     const store = global.persistentStorageSystem.store;
     let secret = String(store.getString(STORAGE_DEVICE_SECRET) || '').trim();
@@ -206,13 +240,18 @@ export class SpecsEditorMock {
     status: string;
     expiresAt: string;
   } {
+    const sequence = this.nextSequence();
     const command: MockBridgeCommand = {
-      commandId: `mock-bridge-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+      commandId: `demo-preview-command-${sequence}`,
       requestId,
       action,
       pollCount: 0,
       status: 'pending',
-      result: detail ? { detail } : {},
+      result: {
+        message: detail
+          ? 'Demo/Preview: simulated request queued with an opaque selection.'
+          : 'Demo/Preview: simulated request queued.',
+      },
     };
     const commands = this.loadMockBridgeCommands();
     commands.push(command);
@@ -221,7 +260,7 @@ export class SpecsEditorMock {
       commandId: command.commandId,
       requestId: command.requestId,
       status: command.status,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      expiresAt: 'Demo/Preview only',
     };
   }
 
@@ -240,10 +279,10 @@ export class SpecsEditorMock {
       command.result = {
         message:
           command.action === 'open_app'
-            ? 'Editor mock opened the requested Mac application.'
+            ? 'Demo/Preview: simulated opening the requested application.'
             : command.action === 'draft_email'
-              ? 'Editor mock opened the unsent email draft.'
-              : 'Editor mock prepared the programming workspace without changing files.',
+              ? 'Demo/Preview: simulated opening an unsent email draft.'
+              : 'Demo/Preview: simulated agent completion. No files were accessed or changed.',
       };
     } else if (command.pollCount >= 3) {
       command.status = 'approved';
@@ -258,6 +297,186 @@ export class SpecsEditorMock {
       status: command.status,
       result: { ...command.result },
     };
+  }
+
+  public static discoverAgentProviders(): Array<{
+    id: string;
+    displayName: string;
+    available: boolean;
+    setupState: string;
+    description: string;
+  }> {
+    return [
+      {
+        id: 'cursor_sdk',
+        displayName: 'Cursor (Demo/Preview)',
+        available: true,
+        setupState: 'demo',
+        description: 'Demo/Preview provider. No live bridge or files are used.',
+      },
+      {
+        id: 'claude_code',
+        displayName: 'Claude Code (Demo/Preview)',
+        available: true,
+        setupState: 'demo',
+        description: 'Demo/Preview provider. No live bridge or files are used.',
+      },
+    ];
+  }
+
+  public static fetchAgentSetupState(): {
+    paired: boolean;
+    bridgeConnected: boolean;
+    ready: boolean;
+    mode: string;
+    message: string;
+  } {
+    return {
+      paired: this.fetchPairStatus().paired,
+      bridgeConnected: false,
+      ready: true,
+      mode: 'demo_preview',
+      message: 'Demo/Preview mode is ready. No live bridge is connected.',
+    };
+  }
+
+  public static fetchAllowedAgentWorkspaces(): Array<{
+    id: string;
+    repositoryName: string;
+    workspaceName: string;
+    providerIds: string[];
+  }> {
+    return [
+      {
+        id: 'demo-workspace',
+        repositoryName: 'Demo Repository',
+        workspaceName: 'Demo Workspace (Preview only)',
+        providerIds: ['cursor_sdk', 'claude_code'],
+      },
+    ];
+  }
+
+  public static fetchAgentModels(providerId: string): Array<{
+    id: string;
+    displayName: string;
+    providerId: string;
+    isDefault: boolean;
+  }> {
+    const normalizedProvider = String(providerId || 'cursor_sdk').trim().toLowerCase();
+    return [
+      {
+        id: 'auto',
+        displayName: 'Automatic (Demo/Preview)',
+        providerId: normalizedProvider,
+        isDefault: true,
+      },
+      {
+        id: 'demo-fast',
+        displayName: 'Fast Demo (Preview only)',
+        providerId: normalizedProvider,
+        isDefault: false,
+      },
+    ];
+  }
+
+  public static startAgentSession(
+    providerId: string,
+    workspaceId: string,
+    modelId: string,
+    prompt: string
+  ): MockAgentSession {
+    const sequence = this.nextSequence();
+    const session: MockStoredAgentSession = {
+      sessionId: `demo-preview-session-${sequence}`,
+      providerId: String(providerId || 'cursor_sdk').trim().toLowerCase(),
+      workspaceId: String(workspaceId || 'demo-workspace').trim(),
+      modelId: String(modelId || 'auto').trim(),
+      status: 'queued',
+      progress: 'Demo/Preview: queued a simulated agent session.',
+      result: '',
+      createdAt: DEMO_TIMESTAMP,
+      updatedAt: DEMO_TIMESTAMP,
+      pollCount: 0,
+      history: [
+        {
+          id: `demo-history-${sequence}-1`,
+          role: 'user',
+          text: this.sanitizeDemoText(prompt),
+          createdAt: DEMO_TIMESTAMP,
+        },
+      ],
+    };
+    const sessions = this.loadAgentSessions();
+    sessions.push(session);
+    this.saveAgentSessions(sessions);
+    return this.copyAgentSession(session);
+  }
+
+  public static sendAgentFollowUp(sessionId: string, message: string): MockAgentSession | null {
+    const sessions = this.loadAgentSessions();
+    const session = sessions.find((entry) => entry.sessionId === sessionId);
+    if (!session) {
+      return null;
+    }
+    const sequence = this.nextSequence();
+    session.history.push({
+      id: `demo-history-${sequence}`,
+      role: 'user',
+      text: this.sanitizeDemoText(message),
+      createdAt: DEMO_TIMESTAMP,
+    });
+    session.status = 'running';
+    session.progress = 'Demo/Preview: processing a simulated follow-up.';
+    session.result = '';
+    session.pollCount = 1;
+    this.saveAgentSessions(sessions);
+    return this.copyAgentSession(session);
+  }
+
+  public static fetchAgentSessionStatus(sessionId: string): MockAgentSession | null {
+    const sessions = this.loadAgentSessions();
+    const session = sessions.find((entry) => entry.sessionId === sessionId);
+    if (!session) {
+      return null;
+    }
+    if (session.status !== 'cancelled' && session.status !== 'completed') {
+      session.pollCount += 1;
+      if (session.pollCount >= 3) {
+        session.status = 'completed';
+        session.progress = 'Demo/Preview: simulation complete.';
+        session.result =
+          'Demo/Preview result only. The request was simulated; no files were accessed or changed.';
+        session.history.push({
+          id: `demo-history-result-${session.sessionId}`,
+          role: 'assistant',
+          text: session.result,
+          createdAt: DEMO_TIMESTAMP,
+        });
+      } else {
+        session.status = 'running';
+        session.progress = 'Demo/Preview: running a deterministic simulation.';
+      }
+      this.saveAgentSessions(sessions);
+    }
+    return this.copyAgentSession(session);
+  }
+
+  public static fetchAgentSessionHistory(sessionId: string): MockAgentHistoryEntry[] {
+    const session = this.loadAgentSessions().find((entry) => entry.sessionId === sessionId);
+    return session ? session.history.map((entry) => ({ ...entry })) : [];
+  }
+
+  public static cancelAgentSession(sessionId: string): MockAgentSession | null {
+    const sessions = this.loadAgentSessions();
+    const session = sessions.find((entry) => entry.sessionId === sessionId);
+    if (!session) {
+      return null;
+    }
+    session.status = 'cancelled';
+    session.progress = 'Demo/Preview: simulated session cancelled.';
+    session.result = 'Demo/Preview cancellation only. No files were accessed or changed.';
+    this.saveAgentSessions(sessions);
+    return this.copyAgentSession(session);
   }
 
   public static fetchCalendarConfig(): MockCalendarConfig {
@@ -588,5 +807,60 @@ export class SpecsEditorMock {
       STORAGE_MOCK_BRIDGE_COMMANDS,
       JSON.stringify(commands.slice(-20))
     );
+  }
+
+  private static loadAgentSessions(): MockStoredAgentSession[] {
+    const raw = global.persistentStorageSystem.store.getString(
+      STORAGE_MOCK_AGENT_SESSIONS
+    );
+    if (!raw) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(raw) as MockStoredAgentSession[];
+      return Array.isArray(parsed)
+        ? parsed.filter(
+            (entry) =>
+              entry &&
+              String(entry.sessionId || '').trim() &&
+              Array.isArray(entry.history)
+          )
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private static saveAgentSessions(sessions: MockStoredAgentSession[]): void {
+    global.persistentStorageSystem.store.putString(
+      STORAGE_MOCK_AGENT_SESSIONS,
+      JSON.stringify(sessions.slice(-10))
+    );
+  }
+
+  private static copyAgentSession(session: MockStoredAgentSession): MockAgentSession {
+    return {
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      workspaceId: session.workspaceId,
+      modelId: session.modelId,
+      status: session.status,
+      progress: session.progress,
+      result: session.result,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+    };
+  }
+
+  private static sanitizeDemoText(value: string): string {
+    return String(value || '')
+      .replace(/(?:\/Users|\/home|[A-Za-z]:\\)[^\s"'<>]+/g, '[local path hidden]')
+      .replace(
+        /\b(?:secret|token|password|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
+        '$1=[hidden]'
+      )
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 2000);
   }
 }

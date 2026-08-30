@@ -1998,7 +1998,9 @@ export class PlantLifecycle extends BaseScriptComponent {
           continue;
         }
 
-        candidate.targetingMode = 7;
+        // Movable seeds use direct/indirect pinch only. Poke is incompatible
+        // with InteractableManipulation and produced a native SIK warning.
+        candidate.targetingMode = 3;
         if (candidate.ignoreInteractionPlane !== undefined) {
           candidate.ignoreInteractionPlane = true;
         }

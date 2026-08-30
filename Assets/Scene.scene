@@ -13,6 +13,7 @@
     - !<own> b0bf5e9a-1efe-452b-9e49-c9711533f11e
     - !<own> f6e5d4c3-b2a1-4098-8765-4321fedcba98
     - !<own> 193f0b37-a3ed-43c0-9c24-09ecdf78cb18
+    - !<own> 626d292e-1bc6-4b50-b79f-d56f28b60454
     - !<own> bcbb9be7-d298-4132-a5c8-1ef0b9e78dab
     - !<own> 3e3e0c24-7e6d-453a-a197-65fc4e4d3b63
     - !<own> 7c7350dc-41a2-4426-a5bb-047d14525a11
@@ -346,8 +347,10 @@
   Enabled: true
   ScriptAsset: !<reference> bcdd740e-ad08-41a2-b7cd-93b0f943f363
   ScriptInputsDefault:
-    cursorWorkspacePath: true
-    cursorModel: true
+    providerId: true
+    buddyName: true
+    workspaceId: true
+    agentModel: true
     enableSpeechOutput: true
     debugLogging: true
   ScriptTypesDefault:
@@ -359,8 +362,10 @@
       deviceRegistry: !<MappingBased.AssignableType_2> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
       speechRecognition: !<MappingBased.AssignableType_3> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
       agentTts: !<MappingBased.AssignableType_4> a1b2c3d4-e5f6-7890-abcd-ef1234567892
-      cursorWorkspacePath: /Users/allanyde/Documents/GitHub/DeskGame
-      cursorModel: auto
+      providerId: cursor_sdk
+      buddyName: Cursor
+      workspaceId: ""
+      agentModel: auto
       enableSpeechOutput: true
       debugLogging: false
   ScriptTypes:
@@ -472,12 +477,12 @@
       keepHoverOnTrigger: true
       enableInstantDrag: true
       isScrollable: false
-      allowMultipleInteractors: true
+      allowMultipleInteractors: false
       enablePokeDirectionality: false
       acceptableXDirections: !<float> 0.000000
       acceptableYDirections: !<float> 0.000000
       acceptableZDirections: !<float> 1.000000
-      useFilteredPinch: false
+      useFilteredPinch: true
   ScriptTypes:
     "":
       {}
@@ -1439,7 +1444,7 @@
     {}
   ScriptInputs:
     "":
-      runHarness: true
+      runHarness: false
       startupDelaySec: !<float> 2.000000
       runOnce: true
       goalText: I want to walk 20 meters
@@ -8301,7 +8306,7 @@
   PrefabRemaps:
     []
   Name: FlowGardenSpacePanel
-  Enabled: false
+  Enabled: true
   ScriptAsset: !<reference> d4eb7915-4ff7-423d-9880-b2dc9f586e5f
   ScriptInputsDefault:
     refreshIntervalSec: true
@@ -8311,6 +8316,7 @@
     agentChatInnerWidth: true
     agentChatInnerHeight: true
     agentChatBackgroundAlpha: true
+    autoShowAgentCenterOnStart: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -8330,7 +8336,8 @@
       scrollInteractable: !<reference.ScriptComponent> f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c
       refreshIntervalSec: !<float> 30.000000
       scrollDragSensitivity: 0.350000
-      startVisible: false
+      startVisible: true
+      autoShowAgentCenterOnStart: true
       debugLogging: false
       titleWorldScale: 1.200000
       bodyWorldScale: 0.900000
@@ -12426,3 +12433,230 @@
     - !<own> e89380f6-e75a-4ebb-b796-993facb94754
     - !<own> cf5710f2-4880-47bb-b055-343e8258877d
     - !<own> d2004289-1e40-428c-959b-cee20ed820b3
+- !<SceneObject/626d292e-1bc6-4b50-b79f-d56f28b60454>
+  PrefabRemaps:
+    []
+  Name: Claude
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 28.000000, y: -2.818398, z: -30.543983}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 8.400000, y: 8.400000, z: 8.400000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> d1ff98ea-87a9-45cf-aba9-b83f079c706f
+    - !<own> 82c40efe-205a-4cb8-ab0a-8ce7e4c83a0a
+    - !<own> 67c002c0-fb69-4807-b889-07efe6e676f4
+    - !<own> a594f463-c07e-4abf-895b-f6fbc576f9bf
+    - !<own> 02316ef8-90b0-40bc-aedf-9d4bee12595c
+    - !<own> 337a2ded-2fa1-4271-9086-2e9d52fd6225
+- !<RenderMeshVisual/d1ff98ea-87a9-45cf-aba9-b83f079c706f>
+  PrefabRemaps:
+    []
+  Name: Claude Ghost Visual
+  Enabled: true
+  RenderOrder: 2
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 845da6ca-6433-4848-be46-3d6803c44c5d
+  Mesh: !<reference> dc14ddf6-beb4-4506-bf99-d1178aab0072
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/82c40efe-205a-4cb8-ab0a-8ce7e4c83a0a>
+  PrefabRemaps:
+    []
+  Name: ArvisGhostBlob
+  Enabled: true
+  ScriptAsset: !<reference> 8b234eee-0cca-4876-83b9-77c5543e6c85
+  ScriptInputsDefault:
+    eyeMaterialTemplate: true
+    eyeScale: true
+    idlePulseSpeed: true
+    activePulseSpeed: true
+    thinkingPulseSpeed: true
+    debugLogging: true
+    releaseSoundVolume: true
+    enableGrabSounds: true
+    enableSpeechBubble: true
+    speechBubbleHideDelaySec: true
+    showNameTagWhenMultiple: true
+    enableLookAt: true
+    lookAtDistanceMeters: true
+    lookAtExitPaddingMeters: true
+    lookAtTurnSpeed: true
+    lookAtAlwaysActive: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      ghostVisual: !<reference.RenderMeshVisual> d1ff98ea-87a9-45cf-aba9-b83f079c706f
+      waterMaterialTemplate: !<reference.Material> 845da6ca-6433-4848-be46-3d6803c44c5d
+      eyeMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      baseScale: 8.400000
+      eyeScale: 0.160000
+      eyeSeparation: 0.280000
+      eyeHeight: 0.120000
+      eyeForwardOffset: 0.350000
+      idlePulseSpeed: 0.550000
+      activePulseSpeed: 1.350000
+      thinkingPulseSpeed: 2.100000
+      enablePinchToTalk: false
+      registerAsSharedArvis: false
+      useAccentColor: true
+      accentColor: !<Vec3> {x: 1.000000, y: 0.340000, z: 0.080000}
+      debugLogging: false
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
+      grabSoundVolume: 0.850000
+      releaseSoundVolume: 0.800000
+      enableGrabSounds: true
+      enableSpeechBubble: true
+      speechBubbleHideDelaySec: !<float> 14.000000
+      companionName: Claude
+      showNameTagWhenMultiple: true
+      enableLookAt: true
+      lookAtDistanceMeters: 0.200000
+      lookAtExitPaddingMeters: 0.050000
+      lookAtTurnSpeed: !<float> 6.000000
+      lookAtAlwaysActive: true
+  ScriptTypes:
+    "":
+      {}
+- !<ColliderComponent/67c002c0-fb69-4807-b889-07efe6e676f4>
+  PrefabRemaps:
+    []
+  Name: Claude Grab Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 1.080000, y: 1.080000, z: 1.080000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<ScriptComponent/a594f463-c07e-4abf-895b-f6fbc576f9bf>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: true
+      keepHoverOnTrigger: true
+      enableInstantDrag: true
+      isScrollable: false
+      allowMultipleInteractors: false
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: true
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/02316ef8-90b0-40bc-aedf-9d4bee12595c>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: true
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> 626d292e-1bc6-4b50-b79f-d56f28b60454
+      enableTranslation: true
+      enableRotation: false
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: false
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: false
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/337a2ded-2fa1-4271-9086-2e9d52fd6225>
+  PrefabRemaps:
+    []
+  Name: CursorBuddy
+  Enabled: true
+  ScriptAsset: !<reference> bcdd740e-ad08-41a2-b7cd-93b0f943f363
+  ScriptInputsDefault:
+    providerId: true
+    buddyName: true
+    workspaceId: true
+    agentModel: true
+    enableSpeechOutput: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      ghostBlob: !<MappingBased.AssignableType> 82c40efe-205a-4cb8-ab0a-8ce7e4c83a0a
+      specsApi: !<MappingBased.AssignableType_1> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_2> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      speechRecognition: !<MappingBased.AssignableType_3> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
+      agentTts: !<MappingBased.AssignableType_4> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      providerId: claude_code
+      buddyName: Claude
+      workspaceId: ""
+      agentModel: auto
+      enableSpeechOutput: true
+      debugLogging: false
+  ScriptTypes:
+    "":
+      {}

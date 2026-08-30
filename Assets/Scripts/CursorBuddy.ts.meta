@@ -26,15 +26,17 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    agentModel: false
     agentTts: false
-    cursorModel: false
-    cursorWorkspacePath: false
+    buddyName: false
     debugLogging: false
     deviceRegistry: false
     enableSpeechOutput: false
     ghostBlob: false
+    providerId: false
     specsApi: false
     speechRecognition: false
+    workspaceId: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -49,8 +51,10 @@
       deviceRegistry: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
       speechRecognition: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
       agentTts: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
-      cursorWorkspacePath: /Users/allanyde/Documents/GitHub/DeskGame
-      cursorModel: auto
+      providerId: cursor_sdk
+      buddyName: Cursor
+      workspaceId: ""
+      agentModel: auto
       enableSpeechOutput: true
       debugLogging: false
   ScriptTypes:
@@ -62,7 +66,9 @@
     - // @input AssignableType_2 deviceRegistry
     - // @input AssignableType_3 speechRecognition
     - // @input AssignableType_4 agentTts
-    - '// @input string cursorWorkspacePath = "/Users/allanyde/Documents/GitHub/DeskGame" {"label":"Cursor Workspace", "hint":"Mac folder that Cursor SDK is allowed to edit."}'
-    - '// @input string cursorModel = "auto" {"label":"Cursor Model"}'
+    - '// @input string providerId = "cursor_sdk" {"label":"Provider ID", "hint":"Bridge provider: cursor_sdk or claude_code."}'
+    - '// @input string buddyName = "Cursor" {"label":"Buddy Name"}'
+    - '// @input string workspaceId {"label":"Approved Workspace ID", "hint":"Bridge-issued allowlisted workspace ID. Never store a personal path here."}'
+    - '// @input string agentModel = "auto" {"label":"Agent Model"}'
     - // @input bool enableSpeechOutput = true
     - // @input bool debugLogging

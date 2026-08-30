@@ -222,7 +222,7 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
         if (isNull(target)) {
           continue;
         }
-        if (!target.enabled) {
+        if (!this.isEffectivelyEnabled(target)) {
           hiddenNames.push(target.name);
         } else {
           failures.push(`distance cull did not hide ${target.name} beyond 20m`);
@@ -241,7 +241,7 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
           if (isNull(target)) {
             continue;
           }
-          if (target.enabled) {
+          if (this.isEffectivelyEnabled(target)) {
             shownNames.push(target.name);
           } else {
             failures.push(`distance cull did not restore ${target.name} within 20m`);
@@ -428,5 +428,16 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
       }
     }
     return targets;
+  }
+
+  private isEffectivelyEnabled(target: SceneObject): boolean {
+    let current: SceneObject | null = target;
+    while (!isNull(current)) {
+      if (!(current as SceneObject).enabled) {
+        return false;
+      }
+      current = (current as SceneObject).getParent();
+    }
+    return true;
   }
 }

@@ -102,6 +102,55 @@ export type SpecsBridgeCommandStatus = {
   result: JsonRecord;
 };
 
+export type SpecsAgentProvider = {
+  id: string;
+  displayName: string;
+  available: boolean;
+  setupState: string;
+  description: string;
+};
+
+export type SpecsAgentSetupState = {
+  paired: boolean;
+  bridgeConnected: boolean;
+  ready: boolean;
+  mode: string;
+  message: string;
+};
+
+export type SpecsAgentWorkspace = {
+  id: string;
+  repositoryName: string;
+  workspaceName: string;
+  providerIds: string[];
+};
+
+export type SpecsAgentModel = {
+  id: string;
+  displayName: string;
+  providerId: string;
+  isDefault: boolean;
+};
+
+export type SpecsAgentSession = {
+  sessionId: string;
+  providerId: string;
+  workspaceId: string;
+  modelId: string;
+  status: string;
+  progress: string;
+  result: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SpecsAgentHistoryEntry = {
+  id: string;
+  role: string;
+  text: string;
+  createdAt: string;
+};
+
 export type SpecsSpaceItem = {
   type: string;
   id: string;
@@ -785,6 +834,355 @@ export class SpecsApiClient extends BaseScriptComponent {
     );
   }
 
+  public discoverAgentProviders(
+    deviceId: string,
+    deviceSecret: string,
+    onDone: (providers: SpecsAgentProvider[], error?: string) => void
+  ): void {
+    if (this.isEditorMockActive()) {
+      onDone(SpecsEditorMock.discoverAgentProviders() as SpecsAgentProvider[]);
+      return;
+    }
+    this.getAgentBridgeJson(
+      '/api/specs/bridge/agent/providers',
+      deviceId,
+      deviceSecret,
+      (data, err) => {
+        if (err || !data) {
+          onDone([], this.formatAgentBridgeError(err));
+          return;
+        }
+        const raw = Array.isArray(data.providers) ? data.providers : [];
+        onDone(raw.map((entry) => this.parseAgentProvider(entry as JsonRecord)));
+      }
+    );
+  }
+
+  public fetchAgentSetupState(
+    deviceId: string,
+    deviceSecret: string,
+    onDone: (state: SpecsAgentSetupState | null, error?: string) => void
+  ): void {
+    if (this.isEditorMockActive()) {
+      onDone(SpecsEditorMock.fetchAgentSetupState() as SpecsAgentSetupState);
+      return;
+    }
+    this.getAgentBridgeJson(
+      '/api/specs/bridge/agent/setup',
+      deviceId,
+      deviceSecret,
+      (data, err) => {
+        if (err || !data) {
+          onDone(null, this.formatAgentBridgeError(err));
+          return;
+        }
+        onDone({
+          paired: this.parseBoolean(data.paired, true),
+          bridgeConnected: this.parseBoolean(
+            data.bridge_connected ?? data.bridgeConnected,
+            false
+          ),
+          ready: this.parseBoolean(data.ready, false),
+          mode: this.sanitizeAgentText(data.mode || 'live'),
+          message: this.sanitizeAgentText(data.message || ''),
+        });
+      }
+    );
+  }
+
+  public fetchAllowedAgentWorkspaces(
+    deviceId: string,
+    deviceSecret: string,
+    onDone: (workspaces: SpecsAgentWorkspace[], error?: string) => void
+  ): void {
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.fetchAllowedAgentWorkspaces() as SpecsAgentWorkspace[]
+      );
+      return;
+    }
+    this.getAgentBridgeJson(
+      '/api/specs/bridge/agent/workspaces',
+      deviceId,
+      deviceSecret,
+      (data, err) => {
+        if (err || !data) {
+          onDone([], this.formatAgentBridgeError(err));
+          return;
+        }
+        const raw = Array.isArray(data.workspaces)
+          ? data.workspaces
+          : Array.isArray(data.repositories)
+            ? data.repositories
+            : [];
+        onDone(raw.map((entry) => this.parseAgentWorkspace(entry as JsonRecord)));
+      }
+    );
+  }
+
+  public fetchAgentModels(
+    deviceId: string,
+    deviceSecret: string,
+    providerId: string,
+    onDone: (models: SpecsAgentModel[], error?: string) => void
+  ): void {
+    const normalizedProvider = this.normalizeAgentProvider(providerId);
+    if (!normalizedProvider) {
+      onDone([], 'Agent provider is required');
+      return;
+    }
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.fetchAgentModels(normalizedProvider) as SpecsAgentModel[]
+      );
+      return;
+    }
+    this.getAgentBridgeJson(
+      '/api/specs/bridge/agent/providers/' +
+        encodeURIComponent(normalizedProvider) +
+        '/models',
+      deviceId,
+      deviceSecret,
+      (data, err) => {
+        if (err || !data) {
+          onDone([], this.formatAgentBridgeError(err));
+          return;
+        }
+        const raw = Array.isArray(data.models) ? data.models : [];
+        onDone(
+          raw.map((entry) =>
+            this.parseAgentModel(entry as JsonRecord, normalizedProvider)
+          )
+        );
+      }
+    );
+  }
+
+  public startAgentSession(
+    deviceId: string,
+    deviceSecret: string,
+    requestId: string,
+    providerId: string,
+    workspaceId: string,
+    prompt: string,
+    modelId: string,
+    onDone: (session: SpecsAgentSession | null, error?: string) => void
+  ): void {
+    const request = this.normalizeAgentSessionRequest(
+      requestId,
+      providerId,
+      workspaceId,
+      prompt,
+      modelId
+    );
+    if (!request) {
+      onDone(null, 'Agent session request is incomplete');
+      return;
+    }
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.startAgentSession(
+          request.providerId,
+          request.workspaceId,
+          request.modelId,
+          request.prompt
+        ) as SpecsAgentSession
+      );
+      return;
+    }
+    this.postJson(
+      '/api/specs/bridge/agent/sessions',
+      {
+        device_id: deviceId,
+        device_secret: deviceSecret,
+        request_id: request.requestId,
+        provider_id: request.providerId,
+        workspace_id: request.workspaceId,
+        prompt: request.prompt,
+        model_id: request.modelId,
+      },
+      (data, err) => {
+        if (err || !data) {
+          onDone(null, this.formatAgentBridgeError(err));
+          return;
+        }
+        onDone(this.parseAgentSession(data.session || data));
+      },
+      this.requestTimeoutSec
+    );
+  }
+
+  public sendAgentFollowUp(
+    deviceId: string,
+    deviceSecret: string,
+    sessionId: string,
+    message: string,
+    onDone: (session: SpecsAgentSession | null, error?: string) => void
+  ): void {
+    const normalizedSessionId = String(sessionId || '').trim();
+    const normalizedMessage = String(message || '').trim();
+    if (!normalizedSessionId || !normalizedMessage) {
+      onDone(null, 'Agent follow-up request is incomplete');
+      return;
+    }
+    if (normalizedMessage.length > 16000) {
+      onDone(null, 'Agent follow-up is too long');
+      return;
+    }
+    if (this.isEditorMockActive()) {
+      const session = SpecsEditorMock.sendAgentFollowUp(
+        normalizedSessionId,
+        normalizedMessage
+      );
+      onDone(
+        session as SpecsAgentSession | null,
+        session ? undefined : 'Demo/Preview session not found'
+      );
+      return;
+    }
+    this.postJson(
+      '/api/specs/bridge/agent/sessions/' +
+        encodeURIComponent(normalizedSessionId) +
+        '/messages',
+      {
+        device_id: deviceId,
+        device_secret: deviceSecret,
+        message: normalizedMessage,
+      },
+      (data, err) => {
+        if (err || !data) {
+          onDone(null, this.formatAgentBridgeError(err));
+          return;
+        }
+        onDone(this.parseAgentSession(data.session || data));
+      }
+    );
+  }
+
+  public fetchAgentSessionStatus(
+    deviceId: string,
+    deviceSecret: string,
+    sessionId: string,
+    onDone: (session: SpecsAgentSession | null, error?: string) => void
+  ): void {
+    const normalizedSessionId = String(sessionId || '').trim();
+    if (!normalizedSessionId) {
+      onDone(null, 'Agent session id is required');
+      return;
+    }
+    if (this.isEditorMockActive()) {
+      const session = SpecsEditorMock.fetchAgentSessionStatus(normalizedSessionId);
+      onDone(
+        session as SpecsAgentSession | null,
+        session ? undefined : 'Demo/Preview session not found'
+      );
+      return;
+    }
+    this.getAgentBridgeJson(
+      '/api/specs/bridge/agent/sessions/' +
+        encodeURIComponent(normalizedSessionId),
+      deviceId,
+      deviceSecret,
+      (data, err) => {
+        if (err || !data) {
+          onDone(null, this.formatAgentBridgeError(err));
+          return;
+        }
+        onDone(this.parseAgentSession(data.session || data));
+      }
+    );
+  }
+
+  public fetchAgentSessionProgress(
+    deviceId: string,
+    deviceSecret: string,
+    sessionId: string,
+    onDone: (session: SpecsAgentSession | null, error?: string) => void
+  ): void {
+    this.fetchAgentSessionStatus(deviceId, deviceSecret, sessionId, onDone);
+  }
+
+  public fetchAgentSessionHistory(
+    deviceId: string,
+    deviceSecret: string,
+    sessionId: string,
+    onDone: (history: SpecsAgentHistoryEntry[], error?: string) => void
+  ): void {
+    const normalizedSessionId = String(sessionId || '').trim();
+    if (!normalizedSessionId) {
+      onDone([], 'Agent session id is required');
+      return;
+    }
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.fetchAgentSessionHistory(
+          normalizedSessionId
+        ) as SpecsAgentHistoryEntry[]
+      );
+      return;
+    }
+    this.getAgentBridgeJson(
+      '/api/specs/bridge/agent/sessions/' +
+        encodeURIComponent(normalizedSessionId) +
+        '/history',
+      deviceId,
+      deviceSecret,
+      (data, err) => {
+        if (err || !data) {
+          onDone([], this.formatAgentBridgeError(err));
+          return;
+        }
+        const raw = Array.isArray(data.history)
+          ? data.history
+          : Array.isArray(data.messages)
+            ? data.messages
+            : [];
+        onDone(
+          raw.map((entry, index) =>
+            this.parseAgentHistoryEntry(entry as JsonRecord, index)
+          )
+        );
+      }
+    );
+  }
+
+  public cancelAgentSession(
+    deviceId: string,
+    deviceSecret: string,
+    sessionId: string,
+    onDone: (session: SpecsAgentSession | null, error?: string) => void
+  ): void {
+    const normalizedSessionId = String(sessionId || '').trim();
+    if (!normalizedSessionId) {
+      onDone(null, 'Agent session id is required');
+      return;
+    }
+    if (this.isEditorMockActive()) {
+      const session = SpecsEditorMock.cancelAgentSession(normalizedSessionId);
+      onDone(
+        session as SpecsAgentSession | null,
+        session ? undefined : 'Demo/Preview session not found'
+      );
+      return;
+    }
+    this.postJson(
+      '/api/specs/bridge/agent/sessions/' +
+        encodeURIComponent(normalizedSessionId) +
+        '/cancel',
+      {
+        device_id: deviceId,
+        device_secret: deviceSecret,
+      },
+      (data, err) => {
+        if (err || !data) {
+          onDone(null, this.formatAgentBridgeError(err));
+          return;
+        }
+        onDone(this.parseAgentSession(data.session || data));
+      }
+    );
+  }
+
   /**
    * Queues a local coding task for the paired Arvis Mac bridge.
    * The bridge keeps provider credentials on the Mac; Spectacles only sends
@@ -1297,6 +1695,157 @@ export class SpecsApiClient extends BaseScriptComponent {
     };
   }
 
+  private normalizeAgentProvider(providerId: string): string {
+    const normalized = String(providerId || '').trim().toLowerCase();
+    return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(normalized) ? normalized : '';
+  }
+
+  private normalizeAgentSessionRequest(
+    requestId: string,
+    providerId: string,
+    workspaceId: string,
+    prompt: string,
+    modelId: string
+  ): {
+    requestId: string;
+    providerId: string;
+    workspaceId: string;
+    prompt: string;
+    modelId: string;
+  } | null {
+    const normalizedRequestId = String(requestId || '').trim();
+    const normalizedProvider = this.normalizeAgentProvider(providerId);
+    const normalizedWorkspace = String(workspaceId || '').trim();
+    const normalizedPrompt = String(prompt || '').trim();
+    const normalizedModel = String(modelId || 'auto').trim() || 'auto';
+    if (
+      !normalizedRequestId ||
+      !normalizedProvider ||
+      !normalizedWorkspace ||
+      !normalizedPrompt ||
+      normalizedPrompt.length > 16000
+    ) {
+      return null;
+    }
+    return {
+      requestId: normalizedRequestId,
+      providerId: normalizedProvider,
+      workspaceId: normalizedWorkspace,
+      prompt: normalizedPrompt,
+      modelId: normalizedModel,
+    };
+  }
+
+  private parseAgentProvider(raw: JsonRecord): SpecsAgentProvider {
+    const id = this.normalizeAgentProvider(String(raw.id || raw.provider_id || ''));
+    return {
+      id,
+      displayName: this.sanitizeAgentText(
+        raw.displayName || raw.display_name || raw.name || id
+      ),
+      available: this.parseBoolean(raw.available, true),
+      setupState: this.sanitizeAgentText(
+        raw.setupState || raw.setup_state || 'unknown'
+      ),
+      description: this.sanitizeAgentText(raw.description || ''),
+    };
+  }
+
+  private parseAgentWorkspace(raw: JsonRecord): SpecsAgentWorkspace {
+    const providerValues = Array.isArray(raw.providerIds)
+      ? raw.providerIds
+      : Array.isArray(raw.provider_ids)
+        ? raw.provider_ids
+        : [];
+    const providerIds = providerValues
+      .map((value) => this.normalizeAgentProvider(String(value || '')))
+      .filter((value) => !!value);
+    return {
+      id: String(raw.id || raw.workspace_id || raw.repository_id || '').trim(),
+      repositoryName: this.sanitizeAgentText(
+        raw.repositoryName || raw.repository_name || raw.repository || 'Repository'
+      ),
+      workspaceName: this.sanitizeAgentText(
+        raw.workspaceName || raw.workspace_name || raw.name || 'Workspace'
+      ),
+      providerIds,
+    };
+  }
+
+  private parseAgentModel(raw: JsonRecord, providerId: string): SpecsAgentModel {
+    return {
+      id: String(raw.id || raw.model_id || '').trim(),
+      displayName: this.sanitizeAgentText(
+        raw.displayName || raw.display_name || raw.name || raw.id || 'Model'
+      ),
+      providerId: this.normalizeAgentProvider(
+        String(raw.providerId || raw.provider_id || providerId)
+      ),
+      isDefault: this.parseBoolean(raw.isDefault ?? raw.is_default, false),
+    };
+  }
+
+  private parseAgentSession(raw: unknown): SpecsAgentSession {
+    const record = raw && typeof raw === 'object' ? (raw as JsonRecord) : {};
+    return {
+      sessionId: String(record.sessionId || record.session_id || record.id || '').trim(),
+      providerId: this.normalizeAgentProvider(
+        String(record.providerId || record.provider_id || '')
+      ),
+      workspaceId: String(record.workspaceId || record.workspace_id || '').trim(),
+      modelId: String(record.modelId || record.model_id || '').trim(),
+      status: this.sanitizeAgentText(record.status || 'unknown').toLowerCase(),
+      progress: this.sanitizeAgentText(
+        record.progress || record.progress_text || record.message || ''
+      ),
+      result: this.sanitizeAgentText(
+        record.result_text ||
+          (typeof record.result === 'string' ? record.result : '') ||
+          ''
+      ),
+      createdAt: String(record.createdAt || record.created_at || '').trim(),
+      updatedAt: String(record.updatedAt || record.updated_at || '').trim(),
+    };
+  }
+
+  private parseAgentHistoryEntry(
+    raw: JsonRecord,
+    index: number
+  ): SpecsAgentHistoryEntry {
+    return {
+      id: String(raw.id || raw.message_id || `message-${index}`).trim(),
+      role: String(raw.role || 'assistant').trim().toLowerCase(),
+      text: this.sanitizeAgentText(raw.text || raw.content || raw.message || ''),
+      createdAt: String(raw.createdAt || raw.created_at || '').trim(),
+    };
+  }
+
+  private sanitizeAgentText(value: unknown): string {
+    return String(value || '')
+      .replace(/(?:\/[A-Za-z0-9._-]+){3,}/g, '[local path hidden]')
+      .replace(/[A-Za-z]:\\(?:[^\\\s]+\\){2,}[^\\\s]*/g, '[local path hidden]')
+      .replace(
+        /\b(secret|token|password|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
+        '$1=[hidden]'
+      )
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 4000);
+  }
+
+  private formatAgentBridgeError(error?: string): string {
+    const sanitized = this.sanitizeAgentText(error || '');
+    if (
+      !sanitized ||
+      /http 404|http 405|not found|unknown route|unsupported endpoint/i.test(
+        sanitized
+      )
+    ) {
+      return 'Agent bridge update required. Update the paired Mac bridge to use live agent sessions.';
+    }
+    return sanitized;
+  }
+
   private parseBoolean(value: unknown, fallback: boolean): boolean {
     if (typeof value === 'boolean') {
       return value;
@@ -1314,6 +1863,22 @@ export class SpecsApiClient extends BaseScriptComponent {
       return value !== 0;
     }
     return fallback;
+  }
+
+  private getAgentBridgeJson(
+    path: string,
+    deviceId: string,
+    deviceSecret: string,
+    onDone: (data: JsonRecord | null, error?: string) => void
+  ): void {
+    this.getJsonWithHeaders(
+      path,
+      {
+        'x-specs-device-id': String(deviceId || ''),
+        'x-specs-device-secret': String(deviceSecret || ''),
+      },
+      onDone
+    );
   }
 
   private getJson(path: string, onDone: (data: JsonRecord | null, error?: string) => void): void {

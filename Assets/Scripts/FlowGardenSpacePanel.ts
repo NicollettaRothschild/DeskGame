@@ -1,6 +1,7 @@
 import { registerFlowGardenSpacePanel } from './FlowGardenServiceRegistry';
 import { SpecsApiClient, SpecsSpaceItem, SpecsSpacePanel } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
+import { AgentCenterStateStore } from './AgentCenterStateStore';
 
 type InteractableLike = ScriptComponent & {
   onDragUpdate?: { add: (cb: (event?: unknown) => void) => void };
@@ -17,6 +18,51 @@ type DragEventLike = {
   interactor?: {
     targetHitPosition?: vec3;
   };
+};
+
+export type AgentCenterTab = 'agents' | 'chats' | 'settings';
+
+export type AgentCenterPhase =
+  | 'idle'
+  | 'pairing'
+  | 'demo'
+  | 'running'
+  | 'approval'
+  | 'final'
+  | 'error'
+  | 'cancelled'
+  | 'retrying';
+
+export type AgentVoiceActionName =
+  | 'open_agents'
+  | 'open_chats'
+  | 'open_settings'
+  | 'pair'
+  | 'demo'
+  | 'select_provider'
+  | 'select_repository'
+  | 'select_model'
+  | 'approve'
+  | 'reject'
+  | 'cancel'
+  | 'retry'
+  | 'unknown';
+
+export type AgentVoiceAction = {
+  action: AgentVoiceActionName;
+  value: string;
+  transcript: string;
+};
+
+export type AgentCenterState = {
+  tab: AgentCenterTab;
+  phase: AgentCenterPhase;
+  paired: boolean;
+  demoMode: boolean;
+  provider: string;
+  repository: string;
+  model: string;
+  retryable: boolean;
 };
 
 @component
@@ -83,6 +129,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   startVisible: boolean = false;
 
   @input
+  autoShowAgentCenterOnStart: boolean = true;
+
+  @input
   debugLogging: boolean = false;
 
   @input('float')
@@ -133,6 +182,16 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private lastDebugStatus = '';
   private lastAgentChatKey = '';
   private lastSpeechTranscriptKey = '';
+  private agentCenterState: AgentCenterState = {
+    tab: 'agents',
+    phase: 'idle',
+    paired: false,
+    demoMode: false,
+    provider: '',
+    repository: '',
+    model: '',
+    retryable: false,
+  };
 
   onAwake(): void {
     registerFlowGardenSpacePanel(this);
@@ -148,7 +207,11 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       this.setAgentChatFieldsVisible(false);
       this.suppressAgentLegacyUi();
       this.bindAgentFrameInitializer();
-      this.refreshPanel();
+      if (this.autoShowAgentCenterOnStart) {
+        this.beginAgentCenterOnboarding();
+      } else {
+        this.refreshPanel();
+      }
       this.scheduleRefresh();
       this.schedulePairPoll();
     });
@@ -156,6 +219,338 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
   public isAgentViewActive(): boolean {
     return this.agentViewActive;
+  }
+
+  public getAgentCenterState(): AgentCenterState {
+    return {
+      tab: this.agentCenterState.tab,
+      phase: this.agentCenterState.phase,
+      paired: this.agentCenterState.paired,
+      demoMode: this.agentCenterState.demoMode,
+      provider: this.agentCenterState.provider,
+      repository: this.agentCenterState.repository,
+      model: this.agentCenterState.model,
+      retryable: this.agentCenterState.retryable,
+    };
+  }
+
+  public beginAgentCenterOnboarding(): void {
+    this.setPanelVisible(true);
+    if (!isNull(this.deviceRegistry)) {
+      this.deviceRegistry.syncPairingFromStorage();
+      if (this.deviceRegistry.isPaired()) {
+        this.agentCenterState.paired = true;
+        this.showAgentCenter('agents');
+        return;
+      }
+    }
+    this.agentCenterState.tab = 'settings';
+    this.agentCenterState.phase = 'pairing';
+    this.presentAgentCenter(
+      'Agent Center · Welcome',
+      'Pair Mac at arvis.space/specs',
+      'Or say “start demo” for a credential-free preview. Demo never edits files.',
+      'Choose Pair Mac or Demo'
+    );
+  }
+
+  public showAgentCenter(tab: AgentCenterTab = 'agents'): void {
+    this.agentCenterState.tab = tab;
+    this.agentCenterState.phase = 'idle';
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      `Agent Center · ${this.formatAgentCenterTab(tab)}`,
+      this.formatAgentCenterConfiguration(),
+      this.getAgentCenterTabHelp(tab),
+      ''
+    );
+  }
+
+  public setAgentCenterTab(tab: AgentCenterTab): void {
+    this.showAgentCenter(tab);
+  }
+
+  public showAgentPairing(pairingUrl: string = 'arvis.space/specs', pairingCode?: string): void {
+    const url = String(pairingUrl || 'arvis.space/specs').trim() || 'arvis.space/specs';
+    const code = String(pairingCode || '').trim();
+    this.agentCenterState.tab = 'settings';
+    this.agentCenterState.phase = 'pairing';
+    this.agentCenterState.paired = false;
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      'Agent Center · Pairing',
+      `Open ${url}${code ? `\nPairing code: ${code}` : ''}`,
+      'Pairing connects this panel to your real Agent Center account.',
+      'Waiting for pairing'
+    );
+  }
+
+  public showAgentCenterPairing(
+    pairingUrl: string = 'arvis.space/specs',
+    pairingCode?: string
+  ): void {
+    this.showAgentPairing(pairingUrl, pairingCode);
+  }
+
+  public showAgentPaired(accountLabel?: string): void {
+    const label = String(accountLabel || '').trim();
+    this.agentCenterState.tab = 'settings';
+    this.agentCenterState.phase = 'idle';
+    this.agentCenterState.paired = true;
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      'Agent Center · Paired',
+      label ? `Connected as ${label}` : 'Connected',
+      this.formatAgentCenterConfiguration(),
+      'Ready'
+    );
+  }
+
+  public showAgentDemo(summary?: string, detail?: string): void {
+    const safeSummary = String(summary || 'Explore the Agent Center workflow').trim();
+    const safeDetail = String(
+      detail || 'This is presentation-only. No files, commits, or remote services are changed.'
+    ).trim();
+    this.agentCenterState.tab = 'agents';
+    this.agentCenterState.phase = 'demo';
+    this.agentCenterState.demoMode = true;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      'Agent Center · DEMO',
+      `DEMO — ${safeSummary}`,
+      `DEMO — ${safeDetail}`,
+      'DEMO · No real changes'
+    );
+  }
+
+  public showAgentCenterDemo(summary?: string, detail?: string): void {
+    this.showAgentDemo(summary, detail);
+  }
+
+  public showAgentProviderSelection(providers: string[], selected?: string): void {
+    const options = this.cleanAgentOptions(providers);
+    const choice = String(selected || '').trim();
+    this.agentCenterState.tab = 'settings';
+    this.agentCenterState.phase = 'idle';
+    this.agentCenterState.provider = choice;
+    if (choice) {
+      this.agentCenterState.provider = this.normalizeAgentProviderId(choice);
+    }
+    this.agentCenterState.retryable = false;
+    this.presentAgentSelection('Provider', options, choice);
+  }
+
+  public showAgentRepositorySelection(repositories: string[], selected?: string): void {
+    const options = this.cleanAgentOptions(repositories);
+    const choice = String(selected || '').trim();
+    this.agentCenterState.tab = 'settings';
+    this.agentCenterState.phase = 'idle';
+    this.agentCenterState.repository = choice;
+    if (choice) {
+      AgentCenterStateStore.setWorkspace(
+        this.agentCenterState.provider || 'cursor_sdk',
+        choice
+      );
+    }
+    this.agentCenterState.retryable = false;
+    this.presentAgentSelection('Repository', options, choice);
+  }
+
+  public showAgentModelSelection(models: string[], selected?: string): void {
+    const options = this.cleanAgentOptions(models);
+    const choice = String(selected || '').trim();
+    this.agentCenterState.tab = 'settings';
+    this.agentCenterState.phase = 'idle';
+    this.agentCenterState.model = choice;
+    if (choice) {
+      AgentCenterStateStore.setModel(
+        this.agentCenterState.provider || 'cursor_sdk',
+        choice
+      );
+    }
+    this.agentCenterState.retryable = false;
+    this.presentAgentSelection('Model', options, choice);
+  }
+
+  public showAgentStatus(agentName: string, status: string, detail?: string): void {
+    const label = this.cleanAgentLabel(agentName);
+    const safeStatus = String(status || 'Working').trim() || 'Working';
+    this.agentCenterState.tab = 'chats';
+    this.agentCenterState.phase = 'running';
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      `${label} · ${safeStatus}`,
+      this.formatAgentCenterConfiguration(),
+      this.truncateBody(String(detail || safeStatus).trim()),
+      safeStatus
+    );
+  }
+
+  public showAgentProgress(
+    agentName: string,
+    summary: string,
+    completed: number,
+    total: number
+  ): void {
+    const label = this.cleanAgentLabel(agentName);
+    const safeTotal = Math.max(0, Math.floor(total));
+    const safeCompleted = Math.max(0, Math.min(safeTotal, Math.floor(completed)));
+    const percent = safeTotal > 0 ? Math.floor((safeCompleted / safeTotal) * 100) : 0;
+    const progress = safeTotal > 0 ? `${safeCompleted}/${safeTotal} · ${percent}%` : 'In progress';
+    this.agentCenterState.tab = 'chats';
+    this.agentCenterState.phase = 'running';
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      `${label} · Progress`,
+      this.truncateBody(String(summary || 'Working…').trim()),
+      this.formatAgentCenterConfiguration(),
+      progress
+    );
+  }
+
+  public showAgentApproval(agentName: string, summary: string, detail?: string): void {
+    const label = this.cleanAgentLabel(agentName);
+    this.agentCenterState.tab = 'chats';
+    this.agentCenterState.phase = 'approval';
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      `${label} · Approval required`,
+      this.truncateBody(String(summary || 'Review the requested action.').trim()),
+      this.truncateBody(String(detail || 'Say “approve” or “reject”.').trim()),
+      'Waiting for approval'
+    );
+  }
+
+  public showAgentFinal(agentName: string, summary: string, detail?: string): void {
+    const label = this.cleanAgentLabel(agentName);
+    this.agentCenterState.tab = 'chats';
+    this.agentCenterState.phase = 'final';
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      `${label} · Complete`,
+      this.truncateBody(String(summary || 'Task complete.').trim()),
+      this.truncateBody(String(detail || '').trim()),
+      'Complete'
+    );
+  }
+
+  public showAgentError(agentName: string, message: string, retryable: boolean = true): void {
+    const label = this.cleanAgentLabel(agentName);
+    const detail = String(message || 'Something went wrong.').trim() || 'Something went wrong.';
+    this.agentCenterState.tab = 'chats';
+    this.agentCenterState.phase = 'error';
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = retryable;
+    this.presentAgentCenter(
+      `${label} · Error`,
+      this.truncateBody(detail),
+      retryable ? 'Say “retry” to try again, or “cancel”.' : 'This action cannot be retried.',
+      retryable ? 'Error · Retry available' : 'Error'
+    );
+  }
+
+  public showAgentCancelled(agentName: string, reason?: string): void {
+    const label = this.cleanAgentLabel(agentName);
+    this.agentCenterState.tab = 'chats';
+    this.agentCenterState.phase = 'cancelled';
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = true;
+    this.presentAgentCenter(
+      `${label} · Cancelled`,
+      this.truncateBody(String(reason || 'The task was cancelled.').trim()),
+      'Say “retry” to start again.',
+      'Cancelled'
+    );
+  }
+
+  public showAgentRetry(agentName: string, summary?: string): void {
+    const label = this.cleanAgentLabel(agentName);
+    this.agentCenterState.tab = 'chats';
+    this.agentCenterState.phase = 'retrying';
+    this.agentCenterState.demoMode = false;
+    this.agentCenterState.retryable = false;
+    this.presentAgentCenter(
+      `${label} · Retrying`,
+      this.truncateBody(String(summary || 'Starting another attempt…').trim()),
+      this.formatAgentCenterConfiguration(),
+      'Retrying…'
+    );
+  }
+
+  public normalizeAgentVoiceText(transcript: string): string {
+    return String(transcript || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[.,!?;:]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  public parseAgentVoiceAction(transcript: string): AgentVoiceAction {
+    const raw = String(transcript || '').trim();
+    const normalized = this.normalizeAgentVoiceText(raw);
+    const directActions: { phrases: string[]; action: AgentVoiceActionName }[] = [
+      { phrases: ['open agents', 'show agents', 'agents tab'], action: 'open_agents' },
+      { phrases: ['open chats', 'show chats', 'chats tab'], action: 'open_chats' },
+      { phrases: ['open settings', 'show settings', 'settings tab'], action: 'open_settings' },
+      { phrases: ['approve', 'approved', 'confirm', 'go ahead'], action: 'approve' },
+      { phrases: ['reject', 'deny', 'do not approve'], action: 'reject' },
+      { phrases: ['cancel', 'stop', 'stop agent'], action: 'cancel' },
+      { phrases: ['retry', 'try again', 'run again'], action: 'retry' },
+      { phrases: ['pair', 'pair device', 'start pairing'], action: 'pair' },
+      { phrases: ['demo', 'show demo', 'start demo'], action: 'demo' },
+    ];
+
+    for (let i = 0; i < directActions.length; i++) {
+      const match = directActions[i];
+      for (let j = 0; j < match.phrases.length; j++) {
+        if (normalized === match.phrases[j] || normalized.startsWith(match.phrases[j] + ' ')) {
+          return { action: match.action, value: '', transcript: raw };
+        }
+      }
+    }
+
+    const provider = this.extractAgentVoiceSelection(normalized, [
+      'select provider ',
+      'use provider ',
+      'provider ',
+    ]);
+    if (provider) {
+      return { action: 'select_provider', value: provider, transcript: raw };
+    }
+
+    const repository = this.extractAgentVoiceSelection(normalized, [
+      'select repository ',
+      'use repository ',
+      'repository ',
+      'select repo ',
+      'use repo ',
+      'repo ',
+    ]);
+    if (repository) {
+      return { action: 'select_repository', value: repository, transcript: raw };
+    }
+
+    const model = this.extractAgentVoiceSelection(normalized, [
+      'select model ',
+      'use model ',
+      'model ',
+    ]);
+    if (model) {
+      return { action: 'select_model', value: model, transcript: raw };
+    }
+
+    return { action: 'unknown', value: '', transcript: raw };
+  }
+
+  public parseVoiceAction(transcript: string): AgentVoiceAction {
+    return this.parseAgentVoiceAction(transcript);
   }
 
   public showSpeechTranscript(liveText: string, isListening: boolean): void {
@@ -603,6 +998,88 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
   private usesAgentChatContainer(): boolean {
     return !isNull(this.agentChatRoot);
+  }
+
+  private presentAgentCenter(
+    title: string,
+    primary: string,
+    secondary: string,
+    status: string
+  ): void {
+    this.presentAgentChatView();
+    this.setAgentTitle(title);
+    this.setTranscript(this.truncateBody(primary));
+    this.setAgentResponse(this.truncateBody(secondary));
+    this.setStatus(status);
+    this.applyAgentChatLayout();
+  }
+
+  private presentAgentSelection(kind: string, options: string[], selected: string): void {
+    const list = options.length > 0 ? options.join('\n') : '(none available)';
+    this.presentAgentCenter(
+      `Agent Center · ${kind}`,
+      selected ? `Selected: ${selected}` : `Select a ${kind.toLowerCase()}`,
+      this.truncateBody(list),
+      selected ? `${kind} selected` : `Waiting for ${kind.toLowerCase()}`
+    );
+  }
+
+  private cleanAgentOptions(options: string[]): string[] {
+    const clean: string[] = [];
+    const source = options || [];
+    for (let i = 0; i < source.length; i++) {
+      const value = String(source[i] || '').trim();
+      if (value && clean.indexOf(value) < 0) {
+        clean.push(value);
+      }
+    }
+    return clean;
+  }
+
+  private cleanAgentLabel(agentName: string): string {
+    return String(agentName || 'Agent').trim() || 'Agent';
+  }
+
+  private normalizeAgentProviderId(value: string): string {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized.indexOf('claude') >= 0 ? 'claude_code' : 'cursor_sdk';
+  }
+
+  private formatAgentCenterTab(tab: AgentCenterTab): string {
+    if (tab === 'chats') {
+      return 'Chats';
+    }
+    if (tab === 'settings') {
+      return 'Settings';
+    }
+    return 'Agents';
+  }
+
+  private getAgentCenterTabHelp(tab: AgentCenterTab): string {
+    if (tab === 'chats') {
+      return 'Agent activity, approvals, and results appear here.';
+    }
+    if (tab === 'settings') {
+      return 'Choose a provider, repository, and model.';
+    }
+    return 'Choose an agent or say “start demo”.';
+  }
+
+  private formatAgentCenterConfiguration(): string {
+    const provider = this.agentCenterState.provider || 'Not selected';
+    const repository = this.agentCenterState.repository || 'Not selected';
+    const model = this.agentCenterState.model || 'Not selected';
+    return `Provider: ${provider}\nRepository: ${repository}\nModel: ${model}`;
+  }
+
+  private extractAgentVoiceSelection(normalized: string, prefixes: string[]): string {
+    for (let i = 0; i < prefixes.length; i++) {
+      const prefix = prefixes[i];
+      if (normalized.startsWith(prefix)) {
+        return normalized.slice(prefix.length).trim();
+      }
+    }
+    return '';
   }
 
   private presentAgentChatView(): void {

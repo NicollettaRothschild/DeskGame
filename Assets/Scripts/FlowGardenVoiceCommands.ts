@@ -14,6 +14,7 @@ import { isArvisEmailDraftQuery } from './ArvisEmailDraftIntent';
 import { isNewsIntentQuery } from './ArvisNewsSkill';
 import {
   getSharedArvisAgentChat,
+  getSharedCodingBuddy,
   getSharedFlowGardenTts,
   getSharedFriendGrab,
   getSharedSpeechRecognition,
@@ -36,6 +37,11 @@ type SpacePanelLike = {
   showPanel?: () => void;
   nextItem?: () => void;
   previousItem?: () => void;
+  showAgentCenter?: (tab?: 'agents' | 'chats' | 'settings') => void;
+  showAgentCenterDemo?: (summary?: string, detail?: string) => void;
+  showAgentProviderSelection?: (providers: string[], selected?: string) => void;
+  showAgentRepositorySelection?: (repositories: string[], selected?: string) => void;
+  showAgentModelSelection?: (models: string[], selected?: string) => void;
 };
 
 type SpawnSourceLike = {
@@ -220,6 +226,9 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       return;
     }
 
+    if (this.tryAgentCenterCommand(text)) {
+      return;
+    }
     if (this.tryTodoCommand(text)) {
       return;
     }
@@ -278,6 +287,125 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
     }
     agent.sendUtterance(trimmed);
     return true;
+  }
+
+  private tryAgentCenterCommand(text: string): boolean {
+    const normalized = String(text || '').trim().toLowerCase();
+    const panel = this.spacePanel as unknown as SpacePanelLike;
+    if (isNull(this.spacePanel)) {
+      return false;
+    }
+
+    if (
+      /\b(cancel|stop)\b/.test(normalized) &&
+      /\b(cursor|claude|agent|session|coding task)\b/.test(normalized)
+    ) {
+      const provider =
+        normalized.indexOf('claude') >= 0 ? 'claude_code' : 'cursor_sdk';
+      const cancelled =
+        getSharedCodingBuddy(provider)?.cancelCurrentSession?.() === true;
+      this.setStatus(
+        cancelled
+          ? `${provider === 'claude_code' ? 'Claude' : 'Cursor'} session cancellation requested`
+          : `No active ${provider === 'claude_code' ? 'Claude' : 'Cursor'} session`
+      );
+      return true;
+    }
+
+    if (/\b(show|open)\s+(agent center|agents|chats|settings)\b/.test(normalized)) {
+      const tab = /\bsettings\b/.test(normalized)
+        ? 'settings'
+        : /\bchats\b/.test(normalized)
+          ? 'chats'
+          : 'agents';
+      panel.showAgentCenter?.(tab);
+      this.setStatus(`Agent Center: ${tab}`);
+      return true;
+    }
+
+    if (/\b(start|show|open)\s+demo\b/.test(normalized)) {
+      panel.showAgentCenterDemo?.(
+        'Cursor and Claude workflow',
+        'Choose a provider, repository, and model. Demo responses are simulated and never edit files.'
+      );
+      this.setStatus('Agent Center Demo');
+      return true;
+    }
+
+    const providerMatch = normalized.match(
+      /\b(?:use|select|ask)\s+(cursor|claude)(?:\s+code)?\b/
+    );
+    if (providerMatch) {
+      const provider = providerMatch[1] === 'claude' ? 'Claude Code' : 'Cursor';
+      panel.showAgentProviderSelection?.(['Cursor', 'Claude Code'], provider);
+      this.setStatus(`${provider} selected — hold that buddy to talk`);
+      return true;
+    }
+
+    if (/\b(show|list)\s+(repositories|repos|workspaces)\b/.test(normalized)) {
+      if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+        this.setStatus('Agent repository service unavailable');
+        return true;
+      }
+      this.specsApi.fetchAllowedAgentWorkspaces(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        (workspaces, error) => {
+          if (workspaces.length === 0) {
+            panel.showAgentRepositorySelection?.([]);
+            this.setStatus(error || 'No approved repositories');
+            return;
+          }
+          panel.showAgentRepositorySelection?.(
+            workspaces.map(
+              (workspace) =>
+                `${workspace.repositoryName || workspace.workspaceName} · ${workspace.id}`
+            )
+          );
+          this.setStatus(`${workspaces.length} approved repositories`);
+        }
+      );
+      return true;
+    }
+
+    const repositoryMatch = normalized.match(
+      /\b(?:use|select)\s+(?:repository|repo|workspace)\s+(.+)$/
+    );
+    if (repositoryMatch && repositoryMatch[1]) {
+      const repository = repositoryMatch[1].trim().toLowerCase();
+      if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+        this.setStatus('Agent repository service unavailable');
+        return true;
+      }
+      this.specsApi.fetchAllowedAgentWorkspaces(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        (workspaces, error) => {
+          const selected = workspaces.find((workspace) => {
+            const candidates = [
+              workspace.id,
+              workspace.repositoryName,
+              workspace.workspaceName,
+            ];
+            return candidates.some(
+              (candidate) => String(candidate || '').trim().toLowerCase() === repository
+            );
+          });
+          if (!selected) {
+            this.setStatus(error || `Repository is not bridge-approved: ${repository}`);
+            return;
+          }
+          panel.showAgentRepositorySelection?.(
+            [selected.repositoryName || selected.workspaceName],
+            selected.id
+          );
+          this.setStatus(`Repository selected: ${selected.repositoryName}`);
+        }
+      );
+      return true;
+    }
+
+    return false;
   }
 
   private tryWorkspaceResetCommand(text: string): boolean {
