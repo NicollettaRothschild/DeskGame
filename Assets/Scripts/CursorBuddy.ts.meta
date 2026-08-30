@@ -1,0 +1,68 @@
+- !<AssetImportMetadata/ae1eea6f-9bd6-4e89-ae07-f833d8a7142f>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> bcdd740e-ad08-41a2-b7cd-93b0f943f363
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> bcdd740e-ad08-41a2-b7cd-93b0f943f363
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 53e3bb17-6663-4669-9a4d-d28ef1ba8694
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/53e3bb17-6663-4669-9a4d-d28ef1ba8694>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 9b994bc4-ca4c-4ecf-a082-fd8fe27f616b
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    agentTts: false
+    cursorModel: false
+    cursorWorkspacePath: false
+    debugLogging: false
+    deviceRegistry: false
+    enableSpeechOutput: false
+    ghostBlob: false
+    specsApi: false
+    speechRecognition: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - ghostBlob: !<MappingBased.AssignableType> 00000000-0000-0000-0000-000000000000
+      specsApi: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      deviceRegistry: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      speechRecognition: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
+      agentTts: !<MappingBased.AssignableType_4> 00000000-0000-0000-0000-000000000000
+      cursorWorkspacePath: /Users/allanyde/Documents/GitHub/DeskGame
+      cursorModel: auto
+      enableSpeechOutput: true
+      debugLogging: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - // @input AssignableType ghostBlob
+    - // @input AssignableType_1 specsApi
+    - // @input AssignableType_2 deviceRegistry
+    - // @input AssignableType_3 speechRecognition
+    - // @input AssignableType_4 agentTts
+    - '// @input string cursorWorkspacePath = "/Users/allanyde/Documents/GitHub/DeskGame" {"label":"Cursor Workspace", "hint":"Mac folder that Cursor SDK is allowed to edit."}'
+    - '// @input string cursorModel = "auto" {"label":"Cursor Model"}'
+    - // @input bool enableSpeechOutput = true
+    - // @input bool debugLogging

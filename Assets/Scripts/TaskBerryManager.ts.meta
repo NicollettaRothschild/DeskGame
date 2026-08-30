@@ -74,7 +74,7 @@
     - // @input Component.Text statusText
     - // @input Component.ScriptComponent spacePanel
     - '// @input string apiBaseUrl = "https://arvis.space"'
-    - // @input float startupDelaySec = 4
+    - // @input float startupDelaySec = 12
     - // @input float pairPollSec = 4
     - // @input float taskPollSec = 45
     - // @input float berryRingRadius = 22

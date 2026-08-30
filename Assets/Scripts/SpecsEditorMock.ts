@@ -22,6 +22,22 @@ type MockPairStatus = {
   userEmail: string | null;
 };
 
+type MockBridgeCommand = {
+  commandId: string;
+  requestId: string;
+  action: string;
+  pollCount: number;
+  status: string;
+  result: Record<string, unknown>;
+};
+
+export type MockBridgeCommandStatus = {
+  commandId: string;
+  requestId: string;
+  status: string;
+  result: Record<string, unknown>;
+};
+
 export type MockCalendarConfig = {
   calendarId: string | null;
   calendarName: string | null;
@@ -70,6 +86,7 @@ const STORAGE_MOCK_EMAIL = 'specs_editor_mock_user_email';
 const STORAGE_MOCK_SPACE = 'specs_editor_mock_space_panel';
 const STORAGE_MOCK_CALENDAR_CONFIG = 'specs_editor_mock_calendar_config';
 const STORAGE_MOCK_CALENDAR_EVENTS = 'specs_editor_mock_calendar_events';
+const STORAGE_MOCK_BRIDGE_COMMANDS = 'specs_editor_mock_bridge_commands';
 
 const DEFAULT_MOCK_TASKS: MockTask[] = [
   { id: 'mock-1', text: 'Water the focus tree', deadline: null, source: 'editor', done: false },
@@ -177,6 +194,70 @@ export class SpecsEditorMock {
     const next = tasks.filter((task) => task.id !== taskId);
     global.persistentStorageSystem.store.putString(STORAGE_MOCK_TASKS, JSON.stringify(next));
     return true;
+  }
+
+  public static queueBridgeCommand(
+    action: string,
+    requestId: string,
+    detail: string = ''
+  ): {
+    commandId: string;
+    requestId: string;
+    status: string;
+    expiresAt: string;
+  } {
+    const command: MockBridgeCommand = {
+      commandId: `mock-bridge-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+      requestId,
+      action,
+      pollCount: 0,
+      status: 'pending',
+      result: detail ? { detail } : {},
+    };
+    const commands = this.loadMockBridgeCommands();
+    commands.push(command);
+    this.saveMockBridgeCommands(commands);
+    return {
+      commandId: command.commandId,
+      requestId: command.requestId,
+      status: command.status,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    };
+  }
+
+  public static fetchBridgeCommandStatus(
+    commandId: string
+  ): MockBridgeCommandStatus | null {
+    const commands = this.loadMockBridgeCommands();
+    const command = commands.find((entry) => entry.commandId === commandId);
+    if (!command) {
+      return null;
+    }
+
+    command.pollCount += 1;
+    if (command.pollCount >= 4) {
+      command.status = 'completed';
+      command.result = {
+        message:
+          command.action === 'open_app'
+            ? 'Editor mock opened the requested Mac application.'
+            : command.action === 'draft_email'
+              ? 'Editor mock opened the unsent email draft.'
+              : 'Editor mock prepared the programming workspace without changing files.',
+      };
+    } else if (command.pollCount >= 3) {
+      command.status = 'approved';
+    } else if (command.pollCount >= 2) {
+      command.status = 'claimed';
+    }
+    this.saveMockBridgeCommands(commands);
+
+    return {
+      commandId: command.commandId,
+      requestId: command.requestId,
+      status: command.status,
+      result: { ...command.result },
+    };
   }
 
   public static fetchCalendarConfig(): MockCalendarConfig {
@@ -485,5 +566,27 @@ export class SpecsEditorMock {
     ];
     store.putString(STORAGE_MOCK_CALENDAR_EVENTS, JSON.stringify(defaults));
     return defaults;
+  }
+
+  private static loadMockBridgeCommands(): MockBridgeCommand[] {
+    const raw = global.persistentStorageSystem.store.getString(
+      STORAGE_MOCK_BRIDGE_COMMANDS
+    );
+    if (!raw) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(raw) as MockBridgeCommand[];
+      return Array.isArray(parsed) ? parsed.filter((entry) => entry && entry.commandId) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private static saveMockBridgeCommands(commands: MockBridgeCommand[]): void {
+    global.persistentStorageSystem.store.putString(
+      STORAGE_MOCK_BRIDGE_COMMANDS,
+      JSON.stringify(commands.slice(-20))
+    );
   }
 }

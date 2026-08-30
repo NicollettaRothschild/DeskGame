@@ -26,11 +26,13 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    accentColor: false
     activePulseSpeed: false
     baseScale: false
     companionName: false
     debugLogging: false
     enableGrabSounds: false
+    enableLookAt: false
     enablePinchToTalk: false
     enableSpeechBubble: false
     eyeForwardOffset: false
@@ -42,11 +44,17 @@
     grabSoundTrack: false
     grabSoundVolume: false
     idlePulseSpeed: false
+    lookAtAlwaysActive: false
+    lookAtDistanceMeters: false
+    lookAtExitPaddingMeters: false
+    lookAtTurnSpeed: false
+    registerAsSharedArvis: false
     releaseSoundTrack: false
     releaseSoundVolume: false
     showNameTagWhenMultiple: false
     speechBubbleHideDelaySec: false
     thinkingPulseSpeed: false
+    useAccentColor: false
     waterMaterialTemplate: false
   ScriptTypesHidden:
     {}
@@ -69,6 +77,9 @@
       activePulseSpeed: 1.350000
       thinkingPulseSpeed: 2.100000
       enablePinchToTalk: true
+      registerAsSharedArvis: true
+      useAccentColor: false
+      accentColor: !<Vec3> {x: 0.200000, y: 0.550000, z: 1.000000}
       debugLogging: false
       grabSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       releaseSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
@@ -79,6 +90,11 @@
       speechBubbleHideDelaySec: !<float> 14.000000
       companionName: Arvis
       showNameTagWhenMultiple: true
+      enableLookAt: true
+      lookAtDistanceMeters: 0.200000
+      lookAtExitPaddingMeters: 0.050000
+      lookAtTurnSpeed: !<float> 6.000000
+      lookAtAlwaysActive: true
   ScriptTypes:
     -
       {}
@@ -95,7 +111,10 @@
     - // @input float activePulseSpeed = 1.35
     - // @input float thinkingPulseSpeed = 2.1
     - // @input bool enablePinchToTalk = true
-    - // @input bool debugLogging = true
+    - '// @input bool registerAsSharedArvis = true {"label":"Register As Arvis Ghost"}'
+    - '// @input bool useAccentColor {"label":"Use Accent Color"}'
+    - '// @input vec3 accentColor = {0.2,0.55,1} {"label":"Accent Color"}'
+    - // @input bool debugLogging
     - // @input Asset.AudioTrackAsset grabSoundTrack
     - // @input Asset.AudioTrackAsset releaseSoundTrack
     - // @input float grabSoundVolume = 0.85
@@ -105,3 +124,8 @@
     - // @input float speechBubbleHideDelaySec = 14
     - '// @input string companionName = "Arvis" {"label":"Companion Name", "hint":"Name shown above this companion when multiple AI companions are active."}'
     - '// @input bool showNameTagWhenMultiple = true {"label":"Show Name Tag With Multiple Companions", "hint":"Display this name tag when more than one enabled companion is present."}'
+    - '// @input bool enableLookAt = true {"label":"Look At User"}'
+    - '// @input float lookAtDistanceMeters = 0.2 {"label":"Look At Distance (m)"}'
+    - '// @input float lookAtExitPaddingMeters = 0.05 {"label":"Look At Exit Padding (m)"}'
+    - '// @input float lookAtTurnSpeed = 6 {"label":"Look At Turn Speed"}'
+    - '// @input bool lookAtAlwaysActive = true {"label":"Always Look At User", "hint":"Keep Arvis facing the user even when outside the proximity distance."}'

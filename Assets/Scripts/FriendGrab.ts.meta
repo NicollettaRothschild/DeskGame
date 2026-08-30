@@ -78,6 +78,7 @@
     onboardingGoalListenTimeoutSec: false
     onboardingGoalPromptLine: false
     onboardingGoalSeedLine: false
+    onboardingIncludePalette: false
     onboardingLeaderboard: false
     onboardingLeaderboardLine: false
     onboardingObjectSpacingCm: false
@@ -159,6 +160,7 @@
       onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
       onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingIncludePalette: false
       onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
       onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
@@ -248,6 +250,7 @@
     - '// @input SceneObject onboardingClock {"label":"Tour Clock"}'
     - '// @input string onboardingClockLine = "Here’s your clock. Put it somewhere easy to check while you work." {"label":"Clock Line"}'
     - '// @input SceneObject onboardingPalette {"label":"Tour Palette"}'
+    - '// @input bool onboardingIncludePalette {"label":"Include Palette In Onboarding", "hint":"Archived for now. Enable this only when the palette tour returns."}'
     - '// @input string onboardingPaletteLine = "This is your palette. Paint your world with it! Put it somewhere you can reach while you work." {"label":"Palette Line"}'
     - '// @input SceneObject onboardingPlanter {"label":"Tour Planter"}'
     - '// @input string onboardingPlanterLine = "This is your garden. Your goals will grow into plants here. Find a good spot for your extra planters." {"label":"Planter Line"}'
@@ -291,7 +294,7 @@
     - '// @input int leaderboardUsersLimit = 5 {"label":"Leaderboard Users Limit"}'
     - '// @input bool leaderboardUseGlobal = true {"label":"Leaderboard Use Global", "hint":"When off, fetches friends leaderboard instead of global."}'
     - '// @input bool announceLeaderboardRank {"label":"Announce Leaderboard Rank", "hint":"Speak the user rank after a successful score submit."}'
-    - '// @input bool enableFollowAfterOnboarding = true {"hint":"Buddy follows the camera in all sessions (paused only while grabbed)"}'
+    - '// @input bool enableFollowAfterOnboarding = true {"hint":"Buddy follows the camera until manually placed; say \"hey friend\" to resume"}'
     - // @input float followDistanceCm = 45
     - // @input float followSideOffsetCm = 4
     - // @input float followHeightOffsetCm = -18

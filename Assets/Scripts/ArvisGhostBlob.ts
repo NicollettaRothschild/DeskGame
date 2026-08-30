@@ -88,6 +88,18 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   enablePinchToTalk: boolean = true;
 
   @input
+  @label('Register As Arvis Ghost')
+  registerAsSharedArvis: boolean = true;
+
+  @input
+  @label('Use Accent Color')
+  useAccentColor: boolean = false;
+
+  @input
+  @label('Accent Color')
+  accentColor: vec3 = new vec3(0.2, 0.55, 1.0);
+
+  @input
   debugLogging: boolean = false;
 
   @input
@@ -123,6 +135,27 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   @hint('Display this name tag when more than one enabled companion is present.')
   showNameTagWhenMultiple: boolean = true;
 
+  @input
+  @label('Look At User')
+  enableLookAt: boolean = true;
+
+  @input('float')
+  @label('Look At Distance (m)')
+  lookAtDistanceMeters: number = 0.2;
+
+  @input('float')
+  @label('Look At Exit Padding (m)')
+  lookAtExitPaddingMeters: number = 0.05;
+
+  @input('float')
+  @label('Look At Turn Speed')
+  lookAtTurnSpeed: number = 6.0;
+
+  @input
+  @label('Always Look At User')
+  @hint('Keep Arvis facing the user even when outside the proximity distance.')
+  lookAtAlwaysActive: boolean = true;
+
   private phase: ArvisGhostPhase = 'idle';
   private baseLocalPosition: vec3 | null = null;
   private material: Material | null = null;
@@ -149,12 +182,21 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private talkDragStarted = false;
   private grabInteractable: InteractableLike | null = null;
   private grabManipulation: InteractableManipulationLike | null = null;
+  private grabCollider: ColliderComponent | null = null;
   private audioPlayer: AudioComponent | null = null;
   private grabAudioPlayer: AudioComponent | null = null;
   private resolvedGrabTrack: AudioTrackAsset | null = null;
   private resolvedReleaseTrack: AudioTrackAsset | null = null;
   private speechBubble: ArvisGhostSpeechBubble | null = null;
   private companionNameTag: CompanionNameTag | null = null;
+  private lookAt: LookAtComponent | null = null;
+  private lookAtCamera: SceneObject | null = null;
+  private lookAtTargetProxy: SceneObject | null = null;
+  private lookAtActive = false;
+  private lookAtDistanceLogTimer = 0;
+  private lookAtLoggedSetup = false;
+  private lastLookAtInvalidTargetLogAt = -9999;
+  private nextLookAtRetryAt = 0;
 
   private static readonly EYE_SQUASH_SMOOTH_SPEED = 14.0;
   private static readonly DEFAULT_WATER_SCROLL_SPEED = 2.2;
@@ -171,7 +213,9 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private static readonly LEGACY_EYES_NAME = 'ArvisEyes';
 
   onAwake(): void {
-    registerArvisGhostBlob(this);
+    if (this.registerAsSharedArvis) {
+      registerArvisGhostBlob(this);
+    }
     this.ensureAnchorGrabComponents();
     this.createEvent('OnStartEvent').bind(() => {
       this.cleanupLegacyHierarchy();
@@ -182,6 +226,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       this.ensureArvisSounds();
       this.ensureSpeechBubble();
       this.ensureCompanionNameTag();
+      this.ensureLookAt();
       this.refreshGrabCollider();
       this.setPhase('idle');
       this.wireMoveInteraction();
@@ -190,6 +235,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     this.createEvent('UpdateEvent').bind(() => this.tick());
     this.createEvent('LateUpdateEvent').bind(() => {
       this.applyIdleAnchorPose();
+      this.updateLookAt();
       this.syncEyesToGhostWorld();
       this.syncSpeechBubbleToGhostWorld();
     });
@@ -215,15 +261,17 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     this.phase = phase;
 
     if (phase === 'listening') {
-      this.phaseGhostColor = new vec4(1.0, 1.0, 1.0, 0.5);
+      this.phaseGhostColor = this.makePhaseColor(0.5);
     } else if (phase === 'thinking') {
-      this.phaseGhostColor = new vec4(1.0, 1.0, 1.0, 0.58);
+      this.phaseGhostColor = this.makePhaseColor(0.58);
     } else if (phase === 'reply') {
-      this.phaseGhostColor = new vec4(1.0, 1.0, 1.0, 0.62);
+      this.phaseGhostColor = this.makePhaseColor(0.62);
     } else if (phase === 'error') {
-      this.phaseGhostColor = new vec4(1.0, 0.88, 0.9, 0.52);
+      this.phaseGhostColor = this.useAccentColor
+        ? this.makePhaseColor(0.52)
+        : new vec4(1.0, 0.88, 0.9, 0.52);
     } else {
-      this.phaseGhostColor = new vec4(1.0, 1.0, 1.0, 0.38);
+      this.phaseGhostColor = this.makePhaseColor(0.38);
     }
 
     this.refreshGhostColor();
@@ -703,19 +751,25 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     const anchor = this.sceneObject;
     this.refreshGrabCollider();
 
-    let interactable = this.findExistingInteractable(anchor);
+    let interactable = this.grabInteractable;
+    if (isNull(interactable)) {
+      interactable = this.findExistingInteractable(anchor);
+    }
     if (isNull(interactable)) {
       interactable = anchor.createComponent(Interactable.getTypeName()) as InteractableLike;
     }
 
-    let manipulation = this.findExistingManipulation(anchor);
+    let manipulation = this.grabManipulation;
+    if (isNull(manipulation)) {
+      manipulation = this.findExistingManipulation(anchor);
+    }
     if (isNull(manipulation)) {
       manipulation = anchor.createComponent(
         InteractableManipulation.getTypeName()
       ) as unknown as InteractableManipulationLike;
     }
 
-    interactable.targetingMode = 7;
+    interactable.targetingMode = this.enablePinchToTalk ? 7 : 3;
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
     interactable.enableInstantDrag = true;
@@ -731,15 +785,17 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   private findExistingInteractable(root: SceneObject): InteractableLike | null {
+    const direct = root.getComponent(Interactable.getTypeName()) as unknown as InteractableLike;
+    if (!isNull(direct)) {
+      return direct;
+    }
+
     const scripts = root.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
       const candidate = scripts[i] as unknown as InteractableLike;
       if (
         !isNull(candidate) &&
-        candidate.targetingMode !== undefined &&
-        (candidate.onTriggerStart !== undefined ||
-          candidate.onInteractorTriggerStart !== undefined ||
-          candidate.onDragStart !== undefined)
+        candidate.targetingMode !== undefined
       ) {
         return candidate;
       }
@@ -748,6 +804,13 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   private findExistingManipulation(root: SceneObject): InteractableManipulationLike | null {
+    const direct = root.getComponent(
+      InteractableManipulation.getTypeName()
+    ) as unknown as InteractableManipulationLike;
+    if (!isNull(direct)) {
+      return direct;
+    }
+
     const scripts = root.getComponents('Component.ScriptComponent');
     for (let i = 0; i < scripts.length; i++) {
       const candidate = scripts[i] as unknown as InteractableManipulationLike;
@@ -905,15 +968,22 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   private ensureAnchorGrabCollider(anchor: SceneObject): ColliderComponent | null {
-    let collider = anchor.getComponent('Physics.ColliderComponent') as ColliderComponent;
-    if (isNull(collider)) {
-      collider = anchor.getComponent('Component.ColliderComponent') as ColliderComponent;
+    let collider = this.grabCollider;
+    if (isNull(collider) || collider.getSceneObject() !== anchor) {
+      collider = anchor.getComponent('Physics.ColliderComponent') as ColliderComponent;
+      if (isNull(collider)) {
+        collider = anchor.getComponent('Component.ColliderComponent') as ColliderComponent;
+      }
+      if (isNull(collider)) {
+        collider = anchor.createComponent('Physics.ColliderComponent') as ColliderComponent;
+      }
+      if (isNull(collider)) {
+        collider = anchor.createComponent('Component.ColliderComponent') as ColliderComponent;
+      }
+      this.grabCollider = collider;
     }
     if (isNull(collider)) {
-      collider = anchor.createComponent('Physics.ColliderComponent') as ColliderComponent;
-    }
-    if (isNull(collider)) {
-      collider = anchor.createComponent('Component.ColliderComponent') as ColliderComponent;
+      return null;
     }
 
     const colliderLike = collider as unknown as {
@@ -1122,8 +1192,42 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
   private refreshGhostColor(): void {
     this.ghostColor = this.moveActive
-      ? ArvisGhostBlob.GRAB_GHOST_COLOR
+      ? this.getGrabGhostColor()
       : this.phaseGhostColor;
+  }
+
+  private makePhaseColor(alpha: number): vec4 {
+    const color = this.useAccentColor
+      ? this.clampAccentColor(this.accentColor)
+      : new vec3(1.0, 1.0, 1.0);
+    return new vec4(color.x, color.y, color.z, alpha);
+  }
+
+  private getGrabGhostColor(): vec4 {
+    if (!this.useAccentColor) {
+      return ArvisGhostBlob.GRAB_GHOST_COLOR;
+    }
+    const color = this.clampAccentColor(this.accentColor);
+    return new vec4(color.x, color.y, color.z, 0.58);
+  }
+
+  private getGrabGhostEmissive(): vec3 {
+    if (!this.useAccentColor) {
+      return ArvisGhostBlob.GRAB_GHOST_EMISSIVE;
+    }
+    const color = this.clampAccentColor(this.accentColor);
+    return new vec3(color.x * 1.65, color.y * 1.45, color.z * 1.65);
+  }
+
+  private clampAccentColor(color: vec3): vec3 {
+    if (isNull(color)) {
+      return new vec3(0.2, 0.55, 1.0);
+    }
+    return new vec3(
+      Math.max(0, Math.min(1, color.x)),
+      Math.max(0, Math.min(1, color.y)),
+      Math.max(0, Math.min(1, color.z))
+    );
   }
 
   private applyMaterialColor(alphaScale: number): void {
@@ -1144,7 +1248,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       this.setPassVec3(
         pass,
         'Port_Emissive_N170',
-        this.moveActive ? ArvisGhostBlob.GRAB_GHOST_EMISSIVE : new vec3(0, 0, 0)
+        this.moveActive ? this.getGrabGhostEmissive() : new vec3(0, 0, 0)
       );
     }
 
@@ -1260,7 +1364,269 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     if (!this.moveActive) {
       const anchor = this.sceneObject;
       anchor.getTransform().setLocalPosition(this.baseLocalPosition);
-      anchor.getTransform().setLocalRotation(quat.quatIdentity());
+      if (!this.enableLookAt) {
+        anchor.getTransform().setLocalRotation(quat.quatIdentity());
+      }
+    }
+  }
+
+  private ensureLookAt(): void {
+    const now = getTime();
+    if (now < this.nextLookAtRetryAt) {
+      return;
+    }
+
+    const targetProxy = this.ensureLookAtTargetProxy();
+    if (isNull(targetProxy)) {
+      this.nextLookAtRetryAt = now + 1.0;
+      return;
+    }
+    this.refreshLookAtTargetProxyPosition();
+
+    const anchor = this.getSceneObject();
+    let lookAt = anchor.getComponent('Component.LookAtComponent') as LookAtComponent;
+    if (isNull(lookAt)) {
+      lookAt = anchor.createComponent('Component.LookAtComponent') as LookAtComponent;
+    }
+
+    try {
+      lookAt.target = targetProxy as SceneObject;
+    } catch (e) {
+      if (now - this.lastLookAtInvalidTargetLogAt > 3.0) {
+        this.lastLookAtInvalidTargetLogAt = now;
+        print('[ArvisGhostBlob] look-at skipped: invalid camera target: ' + e);
+      }
+      this.nextLookAtRetryAt = now + 1.5;
+      return;
+    }
+
+    this.nextLookAtRetryAt = 0;
+    lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
+    // Arvis' eyes face +Z, matching the Buddy mesh orientation.
+    lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
+    lookAt.worldUpVector = LookAtComponent.WorldUpVector.SceneY;
+    lookAt.enabled = false;
+    this.lookAt = lookAt;
+  }
+
+  private updateLookAt(): void {
+    if (!this.enableLookAt) {
+      this.setLookAtActive(false);
+      return;
+    }
+
+    if (isNull(this.lookAt) || isNull(this.lookAtTargetProxy)) {
+      this.ensureLookAt();
+      if (isNull(this.lookAt) || isNull(this.lookAtTargetProxy)) {
+        return;
+      }
+    }
+    const lookAt = this.lookAt as LookAtComponent;
+    const targetProxy = this.lookAtTargetProxy as SceneObject;
+    this.refreshLookAtTargetProxyPosition();
+
+    try {
+      lookAt.target = targetProxy;
+    } catch (e) {
+      const now = getTime();
+      if (now - this.lastLookAtInvalidTargetLogAt > 3.0) {
+        this.lastLookAtInvalidTargetLogAt = now;
+        print('[ArvisGhostBlob] look-at target refresh failed: ' + e);
+      }
+      lookAt.enabled = false;
+      this.nextLookAtRetryAt = now + 1.5;
+      return;
+    }
+    lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
+
+    if (this.lookAtAlwaysActive && !this.moveActive) {
+      this.setLookAtActive(true);
+      lookAt.enabled = true;
+      return;
+    }
+
+    const arvisPosition = this.getSceneObject().getTransform().getWorldPosition();
+    const cameraPosition = targetProxy.getTransform().getWorldPosition();
+    const dx = cameraPosition.x - arvisPosition.x;
+    const dz = cameraPosition.z - arvisPosition.z;
+    const distanceCm = Math.sqrt(dx * dx + dz * dz);
+    const enterCm = Math.max(0.05, this.lookAtDistanceMeters) * 100.0;
+    const exitCm = enterCm + Math.max(0, this.lookAtExitPaddingMeters) * 100.0;
+
+    if (!this.lookAtLoggedSetup) {
+      this.lookAtLoggedSetup = true;
+      print(
+        `[ArvisGhostBlob] look-at setup dist=${distanceCm.toFixed(1)}cm threshold=${enterCm.toFixed(0)}cm`
+      );
+    }
+
+    this.lookAtDistanceLogTimer += getDeltaTime();
+    if (this.debugLogging && this.lookAtDistanceLogTimer >= 1.5) {
+      this.lookAtDistanceLogTimer = 0;
+      print(
+        `[ArvisGhostBlob] look-at dist=${distanceCm.toFixed(1)}cm active=${this.lookAtActive} (on<=${enterCm.toFixed(0)} off>${exitCm.toFixed(0)})`
+      );
+    }
+
+    if (this.lookAtActive) {
+      if (distanceCm > exitCm) {
+        this.setLookAtActive(false);
+      } else {
+        lookAt.enabled = true;
+      }
+    } else if (distanceCm <= enterCm) {
+      this.setLookAtActive(true);
+    } else {
+      lookAt.enabled = false;
+    }
+  }
+
+  private setLookAtActive(active: boolean): void {
+    if (this.lookAtActive === active) {
+      if (!isNull(this.lookAt)) {
+        const lookAt = this.lookAt as LookAtComponent;
+        lookAt.enabled = active;
+      }
+      return;
+    }
+
+    this.lookAtActive = active;
+    if (active) {
+      if (!isNull(this.lookAt)) {
+        const lookAt = this.lookAt as LookAtComponent;
+        lookAt.enabled = true;
+      }
+      print('[ArvisGhostBlob] look-at ON');
+      return;
+    }
+
+    // Keep the last facing direction when proximity look-at turns off.
+    if (!isNull(this.lookAt)) {
+      const lookAt = this.lookAt as LookAtComponent;
+      lookAt.enabled = false;
+    }
+    print('[ArvisGhostBlob] look-at OFF');
+  }
+
+  private findCameraObject(): SceneObject | null {
+    const preferredNames = ['Camera Object', 'Device Camera', 'Camera'];
+    for (let i = 0; i < preferredNames.length; i++) {
+      const found = this.findSceneObjectByName(preferredNames[i]);
+      if (this.isUsableCameraObject(found)) {
+        return found;
+      }
+    }
+    const fallback = this.findObjectWithCameraComponent();
+    return this.isUsableCameraObject(fallback) ? fallback : null;
+  }
+
+  private ensureLookAtTargetProxy(): SceneObject | null {
+    if (this.isValidSceneObject(this.lookAtTargetProxy)) {
+      return this.lookAtTargetProxy;
+    }
+
+    try {
+      const proxy = global.scene.createSceneObject('ArvisLookAtTarget');
+      proxy.layer = this.getSceneObject().layer;
+      const parent = this.getSceneObject().hasParent()
+        ? this.getSceneObject().getParent()
+        : null;
+      if (!isNull(parent)) {
+        proxy.setParent(parent as SceneObject);
+      }
+      proxy.getTransform().setWorldPosition(
+        this.getSceneObject().getTransform().getWorldPosition()
+      );
+      this.lookAtTargetProxy = proxy;
+      return proxy;
+    } catch (_e) {
+      this.lookAtTargetProxy = null;
+      return null;
+    }
+  }
+
+  private refreshLookAtTargetProxyPosition(): void {
+    const proxy = this.ensureLookAtTargetProxy();
+    if (isNull(proxy)) {
+      return;
+    }
+    const targetProxy = proxy as SceneObject;
+
+    const preferred = this.findCameraObject();
+    if (this.isValidSceneObject(preferred)) {
+      this.lookAtCamera = preferred;
+    }
+
+    if (this.isValidSceneObject(this.lookAtCamera)) {
+      const camera = this.lookAtCamera as SceneObject;
+      try {
+        const position = camera.getTransform().getWorldPosition();
+        targetProxy.getTransform().setWorldPosition(position);
+        return;
+      } catch (_e) {
+        this.lookAtCamera = null;
+      }
+    }
+
+    // Last-resort fallback: keep a stable point in front of Arvis.
+    const selfTransform = this.getSceneObject().getTransform();
+    const selfPosition = selfTransform.getWorldPosition();
+    const forward = selfTransform.forward;
+    targetProxy.getTransform().setWorldPosition(
+      selfPosition.add(new vec3(forward.x * 40, 0, forward.z * 40))
+    );
+  }
+
+  private isUsableCameraObject(node: SceneObject | null): boolean {
+    if (!this.isValidSceneObject(node)) {
+      return false;
+    }
+    try {
+      const camera = (node as SceneObject).getComponent('Component.Camera') as Camera;
+      return !isNull(camera);
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  private findObjectWithCameraComponent(): SceneObject | null {
+    const count = global.scene.getRootObjectsCount();
+    for (let i = 0; i < count; i++) {
+      const root = global.scene.getRootObject(i);
+      const found = this.findCameraComponentRecursive(root);
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private findCameraComponentRecursive(node: SceneObject): SceneObject | null {
+    if (isNull(node)) {
+      return null;
+    }
+    const sceneObject = node as SceneObject;
+    const camera = sceneObject.getComponent('Component.Camera') as Camera;
+    if (!isNull(camera)) {
+      return node;
+    }
+    for (let i = 0; i < sceneObject.getChildrenCount(); i++) {
+      const found = this.findCameraComponentRecursive(sceneObject.getChild(i));
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private isValidSceneObject(node: SceneObject | null): boolean {
+    if (isNull(node)) {
+      return false;
+    }
+    try {
+      return !isNull((node as SceneObject).getTransform());
+    } catch (_e) {
+      return false;
     }
   }
 

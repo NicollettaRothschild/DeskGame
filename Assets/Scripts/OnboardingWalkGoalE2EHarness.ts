@@ -80,7 +80,8 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
     // Avoid Friend onboarding TTS/practice fighting the harness.
     this.disableFriendOnboarding();
 
-    const tourNames = ['Clock', 'palette', 'PostItNotes', 'TrashBin'];
+    // Palette is archived from the onboarding tour until explicitly restored.
+    const tourNames = ['Clock', 'PostItNotes', 'TrashBin'];
     if (this.placeTourObjects) {
       for (let i = 0; i < tourNames.length; i++) {
         const obj = this.findSceneObjectByName(tourNames[i]);

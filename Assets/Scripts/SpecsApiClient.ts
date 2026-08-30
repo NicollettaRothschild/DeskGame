@@ -81,6 +81,20 @@ export type SpecsEmailDraftQueueResult = {
   expiresAt: string;
 };
 
+export type SpecsOpenAppQueueResult = {
+  commandId: string;
+  requestId: string;
+  status: string;
+  expiresAt: string;
+};
+
+export type SpecsCodingTaskQueueResult = {
+  commandId: string;
+  requestId: string;
+  status: string;
+  expiresAt: string;
+};
+
 export type SpecsBridgeCommandStatus = {
   commandId: string;
   requestId: string;
@@ -143,23 +157,6 @@ export class SpecsApiClient extends BaseScriptComponent {
   @input('float')
   editorAutoPairDelaySec: number = 12;
 
-  /** Sign in to arvis.space (Supabase password) and pair this device — no Google OAuth in Lens. */
-  @input
-  autoPairWithCredentials: boolean = true;
-
-  @input
-  autoPairEmail: string = 'test@user.com';
-
-  @input
-  autoPairPassword: string = 'test321';
-
-  @input
-  arvisSupabaseUrl: string = 'https://bigsedudegjukszrfyil.supabase.co';
-
-  @input
-  arvisSupabaseAnonKey: string =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo';
-
   @input
   debugLogging: boolean = false;
 
@@ -167,8 +164,6 @@ export class SpecsApiClient extends BaseScriptComponent {
   private networkAvailable = false;
   private editorAutoPairEvent: DelayedCallbackEvent | null = null;
   private editorAutoPairScheduled = false;
-  private credentialPairInFlight = false;
-  private credentialPairFailed = false;
   private simulatedPlatformWarned = false;
 
   onAwake(): void {
@@ -278,8 +273,7 @@ export class SpecsApiClient extends BaseScriptComponent {
   }
 
   public registerDevice(deviceId: string, onDone: (result: SpecsDeviceRegistration | null, error?: string) => void): void {
-    // With credential auto-pair, always register against arvis.space from editor preview.
-    if (this.isEditorMockActive() && !this.autoPairWithCredentials) {
+    if (this.isEditorMockActive()) {
       const result = SpecsEditorMock.register(deviceId);
       if (this.shouldAutoPairInEditorMock() && !result.paired) {
         SpecsEditorMock.markPaired();
@@ -316,140 +310,9 @@ export class SpecsApiClient extends BaseScriptComponent {
     );
   }
 
-  public isAutoPairWithCredentialsEnabled(): boolean {
-    // Credential pair talks to Supabase + arvis.space — allow it even when the
-    // offline mock probe is active so editor preview can still use the live backend.
-    return this.autoPairWithCredentials;
-  }
-
-  /** Prefer live arvis.space when we have a device secret or credential auto-pair. */
+  /** Prefer live arvis.space when the paired device secret is available. */
   private shouldPreferLiveAgent(deviceSecret?: string): boolean {
-    if (String(deviceSecret || '').trim().length > 0) {
-      return true;
-    }
-    return this.autoPairWithCredentials && !this.credentialPairFailed;
-  }
-
-  public isCredentialPairInFlight(): boolean {
-    return this.credentialPairInFlight;
-  }
-
-  public tryAutoPairWithCredentials(
-    deviceId: string,
-    onDone: (ok: boolean, userEmail?: string | null, error?: string) => void
-  ): void {
-    if (!this.isAutoPairWithCredentialsEnabled()) {
-      onDone(false, null, 'Auto-pair disabled');
-      return;
-    }
-    if (this.credentialPairInFlight) {
-      onDone(false, null, 'Pairing in progress');
-      return;
-    }
-    if (this.credentialPairFailed) {
-      onDone(false, null, 'Auto-pair already failed this session');
-      return;
-    }
-
-    const email = String(this.autoPairEmail || '').trim();
-    const password = String(this.autoPairPassword || '');
-    if (!email || !password) {
-      onDone(false, null, 'Auto-pair email/password not configured');
-      return;
-    }
-
-    const normalizedDeviceId = String(deviceId || '').trim();
-    if (!normalizedDeviceId) {
-      onDone(false, null, 'device_id required');
-      return;
-    }
-
-    this.credentialPairInFlight = true;
-    if (this.debugLogging) {
-      print(`[SpecsApi] Auto-pair signing in as ${email}`);
-    }
-
-    this.supabasePasswordSignIn(email, password, (session, signInError) => {
-      if (!session) {
-        this.credentialPairInFlight = false;
-        this.credentialPairFailed = true;
-        if (this.debugLogging) {
-          print('[SpecsApi] Auto-pair sign-in failed: ' + (signInError || 'unknown'));
-        }
-        onDone(false, null, signInError || 'Supabase sign-in failed');
-        return;
-      }
-
-      this.postJson(
-        '/api/specs/pair',
-        {
-          device_id: normalizedDeviceId,
-          user_id: session.userId,
-          access_token: session.accessToken,
-        },
-        (data, err) => {
-          this.credentialPairInFlight = false;
-          if (err || !data?.ok) {
-            this.credentialPairFailed = true;
-            if (this.debugLogging) {
-              print('[SpecsApi] Auto-pair /pair failed: ' + (err || 'unknown'));
-            }
-            onDone(false, null, err || 'Device pair failed');
-            return;
-          }
-
-          const userEmail = data.user_email ? String(data.user_email) : session.email || email;
-          if (this.debugLogging) {
-            print(`[SpecsApi] Auto-paired ${normalizedDeviceId} as ${userEmail || email}`);
-          }
-          onDone(true, userEmail, undefined);
-        }
-      );
-    });
-  }
-
-  private supabasePasswordSignIn(
-    email: string,
-    password: string,
-    onDone: (session: { userId: string; accessToken: string; email: string | null } | null, error?: string) => void
-  ): void {
-    const supabaseUrl = String(this.arvisSupabaseUrl || '').replace(/\/$/, '');
-    const anonKey = String(this.arvisSupabaseAnonKey || '').trim();
-    if (!supabaseUrl || !anonKey) {
-      onDone(null, 'Arvis Supabase credentials not configured');
-      return;
-    }
-
-    this.requestJson(
-      `${supabaseUrl}/auth/v1/token?grant_type=password`,
-      'POST',
-      { email, password },
-      {
-        'Content-Type': 'application/json',
-        apikey: anonKey,
-      },
-      (data, err) => {
-        if (err || !data) {
-          onDone(null, err || 'Supabase sign-in failed');
-          return;
-        }
-
-        const user = data.user as JsonRecord | undefined;
-        const userId = String(user?.id || '').trim();
-        const accessToken = String(data.access_token || '').trim();
-        if (!userId || !accessToken) {
-          const description = String(data.error_description || data.msg || 'Missing access_token');
-          onDone(null, description);
-          return;
-        }
-
-        onDone({
-          userId,
-          accessToken,
-          email: user?.email ? String(user.email) : null,
-        });
-      }
-    );
+    return String(deviceSecret || '').trim().length > 0;
   }
 
   public fetchPairStatus(
@@ -787,8 +650,8 @@ export class SpecsApiClient extends BaseScriptComponent {
 
   /**
    * Queues an unsent email draft for the paired Arvis Mac host.
-   * This intentionally never uses the editor mock: a successful response must
-   * represent a real bridge request that the Mac can approve or decline.
+   * Editor preview uses a deterministic bridge mock; live requests always
+   * require the paired device secret.
    */
   public queueEmailDraft(
     deviceId: string,
@@ -805,6 +668,17 @@ export class SpecsApiClient extends BaseScriptComponent {
     const normalizedRequestId = String(requestId || '').trim();
     if (!normalizedRequestId || !normalizedRecipient || !normalizedSubject || !normalizedBody) {
       onDone(null, 'Email draft request is incomplete');
+      return;
+    }
+
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.queueBridgeCommand(
+          'draft_email',
+          normalizedRequestId,
+          normalizedRecipient
+        ) as SpecsEmailDraftQueueResult
+      );
       return;
     }
 
@@ -849,6 +723,158 @@ export class SpecsApiClient extends BaseScriptComponent {
     );
   }
 
+  public queueOpenApp(
+    deviceId: string,
+    deviceSecret: string,
+    requestId: string,
+    applicationName: string,
+    onDone: (result: SpecsOpenAppQueueResult | null, error?: string) => void
+  ): void {
+    const normalizedApplicationName = String(applicationName || '').trim();
+    const normalizedRequestId = String(requestId || '').trim();
+    if (!normalizedRequestId || !normalizedApplicationName) {
+      onDone(null, 'Open app request is incomplete');
+      return;
+    }
+    if (normalizedApplicationName.length > 120) {
+      onDone(null, 'Application name is too long');
+      return;
+    }
+
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.queueBridgeCommand(
+          'open_app',
+          normalizedRequestId,
+          normalizedApplicationName
+        ) as SpecsOpenAppQueueResult
+      );
+      return;
+    }
+
+    this.postJson(
+      '/api/specs/bridge/open-app',
+      {
+        device_id: deviceId,
+        device_secret: deviceSecret,
+        request_id: normalizedRequestId,
+        application_name: normalizedApplicationName,
+      },
+      (data, err) => {
+        if (err || !data) {
+          if (this.debugLogging) {
+            print('[SpecsApi] open app bridge failed: ' + (err || 'empty response'));
+          }
+          onDone(null, err || 'Open app bridge failed');
+          return;
+        }
+
+        const commandId = String(data.command_id || '').trim();
+        if (!commandId) {
+          onDone(null, 'Open app bridge returned no command id');
+          return;
+        }
+        onDone({
+          commandId,
+          requestId: String(data.request_id || normalizedRequestId),
+          status: String(data.status || 'pending'),
+          expiresAt: String(data.expires_at || ''),
+        });
+      },
+      this.requestTimeoutSec
+    );
+  }
+
+  /**
+   * Queues a local coding task for the paired Arvis Mac bridge.
+   * The bridge keeps provider credentials on the Mac; Spectacles only sends
+   * the selected provider, workspace, and spoken task.
+   */
+  public queueCodingTask(
+    deviceId: string,
+    deviceSecret: string,
+    requestId: string,
+    agentName: string,
+    workspacePath: string,
+    prompt: string,
+    model: string,
+    onDone: (result: SpecsCodingTaskQueueResult | null, error?: string) => void
+  ): void {
+    const normalizedRequestId = String(requestId || '').trim();
+    const normalizedAgent = String(agentName || 'cursor_sdk').trim().toLowerCase();
+    const normalizedWorkspace = String(workspacePath || '').trim();
+    const normalizedPrompt = String(prompt || '').trim();
+    const normalizedModel = String(model || '').trim();
+
+    if (!normalizedRequestId || !normalizedWorkspace || !normalizedPrompt) {
+      onDone(null, 'Coding task request is incomplete');
+      return;
+    }
+    if (normalizedPrompt.length > 16000) {
+      onDone(null, 'Coding task is too long');
+      return;
+    }
+    if (normalizedAgent !== 'cursor_sdk' && normalizedAgent !== 'claude_code') {
+      onDone(null, 'Unsupported coding agent');
+      return;
+    }
+
+    if (this.isEditorMockActive()) {
+      onDone(
+        SpecsEditorMock.queueBridgeCommand(
+          'prepare_coding_task',
+          normalizedRequestId,
+          normalizedWorkspace
+        ) as SpecsCodingTaskQueueResult
+      );
+      return;
+    }
+
+    const body: JsonRecord = {
+      device_id: deviceId,
+      device_secret: deviceSecret,
+      request_id: normalizedRequestId,
+      agent: normalizedAgent,
+      workspace_path: normalizedWorkspace,
+      prompt: normalizedPrompt,
+    };
+    if (normalizedModel) {
+      body.model = normalizedModel;
+    }
+
+    this.postJson(
+      '/api/specs/bridge/coding-task',
+      body,
+      (data, err) => {
+        if (err || !data) {
+          if (this.debugLogging) {
+            print('[SpecsApi] coding task bridge failed: ' + (err || 'empty response'));
+          }
+          onDone(null, err || 'Coding task bridge failed');
+          return;
+        }
+
+        const commandId = String(data.command_id || '').trim();
+        if (!commandId) {
+          onDone(null, 'Coding task bridge returned no command id');
+          return;
+        }
+        if (this.debugLogging) {
+          print(
+            `[SpecsApi] coding task queued command=${commandId} request=${normalizedRequestId}`
+          );
+        }
+        onDone({
+          commandId,
+          requestId: String(data.request_id || normalizedRequestId),
+          status: String(data.status || 'pending'),
+          expiresAt: String(data.expires_at || ''),
+        });
+      },
+      this.requestTimeoutSec
+    );
+  }
+
   public fetchBridgeCommandStatus(
     deviceId: string,
     deviceSecret: string,
@@ -858,6 +884,16 @@ export class SpecsApiClient extends BaseScriptComponent {
     const normalizedCommandId = String(commandId || '').trim();
     if (!normalizedCommandId) {
       onDone(null, 'Bridge command id is required');
+      return;
+    }
+
+    if (this.isEditorMockActive()) {
+      const status = SpecsEditorMock.fetchBridgeCommandStatus(normalizedCommandId);
+      if (!status) {
+        onDone(null, 'Editor mock bridge command not found');
+        return;
+      }
+      onDone(status as SpecsBridgeCommandStatus);
       return;
     }
 
@@ -1504,9 +1540,6 @@ export class SpecsApiClient extends BaseScriptComponent {
 
   private shouldUseUnpairedMockFallback(error?: string, message?: string): boolean {
     if (!this.useMockFallbackWhenUnpaired || this.isEditorMockActive()) {
-      return false;
-    }
-    if (this.isAutoPairWithCredentialsEnabled() && !this.credentialPairFailed) {
       return false;
     }
     if (isMusicQuery(String(message || ''))) {

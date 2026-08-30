@@ -27,11 +27,6 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     apiBaseUrl: false
-    arvisSupabaseAnonKey: false
-    arvisSupabaseUrl: false
-    autoPairEmail: false
-    autoPairPassword: false
-    autoPairWithCredentials: false
     debugLogging: false
     editorAutoPairDelaySec: false
     editorStartPaired: false
@@ -61,11 +56,6 @@
       editorStartPaired: false
       useMockFallbackWhenUnpaired: true
       editorAutoPairDelaySec: !<float> 12.000000
-      autoPairWithCredentials: true
-      autoPairEmail: test@user.com
-      autoPairPassword: test321
-      arvisSupabaseUrl: "https://bigsedudegjukszrfyil.supabase.co"
-      arvisSupabaseAnonKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo
       debugLogging: false
   ScriptTypes:
     -
@@ -81,9 +71,4 @@
     - // @input bool editorStartPaired
     - // @input bool useMockFallbackWhenUnpaired = true
     - // @input float editorAutoPairDelaySec = 12
-    - // @input bool autoPairWithCredentials = true
-    - '// @input string autoPairEmail = "test@user.com"'
-    - '// @input string autoPairPassword = "test321"'
-    - '// @input string arvisSupabaseUrl = "https://bigsedudegjukszrfyil.supabase.co"'
-    - '// @input string arvisSupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpZ3NlZHVkZWdqdWtzenJmeWlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDgwODAsImV4cCI6MjA4NjMyNDA4MH0.nddfPvJ_uAQ2iC0pP42JIOtxOtNxxojJIMSOt39XHMo"'
-    - // @input bool debugLogging = false
+    - // @input bool debugLogging

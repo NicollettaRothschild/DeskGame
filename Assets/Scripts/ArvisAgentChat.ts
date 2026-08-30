@@ -26,6 +26,9 @@ import {
 } from './ArvisCalendarIntent';
 import {
   ArvisEmailDraftIntent,
+  ArvisMacOpenAppIntent,
+  isExplicitMacRequest,
+  parseArvisMacOpenAppIntent,
   parseArvisEmailDraftIntent,
 } from './ArvisEmailDraftIntent';
 import { looksLikeWorkspaceResetCommand } from './FriendGrab';
@@ -135,12 +138,13 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private emailDraftStatusPollEvent: DelayedCallbackEvent | null = null;
   private emailDraftStatusPollCommandId = '';
   private emailDraftStatusPollAttempts = 0;
+  private bridgeStatusSuccessMessage = '';
 
   private static readonly LISTENING_CUE = 'Listening…';
   private static readonly VOICE_WAKE_DEDUPE_SEC = 2.5;
   private static readonly VOICE_WAKE_STABLE_SEC = 0.55;
   private static readonly VOICE_POLL_INTERVAL_SEC = 0.15;
-  private static readonly EMAIL_DRAFT_STATUS_MAX_POLLS = 45;
+  private static readonly EMAIL_DRAFT_STATUS_MAX_POLLS = 480;
 
   private nextVoiceWakePollAt = 0;
   private nextListeningBoardRefreshAt = 0;
@@ -574,9 +578,6 @@ export class ArvisAgentChat extends BaseScriptComponent {
     if (this.deviceRegistry.getDeviceSecret().length > 0) {
       return true;
     }
-    if (this.specsApi.isAutoPairWithCredentialsEnabled()) {
-      return true;
-    }
     return this.deviceRegistry.isPaired();
   }
 
@@ -633,6 +634,8 @@ export class ArvisAgentChat extends BaseScriptComponent {
     const outbound = this.normalizeAgentPrompt(trimmed);
     const calendarIntent = parseArvisCalendarIntent(outbound);
     const emailDraftIntent = parseArvisEmailDraftIntent(outbound);
+    const macDirectedRequest = isExplicitMacRequest(outbound);
+    const openAppIntent = parseArvisMacOpenAppIntent(outbound);
     this.resolveDependencies();
     if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
       this.updateBoard('error', outbound, 'Missing Specs API wiring');
@@ -647,43 +650,13 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
 
-    // Auto-pair via Supabase credentials before any live agent call (news/chat/image).
-    if (!this.deviceRegistry.isPaired() && this.specsApi.isAutoPairWithCredentialsEnabled()) {
-      if (this.specsApi.isCredentialPairInFlight()) {
-        this.setStatus('Pairing with arvis.space…');
-        this.updateBoard('thinking', outbound, 'Signing in and pairing your device…');
-        const retryEvent = this.createEvent('DelayedCallbackEvent');
-        retryEvent.bind(() => {
-          this.sendMessage(message);
-        });
-        retryEvent.reset(1.5);
-        return;
-      }
-      if (this.deviceRegistry.getDeviceSecret().length > 0) {
-        this.setStatus('Pairing with arvis.space…');
-        this.updateBoard('thinking', outbound, 'Signing in and pairing your device…');
-        this.specsApi.tryAutoPairWithCredentials(
-          this.deviceRegistry.getDeviceId(),
-          (ok, _userEmail, pairError) => {
-            if (ok) {
-              this.deviceRegistry.setPaired(true);
-              this.sendMessage(message);
-              return;
-            }
-            this.updateBoard(
-              'error',
-              outbound,
-              pairError || 'Could not pair with arvis.space — check test@user.com credentials'
-            );
-            this.setStatus(pairError || 'Pairing failed');
-          }
-        );
-        return;
-      }
+    if (emailDraftIntent && macDirectedRequest) {
+      this.queueEmailDraft(emailDraftIntent, outbound);
+      return;
     }
 
-    if (emailDraftIntent) {
-      this.queueEmailDraft(emailDraftIntent, outbound);
+    if (openAppIntent) {
+      this.queueOpenApp(openAppIntent, outbound);
       return;
     }
 
@@ -764,8 +737,13 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     this.sending = true;
-    this.updateBoard('thinking', outbound, 'Sending the draft request to Arvis on your Mac…');
-    this.setStatus('Sending email draft to Arvis on your Mac…');
+    this.bridgeStatusSuccessMessage = 'Arvis opened the unsent Thunderbird draft on your Mac.';
+    this.updateBoard(
+      'thinking',
+      outbound,
+      'Waiting for your approval on the Arvis Mac panel…'
+    );
+    this.setStatus('Waiting for email approval on your Mac…');
     try {
       this.specsApi.queueEmailDraft(
         this.deviceRegistry.getDeviceId(),
@@ -775,21 +753,71 @@ export class ArvisAgentChat extends BaseScriptComponent {
         emailDraftIntent.subject,
         emailDraftIntent.body,
         (result, error) => {
-          this.sending = false;
-          if (isNull(result)) {
+          if (!result) {
+            this.sending = false;
             this.updateBoard('error', outbound, error || 'Could not reach the Arvis Mac bridge');
             this.setStatus(error || 'Arvis Mac bridge unavailable');
             return;
           }
 
           const waitingResponse =
-            'Draft sent to Arvis on your Mac. Thunderbird will open an unsent draft shortly.';
+            'Email draft queued. Approve it in the Arvis Mac panel.';
           this.pushHistory('user', outbound);
           this.pushHistory('assistant', waitingResponse);
           this.activeReplyTranscript = outbound;
           this.activeReplyText = waitingResponse;
-          this.updateBoard('reply', outbound, waitingResponse, this.agentName);
-          this.speakAgentResponse(waitingResponse, this.agentName);
+          this.updateBoard('thinking', outbound, waitingResponse, this.agentName);
+          this.watchEmailDraftStatus(outbound, result.commandId);
+        }
+      );
+    } catch (e) {
+      this.sending = false;
+      this.updateBoard('error', outbound, String(e));
+      this.setStatus('Arvis Mac bridge request failed');
+    }
+  }
+
+  private queueOpenApp(openAppIntent: ArvisMacOpenAppIntent, outbound: string): void {
+    if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
+      this.updateBoard('error', outbound, 'Missing Specs API wiring');
+      return;
+    }
+
+    this.sending = true;
+    this.bridgeStatusSuccessMessage = `Arvis opened ${openAppIntent.applicationName} on your Mac.`;
+    this.updateBoard(
+      'thinking',
+      outbound,
+      'Waiting for your approval on the Arvis Mac panel…'
+    );
+    this.setStatus('Waiting for Mac approval…');
+    try {
+      this.specsApi.queueOpenApp(
+        this.deviceRegistry.getDeviceId(),
+        this.deviceRegistry.getDeviceSecret(),
+        openAppIntent.requestId,
+        openAppIntent.applicationName,
+        (result, error) => {
+          if (!result) {
+            this.sending = false;
+            this.updateBoard('error', outbound, error || 'Could not reach the Arvis Mac bridge');
+            this.setStatus(error || 'Arvis Mac bridge unavailable');
+            return;
+          }
+
+          this.pushHistory('user', outbound);
+          this.pushHistory(
+            'assistant',
+            'Waiting for your approval on the Arvis Mac panel.'
+          );
+          this.activeReplyTranscript = outbound;
+          this.activeReplyText = 'Waiting for your approval on the Arvis Mac panel.';
+          this.updateBoard(
+            'thinking',
+            outbound,
+            'Waiting for your approval on the Arvis Mac panel.',
+            this.agentName
+          );
           this.watchEmailDraftStatus(outbound, result.commandId);
         }
       );
@@ -1031,7 +1059,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
     if (
       this.emailDraftStatusPollAttempts > ArvisAgentChat.EMAIL_DRAFT_STATUS_MAX_POLLS
     ) {
-      this.setStatus('Draft queued — waiting for Arvis on your Mac');
+      this.setStatus('Mac request queued — still waiting for approval');
       return;
     }
 
@@ -1044,7 +1072,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
           return;
         }
 
-        if (isNull(status)) {
+        if (!status) {
           if (this.debugLogging && error) {
             print(`[ArvisAgentChat] Email draft status pending: ${error}`);
           }
@@ -1053,35 +1081,46 @@ export class ArvisAgentChat extends BaseScriptComponent {
         }
 
         const normalizedStatus = String(status.status || '').toLowerCase();
-        if (normalizedStatus === 'pending' || normalizedStatus === 'claimed') {
-          this.setStatus(
-            normalizedStatus === 'claimed'
-              ? 'Arvis is opening the draft on your Mac…'
-              : 'Waiting for Arvis on your Mac…'
-          );
+        if (
+          normalizedStatus === 'pending'
+          || normalizedStatus === 'claimed'
+          || normalizedStatus === 'approved'
+        ) {
+          const statusMessage =
+            normalizedStatus === 'approved'
+              ? 'Approved — completing the safe Mac action…'
+              : normalizedStatus === 'claimed'
+                ? 'Waiting for approval in the Arvis Mac panel…'
+                : 'Waiting for the Mac bridge…';
+          this.updateBoard('thinking', transcript, statusMessage, this.agentName);
+          this.setStatus(statusMessage);
           this.scheduleEmailDraftStatusPoll(transcript, commandId);
           return;
         }
 
         this.emailDraftStatusPollCommandId = '';
         this.emailDraftStatusPollEvent = null;
+        this.sending = false;
         const response =
-          normalizedStatus === 'opened'
-            ? 'Arvis opened the unsent Thunderbird draft on your Mac.'
+          normalizedStatus === 'opened' || normalizedStatus === 'completed'
+            ? this.bridgeStatusSuccessMessage || 'The Mac action completed.'
             : normalizedStatus === 'declined'
-              ? 'The email draft was declined on the Mac.'
+              ? 'The Mac request was declined.'
               : normalizedStatus === 'expired'
-                ? 'The email draft request expired before the Mac handled it.'
-                : String(status.result?.message || 'The Mac could not open the email draft.');
+                ? 'The Mac request expired before approval.'
+                : String(status.result?.message || 'The Mac could not complete the request.');
+        this.bridgeStatusSuccessMessage = '';
         this.activeReplyTranscript = transcript;
         this.activeReplyText = response;
+        const succeeded =
+          normalizedStatus === 'opened' || normalizedStatus === 'completed';
         this.updateBoard(
-          normalizedStatus === 'opened' ? 'reply' : 'error',
+          succeeded ? 'reply' : 'error',
           transcript,
           response,
           this.agentName
         );
-        this.setStatus(normalizedStatus === 'opened' ? '' : response);
+        this.setStatus(succeeded ? '' : response);
         this.speakAgentResponse(response, this.agentName);
       }
     );

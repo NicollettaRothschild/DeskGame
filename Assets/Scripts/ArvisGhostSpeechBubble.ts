@@ -182,6 +182,11 @@ export class ArvisGhostSpeechBubble {
     }
 
     if (phase === 'thinking') {
+      if (label.toLowerCase() === 'cursor') {
+        const statusLine = replyLine || 'Cursor is working…';
+        const taskLine = userLine ? `Working on: ${userLine}` : '';
+        return this.truncate([statusLine, taskLine].filter(Boolean).join('\n\n'));
+      }
       if (userLine) {
         return `You: ${userLine}\n\n…`;
       }

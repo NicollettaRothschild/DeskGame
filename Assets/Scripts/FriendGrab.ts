@@ -49,6 +49,7 @@ type InteractableLike = ScriptComponent & {
   ignoreInteractionPlane?: boolean;
   keepHoverOnTrigger?: boolean;
   enableInstantDrag?: boolean;
+  useFilteredPinch?: boolean;
   onTriggerStart?: { add: (cb: () => void) => void };
   onInteractorTriggerStart?: { add: (cb: () => void) => void };
   onDragStart?: { add: (cb: () => void) => void };
@@ -241,6 +242,11 @@ export class FriendGrab extends BaseScriptComponent {
   onboardingPalette!: SceneObject;
 
   @input
+  @label('Include Palette In Onboarding')
+  @hint('Archived for now. Enable this only when the palette tour returns.')
+  onboardingIncludePalette: boolean = false;
+
+  @input
   @label('Palette Line')
   onboardingPaletteLine: string =
     "This is your palette. Paint your world with it! Put it somewhere you can reach while you work.";
@@ -429,7 +435,7 @@ export class FriendGrab extends BaseScriptComponent {
   announceLeaderboardRank: boolean = false;
 
   @input
-  @hint('Buddy follows the camera in all sessions (paused only while grabbed)')
+  @hint('Buddy follows the camera until manually placed; say "hey friend" to resume')
   enableFollowAfterOnboarding: boolean = true;
 
   /** How far ahead of the user Buddy stays (cm, along look direction). */
@@ -465,6 +471,7 @@ export class FriendGrab extends BaseScriptComponent {
   private moveInteractionWired = false;
   private moveBindAttempts = 0;
   private moveActive = false;
+  private grabStartWorldPosition: vec3 | null = null;
   private companionTalkActive = false;
   private grabAudioPlayer: AudioComponent | null = null;
   private resolvedGrabTrack: AudioTrackAsset | null = null;
@@ -489,6 +496,7 @@ export class FriendGrab extends BaseScriptComponent {
   private lastGoalCompleteAt = 0;
   private followActive = false;
   private followLoggedStart = false;
+  private manualPlacementActive = false;
   private workspaceResetAt = 0;
   private goalLeaderboard: Leaderboard | null = null;
   private resolvingGoalLeaderboard = false;
@@ -499,6 +507,7 @@ export class FriendGrab extends BaseScriptComponent {
   private petDialogueIndex = 0;
   private followPausedByVoice = false;
   private static readonly MIN_COLLIDER_SIZE = new vec3(2.1, 2.8, 2.1);
+  private static readonly MANUAL_PLACEMENT_THRESHOLD_CM = 4;
 
   onAwake(): void {
     this.ensureLeaderboardPanel();
@@ -644,10 +653,15 @@ export class FriendGrab extends BaseScriptComponent {
       ) as unknown as InteractableManipulationLike;
     }
 
-    interactable.targetingMode = 7;
+    // A movable object should use pinch/ray targeting. Poke is reserved for
+    // the separate pet target because SIK disables Poke on manipulated objects.
+    interactable.targetingMode = 3;
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
     interactable.enableInstantDrag = true;
+    if (interactable.useFilteredPinch !== undefined) {
+      interactable.useFilteredPinch = true;
+    }
 
     manipulation.manipulateRootSceneObject = anchor;
     manipulation.enableTranslation = true;
@@ -806,6 +820,12 @@ export class FriendGrab extends BaseScriptComponent {
     if (interactable.onDragStart) {
       interactable.onDragStart.add(onGrabStart);
     }
+    if (interactable.onTriggerStart) {
+      interactable.onTriggerStart.add(onGrabStart);
+    }
+    if (interactable.onInteractorTriggerStart) {
+      interactable.onInteractorTriggerStart.add(onGrabStart);
+    }
     if (interactable.onDragEnd) {
       interactable.onDragEnd.add(onGrabRelease);
     }
@@ -872,6 +892,12 @@ export class FriendGrab extends BaseScriptComponent {
       return;
     }
     this.moveActive = true;
+    const startPosition = this.getSceneObject().getTransform().getWorldPosition();
+    this.grabStartWorldPosition = new vec3(
+      startPosition.x,
+      startPosition.y,
+      startPosition.z
+    );
     this.companionTalkActive =
       !this.onboardingActive && this.beginCompanionGrabTalk();
     this.resetIdleBobOffset();
@@ -890,7 +916,9 @@ export class FriendGrab extends BaseScriptComponent {
     if (!this.moveActive) {
       return;
     }
+    const wasManuallyMoved = this.wasMovedDuringGrab();
     this.moveActive = false;
+    this.grabStartWorldPosition = null;
     const wasCompanionTalkActive = this.companionTalkActive;
     this.companionTalkActive = false;
     if (wasCompanionTalkActive) {
@@ -900,6 +928,20 @@ export class FriendGrab extends BaseScriptComponent {
       }
     }
     this.captureIdleBasePosition();
+    if (wasManuallyMoved) {
+      // Keep a deliberate drag at its dropped position. A short grab remains
+      // the companion voice gesture and continues to follow the user.
+      this.manualPlacementActive = true;
+      this.followPausedByVoice = true;
+      this.followActive = false;
+      this.setLookAtActive(false);
+      if (!isNull(this.lookAt)) {
+        this.lookAt.enabled = false;
+      }
+      if (this.debugLogging) {
+        print('[FriendGrab] manual placement saved — follow paused');
+      }
+    }
     // Release feedback is audio-only; do not speak "Thanks!" after a voice
     // capture because it can be heard as another command on the next session.
     this.playFriendSound(this.resolvedReleaseTrack, this.releaseSoundVolume, 'release');
@@ -1208,17 +1250,11 @@ export class FriendGrab extends BaseScriptComponent {
       return this.findObjectByNameInScene(fallbackName);
     };
 
-    return [
+    const steps = [
       {
         key: 'clock',
         object: resolve(this.onboardingClock, 'Clock'),
         line: this.onboardingClockLine,
-        requirePractice: true,
-      },
-      {
-        key: 'palette',
-        object: resolve(this.onboardingPalette, 'palette'),
-        line: this.onboardingPaletteLine,
         requirePractice: true,
       },
       {
@@ -1243,6 +1279,16 @@ export class FriendGrab extends BaseScriptComponent {
       },
       // Planter stack is skipped — a planted goal pot is gifted after the goal prompt.
     ];
+
+    if (this.onboardingIncludePalette) {
+      steps.splice(1, 0, {
+        key: 'palette',
+        object: resolve(this.onboardingPalette, 'palette'),
+        line: this.onboardingPaletteLine,
+        requirePractice: true,
+      });
+    }
+    return steps;
   }
 
   private hideOnboardingTourObjects(): void {
@@ -1251,6 +1297,16 @@ export class FriendGrab extends BaseScriptComponent {
       const obj = steps[i].object;
       if (!isNull(obj)) {
         obj.enabled = false;
+      }
+    }
+    // The palette is archived from the tour for now. Keep it hidden during
+    // onboarding even if AnchorController restored its saved layout position.
+    if (!this.onboardingIncludePalette) {
+      const palette = !isNull(this.onboardingPalette)
+        ? this.onboardingPalette
+        : this.findObjectByNameInScene('palette');
+      if (!isNull(palette)) {
+        (palette as SceneObject).enabled = false;
       }
     }
     // Planter stack stays hidden during the tour (goal pot is gifted later).
@@ -2231,6 +2287,7 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private resumeFollowingByVoice(): void {
+    this.manualPlacementActive = false;
     this.followPausedByVoice = false;
     this.setFriendVisualState(true);
     this.startFollowingUser('voice-resume');
@@ -2238,6 +2295,19 @@ export class FriendGrab extends BaseScriptComponent {
     this.lookAtCamera = this.findCameraObject();
     this.showSpeech("I'm back.", true, null);
     print('[FriendGrab] follow resumed by voice');
+  }
+
+  private wasMovedDuringGrab(): boolean {
+    if (isNull(this.grabStartWorldPosition)) {
+      return false;
+    }
+    const current = this.getSceneObject().getTransform().getWorldPosition();
+    const start = this.grabStartWorldPosition;
+    const dx = current.x - start.x;
+    const dy = current.y - start.y;
+    const dz = current.z - start.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return distance >= FriendGrab.MANUAL_PLACEMENT_THRESHOLD_CM;
   }
 
   private setFriendVisualState(visible: boolean): void {
@@ -2810,7 +2880,7 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private startFollowingUser(reason: string): void {
-    if (!this.enableFollowAfterOnboarding) {
+    if (!this.enableFollowAfterOnboarding || this.manualPlacementActive) {
       return;
     }
     this.followActive = true;
@@ -2821,7 +2891,11 @@ export class FriendGrab extends BaseScriptComponent {
   }
 
   private updateFollowUser(): void {
-    if (!this.followActive || !this.enableFollowAfterOnboarding) {
+    if (
+      !this.followActive ||
+      !this.enableFollowAfterOnboarding ||
+      this.manualPlacementActive
+    ) {
       return;
     }
     if (this.moveActive) {
