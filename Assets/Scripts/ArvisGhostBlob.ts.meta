@@ -26,6 +26,7 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
+    accentBodyMaterialTemplate: false
     accentColor: false
     activePulseSpeed: false
     baseScale: false
@@ -67,6 +68,7 @@
   DefaultScriptInputs:
     - ghostVisual: !<reference.RenderMeshVisual> 00000000-0000-0000-0000-000000000000
       waterMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      accentBodyMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
       eyeMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
       baseScale: 2.800000
       eyeScale: 0.160000
@@ -101,6 +103,7 @@
   InputLines:
     - // @input Component.RenderMeshVisual ghostVisual
     - // @input Asset.Material waterMaterialTemplate
+    - '// @input Asset.Material accentBodyMaterialTemplate {"label":"Accent Body Material", "hint":"Solid color body for Cursor/Claude. Required on Spectacles 2024 — ocean water washes white."}'
     - // @input Asset.Material eyeMaterialTemplate
     - // @input float baseScale = 8.4
     - // @input float eyeScale = 0.16

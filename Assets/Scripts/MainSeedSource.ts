@@ -43,6 +43,10 @@ type InteractableLike = ScriptComponent & {
 
 type AnchorSeedSpawner = {
   createSeedAtWorldPosition(worldPos: vec3): SceneObject | null;
+  getValidatedSpawnWorldPosition?: (
+    preferredWorldPos?: vec3 | null,
+    index?: number
+  ) => vec3;
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
   notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
@@ -186,12 +190,6 @@ export class MainSeedSource extends BaseScriptComponent {
     }
 
     this.isBound = true;
-    if (interactable.targetingMode !== undefined) {
-      interactable.targetingMode = 7;
-    }
-    if (interactable.ignoreInteractionPlane !== undefined) {
-      interactable.ignoreInteractionPlane = true;
-    }
     this.debugLog('bound to source Interactable.');
   }
 
@@ -327,8 +325,14 @@ export class MainSeedSource extends BaseScriptComponent {
   }
 
   private spawnSeed(worldPosition: vec3, interactor: InteractorLike | null): SceneObject | null {
-    const spawnPosition = this.applySpawnOffset(worldPosition, interactor);
     const anchorSpawner = this.getAnchorSeedSpawner();
+    const resolvedWorldPosition =
+      !isNull(anchorSpawner) &&
+      typeof (anchorSpawner as AnchorSeedSpawner).getValidatedSpawnWorldPosition ===
+        'function'
+        ? (anchorSpawner as AnchorSeedSpawner).getValidatedSpawnWorldPosition(worldPosition)
+        : worldPosition;
+    const spawnPosition = this.applySpawnOffset(resolvedWorldPosition, interactor);
     let seedObject: SceneObject | null = null;
 
     if (!isNull(anchorSpawner)) {

@@ -55,7 +55,7 @@
       followInteractorWhileHeld: true
       allowMultipleActivePots: false
       debugLogging: false
-      postReleaseCaptureSec: !<float> 12.000000
+      postReleaseCaptureSec: 2.500000
   ScriptTypes:
     -
       {}
@@ -69,4 +69,4 @@
     - // @input bool followInteractorWhileHeld = true
     - // @input bool allowMultipleActivePots
     - // @input bool debugLogging
-    - '// @input float postReleaseCaptureSec = 12 {"hint":"Keep goal transcript capture active briefly after release"}'
+    - '// @input float postReleaseCaptureSec = 2.5 {"hint":"Keep goal transcript capture active briefly after release"}'

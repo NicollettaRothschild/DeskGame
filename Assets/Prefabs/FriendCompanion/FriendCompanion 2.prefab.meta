@@ -1,0 +1,975 @@
+- !<AssetImportMetadata/7810d045-0d3a-445b-8c93-59fe069fccbf>
+  ImportedAssetIds:
+    ObjectPrefab: !<reference> d13bd0a0-9736-44a5-b4db-ea8cd217bea9
+  ImporterName: ObjectPrefabImporter
+  PrimaryAsset: !<reference> d13bd0a0-9736-44a5-b4db-ea8cd217bea9
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    ObjectPrefab: !<own> 4bf2d256-e0f0-43d1-aa8e-b84482a9ff34
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<SceneObject/0b366f62-3698-4f1a-7968-ad591208394f>
+  PrefabRemaps:
+    []
+  Name: Wing_02.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 2.197986, z: 0.000000}
+    Rotation: {x: 0.000000, y: -0.000000, z: -4.963778}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/0ea8cfa5-6e7f-4be6-645a-368ee2b4d775>
+  PrefabRemaps:
+    []
+  Name: Antenna_02.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.378487, z: -0.000000}
+    Rotation: {x: 27.181927, y: 0.452855, z: -0.145826}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 5c6a38c4-9ef8-4824-46f7-07cb1a97c5cc
+  Components:
+    []
+- !<RenderMeshVisual/10ae129b-a2b7-4c71-4f4c-e4102332575c>
+  PrefabRemaps:
+    []
+  Name: BézierCurve
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
+  Mesh: !<reference> bf38b7b4-0944-4142-8a79-44de0065143c
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/1261d051-c0cd-41bc-5db7-d46bce586af1>
+  PrefabRemaps:
+    []
+  Name: antenna L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 10ae129b-a2b7-4c71-4f4c-e4102332575c
+- !<SceneObject/13dd649a-ab21-4f6e-644e-b7d1d8fdbc82>
+  PrefabRemaps:
+    []
+  Name: Scene
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> cb1c3ecf-fac7-437c-419a-68af43383e7c
+  Components:
+    - !<own> a441f507-b616-4015-467d-eb488901d4e5
+    - !<own> b0107951-63d3-44ae-4284-f1991eb0ed2e
+- !<SceneObject/1a620d15-67ec-41aa-6a80-8a2c2b92d62d>
+  PrefabRemaps:
+    []
+  Name: Wing R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: -8.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 82451385-c154-4acf-5d96-96619cf8c743
+- !<SceneObject/2219463e-feaf-4b4f-6df2-cb541854b2e3>
+  PrefabRemaps:
+    []
+  Name: Body
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: -0.416426}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.354092}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> f7791309-ea30-475d-4cbb-6974f6f5e7cb
+    - !<own> 66de681c-1943-447f-430b-542238298823
+    - !<own> 7de94d05-5b12-4fc3-53fd-271a0ee5e5bd
+    - !<own> 4b220fff-2d15-49c7-53e5-5a6264516e58
+  Components:
+    []
+- !<SceneObject/2336bf87-a95a-47bd-74f1-ec21df608631>
+  PrefabRemaps:
+    []
+  Name: antenna.008
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> ae778f09-de66-4628-7349-762ca4b3c783
+- !<SceneObject/2365869c-0600-47e5-4342-1150d245325d>
+  PrefabRemaps:
+    []
+  Name: friend
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -2.818398, z: -26.543983}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 3.000000, y: 3.000000, z: 3.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 96112fde-e694-4fb2-564f-80f170c8da24
+  Components:
+    - !<own> 8bccd243-9c78-4347-7f7a-02e0f0629213
+    - !<own> 6e8a602b-531a-482e-69d8-a0f66b615bbc
+    - !<own> 88a970ef-6106-4e8c-7754-3b2b5cecbca9
+    - !<own> 755ded60-bdbc-4ace-646f-0ef8bf7f2ea0
+- !<SceneObject/28672732-a4c6-49de-701f-f998d67d6286>
+  PrefabRemaps:
+    []
+  Name: antenna R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 673c45fb-9bef-4d1e-6a2f-deff6fff9e88
+- !<SceneObject/37d2b03b-5fba-4c9e-7846-64a15ebaa971>
+  PrefabRemaps:
+    []
+  Name: Face
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 7f758b87-cda3-4e49-5ec7-a0163bd5f7aa
+- !<SceneObject/4b220fff-2d15-49c7-53e5-5a6264516e58>
+  PrefabRemaps:
+    []
+  Name: Antenna_01.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.355957, y: 1.869728, z: 0.870218}
+    Rotation: {x: 36.530468, y: 1.199157, z: -14.126577}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> f604712c-e736-42cf-58f5-06b83b92e01c
+  Components:
+    - !<own> 58f92dd8-2830-44be-56e9-45abadea5fd2
+- !<ObjectPrefabAssetData/4bf2d256-e0f0-43d1-aa8e-b84482a9ff34>
+  Prototype: !<ObjectOwner/66d1ea26-ac6f-4d18-b6e0-d24703723c02>
+    PackagePath: ""
+    objects:
+      - !<own> 2365869c-0600-47e5-4342-1150d245325d
+- !<ScriptComponent/58f92dd8-2830-44be-56e9-45abadea5fd2>
+  PrefabRemaps:
+    []
+  Name: 2ChainController
+  Enabled: true
+  ScriptAsset: !<reference> cbdd63a9-bfb6-4125-88b2-fd616b8f7083
+  ScriptInputsDefault:
+    type: true
+    timeSpeed: true
+    isRelative: true
+    useCollider: true
+    collider: true
+    colliderForce: true
+    sizeMutiplier: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      joints: !<reference.SceneObject[]>
+        - !<reference> a6d3d1f1-9c44-4553-6492-13c7d063372b
+        - !<reference> f604712c-e736-42cf-58f5-06b83b92e01c
+        - !<reference> 4b220fff-2d15-49c7-53e5-5a6264516e58
+      anchorCount: 2
+      stiffness: 0.510000
+      type: 0
+      iterations: 7
+      timeSpeed: !<float> 1.000000
+      force: !<Vec3> {x: 0.000000, y: 0.040000, z: 0.000000}
+      isRelative: false
+      relativeTo: !<reference.SceneObject> 2219463e-feaf-4b4f-6df2-cb541854b2e3
+      addRotation: true
+      useCollider: false
+      collider: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      colliderForce: !<float> 0.000000
+      sizeMutiplier: !<float> 6.000000
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/5c6a38c4-9ef8-4824-46f7-07cb1a97c5cc>
+  PrefabRemaps:
+    []
+  Name: Antenna_03.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.326327, z: 0.000000}
+    Rotation: {x: 36.531979, y: -3.127979, z: 9.459065}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/66de681c-1943-447f-430b-542238298823>
+  PrefabRemaps:
+    []
+  Name: Wing_01.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 1.092691, z: -0.000000}
+    Rotation: {x: 0.000000, y: -0.000000, z: -60.809353}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> d4026ffa-e7f8-4351-7631-94c5b086e3ce
+  Components:
+    []
+- !<RenderMeshVisual/673c45fb-9bef-4d1e-6a2f-deff6fff9e88>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.001
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
+  Mesh: !<reference> 7501a91c-7692-4055-8d0b-8e91e178f340
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ColliderComponent/6e8a602b-531a-482e-69d8-a0f66b615bbc>
+  PrefabRemaps:
+    []
+  Name: Buddy Grab Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 1.500000, y: 2.200000, z: 1.500000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<ScriptComponent/755ded60-bdbc-4ace-646f-0ef8bf7f2ea0>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: true
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> 2365869c-0600-47e5-4342-1150d245325d
+      enableTranslation: true
+      enableRotation: false
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: false
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: false
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
+- !<RenderMeshVisual/785620ef-2d4f-437c-4814-b32ecc0f291a>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.005
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
+  Mesh: !<reference> 26144497-fade-429a-a808-53eb39b984f0
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/7bcab15f-a111-4418-6796-66839779e742>
+  PrefabRemaps:
+    []
+  Name: 2ChainController
+  Enabled: true
+  ScriptAsset: !<reference> cbdd63a9-bfb6-4125-88b2-fd616b8f7083
+  ScriptInputsDefault:
+    type: true
+    timeSpeed: true
+    isRelative: true
+    useCollider: true
+    collider: true
+    colliderForce: true
+    sizeMutiplier: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      joints: !<reference.SceneObject[]>
+        - !<reference> 5c6a38c4-9ef8-4824-46f7-07cb1a97c5cc
+        - !<reference> 0ea8cfa5-6e7f-4be6-645a-368ee2b4d775
+        - !<reference> 7de94d05-5b12-4fc3-53fd-271a0ee5e5bd
+      anchorCount: 2
+      stiffness: 0.510000
+      type: 0
+      iterations: 7
+      timeSpeed: !<float> 1.000000
+      force: !<Vec3> {x: 0.000000, y: 0.040000, z: 0.000000}
+      isRelative: false
+      relativeTo: !<reference.SceneObject> 2219463e-feaf-4b4f-6df2-cb541854b2e3
+      addRotation: true
+      useCollider: false
+      collider: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      colliderForce: !<float> 0.000000
+      sizeMutiplier: !<float> 6.000000
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/7de94d05-5b12-4fc3-53fd-271a0ee5e5bd>
+  PrefabRemaps:
+    []
+  Name: Antenna_01.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.359832, y: 1.874151, z: 0.870218}
+    Rotation: {x: 36.530464, y: -1.199154, z: 13.418386}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 0ea8cfa5-6e7f-4be6-645a-368ee2b4d775
+  Components:
+    - !<own> 7bcab15f-a111-4418-6796-66839779e742
+- !<RenderMeshVisual/7f758b87-cda3-4e49-5ec7-a0163bd5f7aa>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.007
+  Enabled: true
+  RenderOrder: 1
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 51459ddc-287f-4bb8-8795-742a2b43f684
+  Mesh: !<reference> ca686132-f3bd-4697-bc03-b8760b683704
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/82451385-c154-4acf-5d96-96619cf8c743>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.006
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> bb48144c-861b-464e-b494-1d9b15a1d9ef
+  Mesh: !<reference> 08809a2f-224d-4672-96ae-368107199cb0
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/88a970ef-6106-4e8c-7754-3b2b5cecbca9>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    isScrollable: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: true
+      keepHoverOnTrigger: true
+      enableInstantDrag: true
+      isScrollable: false
+      allowMultipleInteractors: false
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: true
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/8bccd243-9c78-4347-7f7a-02e0f0629213>
+  PrefabRemaps:
+    []
+  Name: FriendGrab
+  Enabled: true
+  ScriptAsset: !<reference> e062addd-fd4b-4ff9-8ca0-7ba90a2eb46c
+  ScriptInputsDefault:
+    debugLogging: true
+    colliderSize: true
+    grabSoundVolume: true
+    releaseSoundVolume: true
+    enableGrabSounds: true
+    enablePetReaction: true
+    petSoundTrack: true
+    petReactionCooldownSec: true
+    petPokeColliderSize: true
+    petPokeLocalPosition: true
+    petDialogueLines: true
+    enableSpeechBubble: true
+    enableTts: true
+    treatAsNewUser: true
+    onboardingStartDelaySec: true
+    onboardingGapSec: true
+    onboardingPracticeTimeoutSec: true
+    onboardingPracticeFirstReminderSec: true
+    onboardingPracticeReminderMaxCount: true
+    onboardingRequirePractice: true
+    onboardingPresentDistanceCm: true
+    onboardingPresentHeightCm: true
+    onboardingObjectSpacingCm: true
+    onboardingGlobe: true
+    onboardingGlobeLine: true
+    onboardingIncludePalette: true
+    onboardingLeaderboard: true
+    onboardingLeaderboardLine: true
+    enableLeaderboardPanel: true
+    onboardingGoalListenTimeoutSec: true
+    onboardingAutoGoalFallbackOnTimeout: true
+    onboardingRequireGoalPotPractice: true
+    grabSpeechTrack: true
+    releaseSpeechTrack: true
+    grabBubbleText: true
+    releaseBubbleText: true
+    speechBubbleHideDelaySec: true
+    bubbleScaleCompensation: true
+    bubbleForwardOffset: true
+    lookAtTurnSpeed: true
+    lookAtAlwaysWhileFollowing: true
+    enableIdleBob: true
+    idleBobAmplitudeCm: true
+    idleBobSpeed: true
+    goalCongratsLine: true
+    goalLeaderboardModule: true
+    goalLeaderboardName: true
+    goalLeaderboardTtlSec: true
+    nonDistanceGoalScore: true
+    leaderboardDistanceGoalsOnly: true
+    fetchLeaderboardAfterSubmit: true
+    leaderboardUsersLimit: true
+    leaderboardUseGlobal: true
+    announceLeaderboardRank: true
+    enableFollowAfterOnboarding: true
+    followDistanceCm: true
+    followSideOffsetCm: true
+    followHeightOffsetCm: true
+    followLerpSpeed: true
+    followMinMoveCm: true
+    workspaceResetLine: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      debugLogging: false
+      colliderSize: !<Vec3> {x: 1.500000, y: 2.200000, z: 1.500000}
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
+      grabSoundVolume: 0.850000
+      releaseSoundVolume: 0.800000
+      enableGrabSounds: true
+      enablePetReaction: false
+      petSoundTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      petReactionCooldownSec: 2.500000
+      petPokeColliderSize: !<Vec3> {x: 3.400000, y: 4.200000, z: 3.400000}
+      petPokeLocalPosition: !<Vec3> {x: 0.000000, y: 0.000000, z: 0.800000}
+      petDialogueLines: !<string[]>
+        - "Aww, thank you!"
+        - That tickles!
+        - "Hehe, I like that!"
+        - "You're a good friend."
+      enableSpeechBubble: true
+      enableTts: true
+      enableOnboarding: true
+      treatAsNewUser: false
+      onboardingStartDelaySec: 2.500000
+      onboardingGapSec: 0.500000
+      onboardingPracticeTimeoutSec: !<float> 14.000000
+      onboardingPracticeFirstReminderSec: 7.500000
+      onboardingPracticeReminderMaxCount: 2
+      onboardingRequirePractice: true
+      onboardingPresentDistanceCm: !<float> 22.000000
+      onboardingPresentHeightCm: !<float> 0.000000
+      onboardingObjectSpacingCm: !<float> 18.000000
+      onboardingWelcomeLine: "Hi! I’m your buddy. Let’s set up your space one piece at a time. I’ll show you sticky notes, your pot stack, and a clock."
+      onboardingClosingLine: "You're all set! I'll tag along from here. Say hey friend if you want to talk again. When you finish your goal — or walk the distance — I'll congratulate you and your plant will fully grow. Have fun!"
+      onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
+      onboardingClock: !<reference.SceneObject> 0c384a6b-e0e5-473f-9eeb-b74a88ed647f
+      onboardingClockLine: Here’s your clock. Put it somewhere easy to check while you work.
+      onboardingPalette: !<reference.SceneObject> 9aa42fcc-a72f-4475-a934-1f79675ea728
+      onboardingPaletteLine: This is your palette. Paint your world with it! Put it somewhere you can reach while you work.
+      onboardingIncludePalette: false
+      onboardingPlanter: !<reference.SceneObject> 7c7350dc-41a2-4426-a5bb-047d14525a11
+      onboardingPlanterLine: Here’s your pot stack. Each goal pot arrives with a seed already planted. Put the stack somewhere easy to reach.
+      onboardingPostIt: !<reference.SceneObject> d7569447-6ffa-4d71-9778-b93af9b8cb95
+      onboardingPostItLine: "These are your sticky notes. Pull one out and start speaking, and I’ll write down what you say."
+      onboardingTrash: !<reference.SceneObject> f293204d-edc4-4b3a-8a09-4c89c40d6fa2
+      onboardingTrashLine: "And here’s the trash. Put it wherever you like, then drop things in when you don’t need them anymore."
+      onboardingLeaderboard: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
+      enableLeaderboardPanel: false
+      onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to walk 20 meters."
+      onboardingGoalSeedLine: "There it is! Your goal pot already has a seed planted. Place it where you like; it waters itself and grows as you make progress. Tell me when you finish the goal, and it will fully bloom."
+      onboardingGoalListenTimeoutSec: !<float> 22.000000
+      onboardingGoalFallback: I want to walk 20 meters
+      onboardingAutoGoalFallbackOnTimeout: false
+      onboardingRequireGoalPotPractice: true
+      agentTts: !<MappingBased.AssignableType> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      grabSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      releaseSpeechTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
+      grabBubbleText: Whee!
+      releaseBubbleText: Thanks!
+      speechBubbleHideDelaySec: !<float> 4.000000
+      bubbleScaleCompensation: !<float> 3.000000
+      bubbleHeightOffset: !<float> 5.000000
+      bubbleForwardOffset: 0.150000
+      enableLookAt: false
+      lookAtDistanceMeters: 0.200000
+      lookAtExitPaddingMeters: 0.050000
+      lookAtTurnSpeed: !<float> 6.000000
+      lookAtAlwaysWhileFollowing: true
+      enableIdleBob: true
+      idleBobAmplitudeCm: 1.500000
+      idleBobSpeed: 1.800000
+      goalCongratsLine: "Woohoo! You did it! I'm so proud of you — your plant is fully grown!"
+      enableGoalLeaderboard: false
+      goalLeaderboardModule: !<reference.LeaderboardModule> 00000000-0000-0000-0000-000000000000
+      goalLeaderboardName: DeskGameGoals
+      goalLeaderboardTtlSec: !<float> 31536000.000000
+      nonDistanceGoalScore: 100
+      leaderboardDistanceGoalsOnly: true
+      fetchLeaderboardAfterSubmit: true
+      leaderboardUsersLimit: 5
+      leaderboardUseGlobal: true
+      announceLeaderboardRank: false
+      enableFollowAfterOnboarding: false
+      followDistanceCm: !<float> 55.000000
+      followSideOffsetCm: !<float> 18.000000
+      followHeightOffsetCm: !<float> -25.000000
+      followLerpSpeed: 3.500000
+      followMinMoveCm: !<float> 4.000000
+      workspaceResetLine: "Got it — let's set this space up again. I'll clear the anchors and walk you through onboarding."
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/9025bcac-8b84-44d8-6141-442ea0e6a12c>
+  PrefabRemaps:
+    []
+  Name: Glow Orb R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> c55f7609-f7ee-4177-60a5-65de36564058
+- !<SceneObject/96112fde-e694-4fb2-564f-80f170c8da24>
+  PrefabRemaps:
+    []
+  Name: Scenes
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 13dd649a-ab21-4f6e-644e-b7d1d8fdbc82
+  Components:
+    []
+- !<AnimationPlayer/a441f507-b616-4015-467d-eb488901d4e5>
+  PrefabRemaps:
+    []
+  Name: component_9
+  Enabled: true
+  Autoplay: true
+  ClipRangeType: Frames
+  AnimationClips:
+    - !<AnimationClip>
+      AnimationAsset: !<reference> 8e61545d-90c2-428e-8368-ce9399d119a4
+      Name: Default
+      Weight: 1.000000
+      PlaybackSpeed: 0.400000
+      Begin: 0.000000
+      End: 15.000000
+      Offset: 0.000000
+      Reversed: false
+      Disabled: false
+      BlendMode: Default
+      ScaleMode: Multiply
+      PlaybackMode: Loop
+- !<SceneObject/a6d3d1f1-9c44-4553-6492-13c7d063372b>
+  PrefabRemaps:
+    []
+  Name: Antenna_03.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.326327, z: 0.000000}
+    Rotation: {x: 36.531975, y: 3.128000, z: -9.459055}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<RenderMeshVisual/ae778f09-de66-4628-7349-762ca4b3c783>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.008
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    []
+  Mesh: !<reference> 70876b05-1dc1-4f46-a321-24626a0aec0b
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/aff36add-0633-4a48-5286-6b8a86bbf576>
+  PrefabRemaps:
+    []
+  Name: Glow Orb L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> eaec4341-f408-4f8e-45b3-5301d6414610
+- !<Skin/b0107951-63d3-44ae-4284-f1991eb0ed2e>
+  PrefabRemaps:
+    []
+  Name: component_10
+  Enabled: true
+  skinBones:
+    Antenna_01.L: !<reference> 7de94d05-5b12-4fc3-53fd-271a0ee5e5bd
+    Antenna_01.R: !<reference> 4b220fff-2d15-49c7-53e5-5a6264516e58
+    Antenna_02.L: !<reference> 0ea8cfa5-6e7f-4be6-645a-368ee2b4d775
+    Antenna_02.R: !<reference> f604712c-e736-42cf-58f5-06b83b92e01c
+    Antenna_03.L: !<reference> 5c6a38c4-9ef8-4824-46f7-07cb1a97c5cc
+    Antenna_03.R: !<reference> a6d3d1f1-9c44-4553-6492-13c7d063372b
+    Body: !<reference> ff3f3544-3dcd-4e59-531a-4238f9ff8fe2
+    Bones: !<reference> cb1c3ecf-fac7-437c-419a-68af43383e7c
+    Face: !<reference> 37d2b03b-5fba-4c9e-7846-64a15ebaa971
+    Glow Orb L: !<reference> aff36add-0633-4a48-5286-6b8a86bbf576
+    Glow Orb R: !<reference> 9025bcac-8b84-44d8-6141-442ea0e6a12c
+    Wing L: !<reference> c11a0f3e-4d1d-4f2c-4631-f6d26f1230a3
+    Wing R: !<reference> 1a620d15-67ec-41aa-6a80-8a2c2b92d62d
+    Wing_01.L: !<reference> f7791309-ea30-475d-4cbb-6974f6f5e7cb
+    Wing_01.R: !<reference> 66de681c-1943-447f-430b-542238298823
+    Wing_02.L: !<reference> 0b366f62-3698-4f1a-7968-ad591208394f
+    Wing_02.R: !<reference> d4026ffa-e7f8-4351-7631-94c5b086e3ce
+    antenna L: !<reference> 1261d051-c0cd-41bc-5db7-d46bce586af1
+    antenna R: !<reference> 28672732-a4c6-49de-701f-f998d67d6286
+    antenna.008: !<reference> 2336bf87-a95a-47bd-74f1-ec21df608631
+    neutral_bone: !<reference> c6378793-6d75-491a-7ccc-8018328c09df
+- !<SceneObject/c11a0f3e-4d1d-4f2c-4631-f6d26f1230a3>
+  PrefabRemaps:
+    []
+  Name: Wing L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: -8.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 785620ef-2d4f-437c-4814-b32ecc0f291a
+- !<RenderMeshVisual/c55f7609-f7ee-4177-60a5-65de36564058>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.004
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 6c5f1309-41a3-4403-bb87-8517bfde80b4
+  Mesh: !<reference> 75f69f3e-be19-4fea-8507-fe86b12c374d
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/c6378793-6d75-491a-7ccc-8018328c09df>
+  PrefabRemaps:
+    []
+  Name: neutral_bone
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.121150, y: -1.583560, z: 1.675869}
+    Rotation: {x: -153.064606, y: 12.130720, z: 6.929450}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<SceneObject/cb1c3ecf-fac7-437c-419a-68af43383e7c>
+  PrefabRemaps:
+    []
+  Name: Bones
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 1261d051-c0cd-41bc-5db7-d46bce586af1
+    - !<own> 28672732-a4c6-49de-701f-f998d67d6286
+    - !<own> 2336bf87-a95a-47bd-74f1-ec21df608631
+    - !<own> ff3f3544-3dcd-4e59-531a-4238f9ff8fe2
+    - !<own> 37d2b03b-5fba-4c9e-7846-64a15ebaa971
+    - !<own> aff36add-0633-4a48-5286-6b8a86bbf576
+    - !<own> 9025bcac-8b84-44d8-6141-442ea0e6a12c
+    - !<own> c11a0f3e-4d1d-4f2c-4631-f6d26f1230a3
+    - !<own> 1a620d15-67ec-41aa-6a80-8a2c2b92d62d
+    - !<own> 2219463e-feaf-4b4f-6df2-cb541854b2e3
+  Components:
+    []
+- !<SceneObject/d4026ffa-e7f8-4351-7631-94c5b086e3ce>
+  PrefabRemaps:
+    []
+  Name: Wing_02.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 2.197986, z: -0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 4.963777}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    []
+- !<RenderMeshVisual/eaec4341-f408-4f8e-45b3-5301d6414610>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.003
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 6c5f1309-41a3-4403-bb87-8517bfde80b4
+  Mesh: !<reference> 9a3bd599-d2a1-459d-a543-16edb88a421a
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<RenderMeshVisual/eb1ce041-32ea-411e-7d74-34e174ddcfbe>
+  PrefabRemaps:
+    []
+  Name: BézierCurve.002
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> afca2c2e-b0cf-4b1d-b02c-71c19b9780fd
+  Mesh: !<reference> 1fbfa4b9-991e-433d-ac58-20094ba824d7
+  Skin: !<reference> b0107951-63d3-44ae-4284-f1991eb0ed2e
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<SceneObject/f604712c-e736-42cf-58f5-06b83b92e01c>
+  PrefabRemaps:
+    []
+  Name: Antenna_02.R
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 0.378487, z: 0.000000}
+    Rotation: {x: 27.181921, y: -0.452854, z: 0.145837}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> a6d3d1f1-9c44-4553-6492-13c7d063372b
+    - !<own> c6378793-6d75-491a-7ccc-8018328c09df
+  Components:
+    []
+- !<SceneObject/f7791309-ea30-475d-4cbb-6974f6f5e7cb>
+  PrefabRemaps:
+    []
+  Name: Wing_01.L
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -0.000000, y: 1.092691, z: -0.000000}
+    Rotation: {x: -0.000000, y: -0.000000, z: 60.101177}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 0b366f62-3698-4f1a-7968-ad591208394f
+  Components:
+    []
+- !<SceneObject/ff3f3544-3dcd-4e59-531a-4238f9ff8fe2>
+  PrefabRemaps:
+    []
+  Name: Body
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> eb1ce041-32ea-411e-7d74-34e174ddcfbe

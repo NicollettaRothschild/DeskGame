@@ -48,6 +48,10 @@ type AnchorNoteSpawner = {
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
   syncTrackedWrapperToContent?: (content: SceneObject) => void;
   placeTrackedContentAtWorld?: (content: SceneObject, worldPos: vec3, worldRot?: quat) => void;
+  getValidatedSpawnWorldPosition?: (
+    preferredWorldPos?: vec3 | null,
+    index?: number
+  ) => vec3;
   getTrackedSpawnParent?: () => SceneObject;
 };
 
@@ -142,6 +146,7 @@ export class MainPostItSource extends BaseScriptComponent {
   private isBound = false;
   private spawnSuppressed = false;
   private noteSerial = 0;
+  private layeredStackVisualReady = false;
   private fallbackCaptures: FallbackTranscriptCapture[] = [];
   private sharedSpeech: SpeechRecognition | null = null;
 
@@ -156,6 +161,19 @@ export class MainPostItSource extends BaseScriptComponent {
 
   public setSpawnSuppressed(suppressed: boolean): void {
     this.spawnSuppressed = suppressed;
+  }
+
+  /**
+   * Hidden onboarding roots may not receive their normal OnStartEvent before
+   * Friend reveals them. Prepare the source explicitly at reveal time so its
+   * layered visual, collider, and SIK binding are live before the user grabs
+   * the stack.
+   */
+  public prepareForOnboarding(): void {
+    this.provideStickyNotePrefab();
+    this.ensureLayeredStackVisual();
+    this.ensureSourceGrabCollider();
+    this.tryBindInteractable();
   }
 
   public abortActiveSpawnPull(): void {
@@ -361,10 +379,19 @@ export class MainPostItSource extends BaseScriptComponent {
 
     this.provideStickyNotePrefab();
     const parent = this.getSpawnParent();
+    const anchorSpawner = this.getAnchorNoteSpawner();
+    const resolvedWorldPosition =
+      !isNull(anchorSpawner) &&
+      typeof (anchorSpawner as AnchorNoteSpawner).getValidatedSpawnWorldPosition ===
+        'function'
+        ? (anchorSpawner as AnchorNoteSpawner).getValidatedSpawnWorldPosition(worldPosition)
+        : worldPosition;
     const noteObject = this.notePrefab.instantiate(parent);
     this.noteSerial += 1;
     noteObject.name = `PostItNote_${this.noteSerial}`;
-    noteObject.getTransform().setWorldPosition(this.applySpawnOffset(worldPosition, interactor));
+    noteObject
+      .getTransform()
+      .setWorldPosition(this.applySpawnOffset(resolvedWorldPosition, interactor));
     playInteractionSound((sounds) => sounds.playSpawnWater());
     this.debugLog(`spawned ${noteObject.name}.`);
     return noteObject;
@@ -507,8 +534,23 @@ export class MainPostItSource extends BaseScriptComponent {
     }
 
     this.updateEvent = this.createEvent('UpdateEvent');
-    this.updateEvent.bind(() => this.updatePulledNotePosition());
+    this.updateEvent.bind(() => {
+      this.updatePulledNotePosition();
+      this.prewarmSpeechIfNeeded();
+    });
     this.updateEvent.enabled = true;
+  }
+
+  private prewarmSpeechIfNeeded(): void {
+    const speech = this.getSpeech();
+    if (isNull(speech) || speech.isMicrophoneListening()) {
+      return;
+    }
+    if (speech.isPostItCaptureActive() || speech.isAgentSessionActive()) {
+      speech.pumpListening();
+      return;
+    }
+    speech.prewarmListening();
   }
 
   private abandonActivePull(): void {
@@ -796,6 +838,9 @@ export class MainPostItSource extends BaseScriptComponent {
     if (!this.forceLayeredStackVisual) {
       return;
     }
+    if (this.layeredStackVisualReady) {
+      return;
+    }
 
     const root = this.getSceneObject();
     const template = this.findNamedChild(root, 'StackPad');
@@ -820,6 +865,8 @@ export class MainPostItSource extends BaseScriptComponent {
       stackRoot.getTransform().setLocalRotation(quat.quatIdentity());
       stackRoot.getTransform().setLocalScale(vec3.one());
     }
+
+    stackRoot.enabled = true;
 
     while (stackRoot.getChildrenCount() > 0) {
       stackRoot.getChild(0).destroy();
@@ -855,6 +902,8 @@ export class MainPostItSource extends BaseScriptComponent {
       visual.renderOrder = templateVisual.renderOrder;
     }
 
+    stackRoot.enabled = true;
+    this.layeredStackVisualReady = true;
     this.debugLog(`layered stack visual rebuilt (${count} layers).`);
   }
 
@@ -896,9 +945,10 @@ export class MainPostItSource extends BaseScriptComponent {
     }
 
     capture.owners += 1;
-    speech.beginPostItCapture();
+    // This method can be reached from a native SIK trigger callback. Claim
+    // capture ownership here, but let the UpdateEvent request the microphone.
+    speech.beginPostItCapture(false);
     speech.clearUtteranceState();
-    speech.requestListening();
     this.debugLog(`fallback transcript capture ON for ${noteObject.name}`);
   }
 

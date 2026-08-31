@@ -283,16 +283,7 @@ export class ArvisGhostSpeechBubble {
     }
     text3d.renderOrder = 21;
     this.bubbleText = text3d;
-
-    const camera = this.findCameraObject();
-    if (!isNull(camera)) {
-      const lookAt = root.createComponent('Component.LookAtComponent') as LookAtComponent;
-      lookAt.target = camera;
-      lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
-      lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
-      lookAt.worldUpVector = LookAtComponent.WorldUpVector.SceneY;
-      this.lookAt = lookAt;
-    }
+    this.lookAt = null;
 
     this.bubbleRoot = root;
     root.enabled = false;
@@ -518,6 +509,7 @@ export class CompanionNameTag {
   private updateEvent: UpdateEvent | null = null;
   private disposed = false;
   private lastVisibleState: boolean | null = null;
+  private suppressed = false;
 
   constructor(
     followRoot: SceneObject,
@@ -540,10 +532,17 @@ export class CompanionNameTag {
 
     this.updateEvent = this.host.createEvent('UpdateEvent') as UpdateEvent;
     this.updateEvent.bind(() => {
-      this.ensureLookAt();
       CompanionNameTag.refreshVisibility();
     });
     this.updateEvent.enabled = true;
+    CompanionNameTag.refreshVisibility();
+  }
+
+  public setSuppressed(suppressed: boolean): void {
+    if (this.suppressed === suppressed) {
+      return;
+    }
+    this.suppressed = suppressed;
     CompanionNameTag.refreshVisibility();
   }
 
@@ -554,6 +553,40 @@ export class CompanionNameTag {
     }
     this.updateLayout();
     CompanionNameTag.refreshVisibility();
+  }
+
+  /** Keep the label attached to the animated body and its shader displacement. */
+  public syncToGhostBody(
+    body: SceneObject,
+    displacementConfig: GhostWaterDisplacementConfig,
+    applyShaderDisplacement: boolean,
+    ySquash: number
+  ): void {
+    if (this.disposed || isNull(this.tagRoot) || isNull(body)) {
+      return;
+    }
+
+    const bodyTransform = body.getTransform();
+    const worldMatrix = bodyTransform.getWorldTransform();
+    const bodyWorldScale = bodyTransform.getWorldScale();
+    const invWorldScaleY = 1.0 / Math.max(0.001, bodyWorldScale.y);
+    const baseY = this.heightOffset * Math.max(0.75, ySquash);
+    const anchorLocal = new vec3(0, baseY, 0);
+    const anchorWorld = worldMatrix.multiplyPoint(anchorLocal);
+    const displacementY = applyShaderDisplacement
+      ? sampleGhostWaterDisplacementY(
+          anchorWorld.x,
+          anchorWorld.z,
+          getTime(),
+          displacementConfig
+        )
+      : 0;
+
+    // tagRoot is a body child, so only the local offset is rewritten. The
+    // body's animation scale/translation continues to drive the full label.
+    this.tagRoot.getTransform().setLocalPosition(
+      new vec3(0, baseY + displacementY * invWorldScaleY, 0)
+    );
   }
 
   public dispose(): void {
@@ -588,7 +621,9 @@ export class CompanionNameTag {
 
     for (let i = 0; i < CompanionNameTag.instances.length; i++) {
       const tag = CompanionNameTag.instances[i];
-      const shouldShow = tag.showWhenMultiple ? activeCount > 1 : activeCount > 0;
+      const shouldShow =
+        !tag.suppressed &&
+        (tag.showWhenMultiple ? activeCount > 1 : activeCount > 0);
       tag.setVisible(shouldShow);
     }
   }
@@ -623,7 +658,6 @@ export class CompanionNameTag {
 
     this.createBackground(root);
     this.createText(root);
-    this.ensureLookAt();
   }
 
   private createBackground(root: SceneObject): void {
@@ -758,29 +792,7 @@ export class CompanionNameTag {
   }
 
   private ensureLookAt(): void {
-    if (this.disposed || isNull(this.tagRoot) || !isNull(this.lookAt)) {
-      return;
-    }
-
-    const camera = this.findCameraObject();
-    if (isNull(camera)) {
-      return;
-    }
-
-    try {
-      const lookAt = this.tagRoot.createComponent(
-        'Component.LookAtComponent'
-      ) as LookAtComponent;
-      lookAt.target = camera;
-      lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
-      lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
-      lookAt.worldUpVector = LookAtComponent.WorldUpVector.SceneY;
-      this.lookAt = lookAt;
-    } catch (error) {
-      if (this.debugLogging) {
-        print('[CompanionNameTag] camera-facing label unavailable: ' + error);
-      }
-    }
+    return;
   }
 
   private findCameraObject(): SceneObject | null {

@@ -36,6 +36,16 @@ export function registerCodingBuddy(
   }
 }
 
+export function unregisterCodingBuddy(
+  providerId: string,
+  instance: CodingBuddyLike
+): void {
+  const key = String(providerId || '').trim().toLowerCase();
+  if (key && codingBuddies[key] === instance) {
+    delete codingBuddies[key];
+  }
+}
+
 export function getSharedCodingBuddy(providerId: string): CodingBuddyLike | null {
   const key = String(providerId || '').trim().toLowerCase();
   return key && codingBuddies[key] ? codingBuddies[key] : null;
@@ -43,6 +53,12 @@ export function getSharedCodingBuddy(providerId: string): CodingBuddyLike | null
 
 export function registerSpeechRecognition(instance: SpeechRecognition): void {
   speechRecognition = instance;
+}
+
+export function unregisterSpeechRecognition(instance: SpeechRecognition): void {
+  if (speechRecognition === instance) {
+    speechRecognition = null;
+  }
 }
 
 export function getSharedSpeechRecognition(): SpeechRecognition | null {
@@ -53,12 +69,24 @@ export function registerSpecsApi(instance: SpecsApiClient): void {
   specsApi = instance;
 }
 
+export function unregisterSpecsApi(instance: SpecsApiClient): void {
+  if (specsApi === instance) {
+    specsApi = null;
+  }
+}
+
 export function getSharedSpecsApi(): SpecsApiClient | null {
   return specsApi;
 }
 
 export function registerSpecsDeviceRegistry(instance: SpecsDeviceRegistry): void {
   deviceRegistry = instance;
+}
+
+export function unregisterSpecsDeviceRegistry(instance: SpecsDeviceRegistry): void {
+  if (deviceRegistry === instance) {
+    deviceRegistry = null;
+  }
 }
 
 export function getSharedSpecsDeviceRegistry(): SpecsDeviceRegistry | null {
@@ -69,12 +97,24 @@ export function registerFlowGardenSpacePanel(instance: FlowGardenSpacePanel): vo
   spacePanel = instance;
 }
 
+export function unregisterFlowGardenSpacePanel(instance: FlowGardenSpacePanel): void {
+  if (spacePanel === instance) {
+    spacePanel = null;
+  }
+}
+
 export function getSharedFlowGardenSpacePanel(): FlowGardenSpacePanel | null {
   return spacePanel;
 }
 
 export function registerFlowGardenTts(instance: FlowGardenTTS): void {
   agentTts = instance;
+}
+
+export function unregisterFlowGardenTts(instance: FlowGardenTTS): void {
+  if (agentTts === instance) {
+    agentTts = null;
+  }
 }
 
 export function getSharedFlowGardenTts(): FlowGardenTTS | null {
@@ -85,6 +125,12 @@ export function registerArvisAgentChat(instance: ArvisAgentChat): void {
   arvisAgentChat = instance;
 }
 
+export function unregisterArvisAgentChat(instance: ArvisAgentChat): void {
+  if (arvisAgentChat === instance) {
+    arvisAgentChat = null;
+  }
+}
+
 export function getSharedArvisAgentChat(): ArvisAgentChat | null {
   return arvisAgentChat;
 }
@@ -93,12 +139,24 @@ export function registerArvisGhostBlob(instance: ArvisGhostBlob): void {
   arvisGhostBlob = instance;
 }
 
+export function unregisterArvisGhostBlob(instance: ArvisGhostBlob): void {
+  if (arvisGhostBlob === instance) {
+    arvisGhostBlob = null;
+  }
+}
+
 export function getSharedArvisGhostBlob(): ArvisGhostBlob | null {
   return arvisGhostBlob;
 }
 
 export function registerFriendGrab(instance: FriendGrabLike): void {
   friendGrab = instance;
+}
+
+export function unregisterFriendGrab(instance: FriendGrabLike): void {
+  if (friendGrab === instance) {
+    friendGrab = null;
+  }
 }
 
 export function getSharedFriendGrab(): FriendGrabLike | null {

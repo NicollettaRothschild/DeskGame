@@ -1,4 +1,7 @@
-import { registerSpecsDeviceRegistry } from './FlowGardenServiceRegistry';
+import {
+  registerSpecsDeviceRegistry,
+  unregisterSpecsDeviceRegistry,
+} from './FlowGardenServiceRegistry';
 import { applySpecsPairingText3D, isSpecsEditorMockActive, SPECS_PAIRING_URL } from './SpecsPairingDisplay';
 
 const STORAGE_DEVICE_ID = 'specs_device_id';
@@ -22,8 +25,10 @@ export class SpecsDeviceRegistry extends BaseScriptComponent {
   private deviceSecret = '';
   private paired = false;
   private pairSyncEvent: DelayedCallbackEvent | null = null;
+  private destroyed = false;
 
   onAwake(): void {
+    this.destroyed = false;
     registerSpecsDeviceRegistry(this);
     this.resolveUserIdText3D();
     this.loadFromStorage();
@@ -33,6 +38,15 @@ export class SpecsDeviceRegistry extends BaseScriptComponent {
     }
     this.refreshStatusText();
     this.schedulePairingSync();
+  }
+
+  onDestroy(): void {
+    this.destroyed = true;
+    if (!isNull(this.pairSyncEvent)) {
+      this.pairSyncEvent.enabled = false;
+      this.pairSyncEvent = null;
+    }
+    unregisterSpecsDeviceRegistry(this);
   }
 
   public syncPairingFromStorage(): boolean {
@@ -54,6 +68,9 @@ export class SpecsDeviceRegistry extends BaseScriptComponent {
 
     this.pairSyncEvent = this.createEvent('DelayedCallbackEvent');
     this.pairSyncEvent.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.pairSyncEvent = null;
       this.syncPairingFromStorage();
       this.schedulePairingSync();
@@ -127,7 +144,7 @@ export class SpecsDeviceRegistry extends BaseScriptComponent {
 
     if (!isNull(this.statusText)) {
       if (this.paired) {
-        this.statusText.text = `Specs ID: ${displayId}`;
+        this.statusText.text = '';
       } else {
         let pairHint = SPECS_PAIRING_URL;
         if (editorMock) {

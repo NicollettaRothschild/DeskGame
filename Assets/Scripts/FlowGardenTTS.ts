@@ -1,4 +1,8 @@
-import { getSharedSpeechRecognition, registerFlowGardenTts } from './FlowGardenServiceRegistry';
+import {
+  getSharedSpeechRecognition,
+  registerFlowGardenTts,
+  unregisterFlowGardenTts,
+} from './FlowGardenServiceRegistry';
 import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 
@@ -59,19 +63,69 @@ export class FlowGardenTTS extends BaseScriptComponent {
   private speaking = false;
   private speakingStartedAt = -9999;
   private speechRequestId = 0;
+  private speakingDone: ((ok: boolean) => void) | null = null;
   private suppressVoiceCommandsUntil = 0;
   private cloudTtsDisabled = false;
   private cloudTtsFailureLogged = false;
+  private destroyed = false;
 
   onAwake(): void {
+    this.destroyed = false;
     registerFlowGardenTts(this);
-    this.audioPlayer = this.getSceneObject().createComponent('Component.AudioComponent') as AudioComponent;
-    this.createEvent('OnStartEvent').bind(() => this.configureAudioPlayer());
+    this.createEvent('OnStartEvent').bind(() => {
+      this.configureAudioPlayer();
+      this.ensureAudioListener();
+    });
+    this.createEvent('UpdateEvent').bind(() => this.recoverStaleSpeakingLock());
     print('[FlowGardenTTS] registered');
   }
 
+  onDestroy(): void {
+    this.destroyed = true;
+    this.speechRequestId += 1;
+    if (!isNull(this.audioPlayer)) {
+      try {
+        this.audioPlayer.stop(false);
+      } catch (_error) {
+        // The audio component may already be invalid during teardown.
+      }
+    }
+    this.speaking = false;
+    this.speakingDone = null;
+    this.suppressVoiceCommandsUntil = 0;
+    unregisterFlowGardenTts(this);
+  }
+
+  private recoverStaleSpeakingLock(): void {
+    if (this.destroyed || !this.speaking) {
+      return;
+    }
+
+    const timeoutSec = Math.max(8, Number(this.speakingLockTimeoutSec) || 24);
+    if (getTime() - this.speakingStartedAt <= timeoutSec) {
+      return;
+    }
+
+    print('[FlowGardenTTS] recovering stale speaking lock');
+    this.speaking = false;
+    this.speechRequestId += 1;
+    this.suppressVoiceCommandsUntil = Math.min(
+      this.suppressVoiceCommandsUntil,
+      getTime() + 1
+    );
+    const speech = getSharedSpeechRecognition();
+    if (!isNull(speech)) {
+      speech.resumeAfterTtsPlayback();
+    }
+    const onDone = this.speakingDone;
+    this.speakingDone = null;
+    if (onDone) {
+      onDone(false);
+    }
+  }
+
   private configureAudioPlayer(): void {
-    if (isNull(this.audioPlayer)) {
+    if (this.destroyed || isNull(this.audioPlayer)) {
       return;
     }
     try {
@@ -87,6 +141,9 @@ export class FlowGardenTTS extends BaseScriptComponent {
   }
 
   private ensureAudioPlayer(): AudioComponent | null {
+    if (this.destroyed) {
+      return null;
+    }
     if (isNull(this.audioPlayer)) {
       this.audioPlayer = this.getSceneObject().createComponent(
         'Component.AudioComponent'
@@ -99,7 +156,67 @@ export class FlowGardenTTS extends BaseScriptComponent {
     return this.audioPlayer;
   }
 
+  private ensureAudioListener(): void {
+    if (this.destroyed) {
+      return;
+    }
+
+    try {
+      const rootCount = global.scene.getRootObjectsCount();
+      for (let i = 0; i < rootCount; i++) {
+        const cameraObject = this.findCameraObjectRecursive(
+          global.scene.getRootObject(i)
+        );
+        if (isNull(cameraObject)) {
+          continue;
+        }
+
+        const listener = cameraObject.getComponent(
+          'Component.AudioListenerComponent'
+        );
+        if (isNull(listener) && this.debugLogging) {
+          print('[FlowGardenTTS] camera has no authored AudioListenerComponent');
+        }
+        return;
+      }
+    } catch (e) {
+      if (this.debugLogging) {
+        print('[FlowGardenTTS] Audio Listener setup failed: ' + e);
+      }
+    }
+  }
+
+  private findCameraObjectRecursive(node: SceneObject): SceneObject | null {
+    if (isNull(node)) {
+      return null;
+    }
+
+    try {
+      if (!isNull(node.getComponent('Component.Camera'))) {
+        return node;
+      }
+    } catch (_error) {
+      return null;
+    }
+
+    const childCount = node.getChildrenCount();
+    for (let i = 0; i < childCount; i++) {
+      const found = this.findCameraObjectRecursive(node.getChild(i));
+      if (!isNull(found)) {
+        return found;
+      }
+    }
+    return null;
+  }
+
   public speak(text: string, onDone?: (ok: boolean) => void): void {
+    if (this.destroyed) {
+      if (onDone) {
+        onDone(false);
+      }
+      return;
+    }
+
     const spokenText = this.cleanSpeechText(text);
     if (!spokenText) {
       if (onDone) {
@@ -112,9 +229,7 @@ export class FlowGardenTTS extends BaseScriptComponent {
       this.speaking &&
       getTime() - this.speakingStartedAt > Math.max(8, this.speakingLockTimeoutSec)
     ) {
-      print('[FlowGardenTTS] recovering stale speaking lock');
-      this.speaking = false;
-      this.speechRequestId += 1;
+      this.recoverStaleSpeakingLock();
     }
 
     if (this.speaking) {
@@ -128,20 +243,16 @@ export class FlowGardenTTS extends BaseScriptComponent {
     this.speaking = true;
     this.speakingStartedAt = getTime();
     const requestId = ++this.speechRequestId;
+    this.speakingDone = onDone || null;
     this.beginVoiceCommandSuppression(spokenText);
-    const speech = getSharedSpeechRecognition();
-    if (!isNull(speech)) {
-      speech.pauseForTts();
-    }
     print('[FlowGardenTTS] Speaking: ' + spokenText.slice(0, 120));
 
     let finished = false;
     const finish = (ok: boolean): void => {
-      if (finished || requestId !== this.speechRequestId) {
+      if (this.destroyed || finished || requestId !== this.speechRequestId) {
         return;
       }
       finished = true;
-      // Native/cloud play() returns immediately — wait out spoken duration before unblocking mic.
       const delay = this.createEvent('DelayedCallbackEvent');
       delay.bind(() => {
         if (requestId !== this.speechRequestId) {
@@ -149,42 +260,130 @@ export class FlowGardenTTS extends BaseScriptComponent {
         }
         this.speaking = false;
         this.beginVoiceCommandSuppression(spokenText);
+        this.speakingDone = null;
         const speech = getSharedSpeechRecognition();
+        if (!ok) {
+          // Keep the mic paused while callers play a fallback clip.
+          if (onDone) {
+            onDone(false);
+          }
+          const hold = this.createEvent('DelayedCallbackEvent');
+          hold.bind(() => {
+            if (requestId !== this.speechRequestId) {
+              return;
+            }
+            if (!isNull(speech)) {
+              speech.clearUtteranceState();
+              speech.resumeAfterTtsPlayback();
+            }
+          });
+          hold.reset(1.2);
+          return;
+        }
         if (!isNull(speech)) {
           speech.clearUtteranceState();
           speech.resumeAfterTtsPlayback();
         }
         if (onDone) {
-          onDone(ok);
+          onDone(true);
         }
       });
-      // Failed synthesis produced no audio, so unlock immediately for fallback/retry.
-      delay.reset(ok ? estimateSpeechDurationSec(spokenText) : 0.1);
+      delay.reset(ok ? estimateSpeechDurationSec(spokenText) : 0.2);
     };
 
-    if (
-      this.preferArvisVoiceWhenPaired &&
-      !this.cloudTtsDisabled &&
-      !isNull(this.specsApi) &&
-      !isNull(this.deviceRegistry) &&
-      this.deviceRegistry.isPaired() &&
-      !this.specsApi.isEditorMockActive()
-    ) {
-      this.speakViaArvis(spokenText, (ok) => {
-        if (ok) {
-          finish(true);
-          return;
-        }
-        this.speakViaNative(spokenText, (nativeOk) => finish(!!nativeOk));
-      });
+    const beginPlayback = (): void => {
+      if (this.destroyed || requestId !== this.speechRequestId) {
+        return;
+      }
+      if (
+        this.preferArvisVoiceWhenPaired &&
+        !this.cloudTtsDisabled &&
+        !isNull(this.specsApi) &&
+        !isNull(this.deviceRegistry) &&
+        this.deviceRegistry.isPaired() &&
+        !this.specsApi.isEditorMockActive()
+      ) {
+        this.speakViaArvis(spokenText, (ok) => {
+          if (ok) {
+            finish(true);
+            return;
+          }
+          this.speakViaNative(
+            spokenText,
+            (nativeOk) => finish(!!nativeOk),
+            requestId
+          );
+        }, requestId);
+        return;
+      }
+
+      this.speakViaNative(
+        spokenText,
+        (nativeOk) => finish(!!nativeOk),
+        requestId
+      );
+    };
+
+    const speech = getSharedSpeechRecognition();
+    if (!isNull(speech)) {
+      speech.pauseForTts(beginPlayback);
       return;
     }
-
-    this.speakViaNative(spokenText, (nativeOk) => finish(!!nativeOk));
+    beginPlayback();
   }
 
   public isSpeaking(): boolean {
     return this.speaking || getTime() < this.suppressVoiceCommandsUntil;
+  }
+
+  /** True only while audio playback is still occupying the speech channel. */
+  public isAudioPlaying(): boolean {
+    return this.speaking;
+  }
+
+  /**
+   * Stop speech before a held buddy claims the microphone. This runs from an
+   * UpdateEvent, outside native audio and interaction callbacks, so a user
+   * grab can safely interrupt onboarding/reply audio instead of waiting on a
+   * stale speaking lock.
+   */
+  public interruptForInteraction(): void {
+    if (this.destroyed || !this.speaking) {
+      return;
+    }
+
+    this.speechRequestId += 1;
+    this.speaking = false;
+    this.speakingStartedAt = -9999;
+    this.speakingDone = null;
+    this.suppressVoiceCommandsUntil = Math.min(
+      this.suppressVoiceCommandsUntil,
+      getTime() + 0.25
+    );
+
+    try {
+      const player = this.audioPlayer as AudioComponent & {
+        stop?: (fade: boolean) => void;
+      };
+      if (!isNull(player) && typeof player.stop === 'function') {
+        player.stop(false);
+      }
+    } catch (e) {
+      if (this.debugLogging) {
+        print('[FlowGardenTTS] speech interruption failed: ' + e);
+      }
+    }
+
+    const speech = getSharedSpeechRecognition();
+    if (!isNull(speech)) {
+      try {
+        speech.resumeAfterTtsPlayback();
+      } catch (e) {
+        if (this.debugLogging) {
+          print('[FlowGardenTTS] speech resume after interruption failed: ' + e);
+        }
+      }
+    }
   }
 
   public isBlockingVoiceCommands(): boolean {
@@ -208,7 +407,14 @@ export class FlowGardenTTS extends BaseScriptComponent {
     }
   }
 
-  private speakViaArvis(text: string, onDone: (ok: boolean) => void): void {
+  private speakViaArvis(
+    text: string,
+    onDone: (ok: boolean) => void,
+    requestId: number
+  ): void {
+    if (this.destroyed || requestId !== this.speechRequestId) {
+      return;
+    }
     if (isNull(this.specsApi) || isNull(this.deviceRegistry)) {
       onDone(false);
       return;
@@ -217,7 +423,11 @@ export class FlowGardenTTS extends BaseScriptComponent {
     const timeout = this.createEvent('DelayedCallbackEvent');
     let settled = false;
     const settle = (ok: boolean): void => {
-      if (settled) {
+      if (
+        this.destroyed ||
+        requestId !== this.speechRequestId ||
+        settled
+      ) {
         return;
       }
       settled = true;
@@ -239,7 +449,11 @@ export class FlowGardenTTS extends BaseScriptComponent {
         text,
         this.agentName,
         (result, error) => {
-          if (settled) {
+          if (
+            this.destroyed ||
+            requestId !== this.speechRequestId ||
+            settled
+          ) {
             return;
           }
           if (!result || !result.audioBase64) {
@@ -256,20 +470,28 @@ export class FlowGardenTTS extends BaseScriptComponent {
           // The network request succeeded; allow a short second window for the
           // RemoteMediaModule to decode and create the AudioTrackAsset.
           timeout.reset(5);
-          this.playBase64Audio(result.audioBase64, (played) => {
-            if (settled) {
-              return;
-            }
-            if (this.debugLogging) {
-              print(
-                '[FlowGardenTTS] Arvis voice played=' +
-                  played +
-                  ' voice=' +
-                  (result.voiceId || '')
-              );
-            }
-            settle(played);
-          });
+          this.playBase64Audio(
+            result.audioBase64,
+            (played) => {
+              if (
+                this.destroyed ||
+                requestId !== this.speechRequestId ||
+                settled
+              ) {
+                return;
+              }
+              if (this.debugLogging) {
+                print(
+                  '[FlowGardenTTS] Arvis voice played=' +
+                    played +
+                    ' voice=' +
+                    (result.voiceId || '')
+                );
+              }
+              settle(played);
+            },
+            requestId
+          );
         }
       );
     } catch (e) {
@@ -280,7 +502,14 @@ export class FlowGardenTTS extends BaseScriptComponent {
     }
   }
 
-  private speakViaNative(text: string, onDone?: (ok: boolean) => void): void {
+  private speakViaNative(
+    text: string,
+    onDone: ((ok: boolean) => void) | undefined,
+    requestId: number
+  ): void {
+    if (this.destroyed || requestId !== this.speechRequestId) {
+      return;
+    }
     if (isNull(this.ttsModule)) {
       print('[FlowGardenTTS] Missing TextToSpeechModule asset');
       if (onDone) {
@@ -308,6 +537,9 @@ export class FlowGardenTTS extends BaseScriptComponent {
 
     let activeAttemptId = 0;
     const tryVoice = (voiceIndex: number): void => {
+      if (this.destroyed || requestId !== this.speechRequestId) {
+        return;
+      }
       if (voiceIndex >= voices.length) {
         if (onDone) {
           onDone(false);
@@ -318,7 +550,12 @@ export class FlowGardenTTS extends BaseScriptComponent {
       const attemptId = ++activeAttemptId;
       let attemptSettled = false;
       const failAttempt = (reason: string): void => {
-        if (attemptSettled || attemptId !== activeAttemptId) {
+        if (
+          this.destroyed ||
+          requestId !== this.speechRequestId ||
+          attemptSettled ||
+          attemptId !== activeAttemptId
+        ) {
           return;
         }
         attemptSettled = true;
@@ -340,17 +577,29 @@ export class FlowGardenTTS extends BaseScriptComponent {
           nativeText,
           options,
           (audioTrack) => {
-            if (attemptSettled || attemptId !== activeAttemptId) {
+            if (
+              this.destroyed ||
+              requestId !== this.speechRequestId ||
+              attemptSettled ||
+              attemptId !== activeAttemptId
+            ) {
               return;
             }
             attemptSettled = true;
             const player = this.ensureAudioPlayer();
-            if (isNull(player)) {
+            if (isNull(player) || isNull(audioTrack)) {
               tryVoice(voiceIndex + 1);
               return;
             }
-            player.audioTrack = audioTrack;
-            player.play(1);
+            if (
+              !this.playAudioTrack(
+                player as AudioComponent,
+                audioTrack as AudioTrackAsset
+              )
+            ) {
+              tryVoice(voiceIndex + 1);
+              return;
+            }
             if (this.debugLogging) {
               print('[FlowGardenTTS] Native voice played voice=' + voices[voiceIndex]);
             }
@@ -370,7 +619,14 @@ export class FlowGardenTTS extends BaseScriptComponent {
     tryVoice(0);
   }
 
-  private playBase64Audio(base64: string, onDone: (ok: boolean) => void): void {
+  private playBase64Audio(
+    base64: string,
+    onDone: (ok: boolean) => void,
+    requestId: number
+  ): void {
+    if (this.destroyed || requestId !== this.speechRequestId) {
+      return;
+    }
     const internetModule = this.resolveInternetModule();
     const remoteMediaModule = this.resolveRemoteMediaModule();
     const audioPlayer = this.ensureAudioPlayer();
@@ -404,16 +660,35 @@ export class FlowGardenTTS extends BaseScriptComponent {
       remoteMediaModule.loadResourceAsAudioTrackAsset(
         blob,
         (audioTrack) => {
+          if (
+            this.destroyed ||
+            requestId !== this.speechRequestId
+          ) {
+            return;
+          }
           const player = this.ensureAudioPlayer();
-          if (isNull(player)) {
+          if (isNull(player) || isNull(audioTrack)) {
             onDone(false);
             return;
           }
-          player.audioTrack = audioTrack;
-          player.play(1);
+          if (
+            !this.playAudioTrack(
+              player as AudioComponent,
+              audioTrack as AudioTrackAsset
+            )
+          ) {
+            onDone(false);
+            return;
+          }
           onDone(true);
         },
         (errorMessage) => {
+          if (
+            this.destroyed ||
+            requestId !== this.speechRequestId
+          ) {
+            return;
+          }
           if (this.debugLogging) {
             print('[FlowGardenTTS] Remote audio load failed: ' + errorMessage);
           }
@@ -421,10 +696,29 @@ export class FlowGardenTTS extends BaseScriptComponent {
         }
       );
     } catch (e) {
+      if (this.destroyed || requestId !== this.speechRequestId) {
+        return;
+      }
       if (this.debugLogging) {
         print('[FlowGardenTTS] Base64 audio playback failed: ' + e);
       }
       onDone(false);
+    }
+  }
+
+  private playAudioTrack(player: AudioComponent, audioTrack: AudioTrackAsset): boolean {
+    if (this.destroyed) {
+      return false;
+    }
+    try {
+      player.audioTrack = audioTrack;
+      player.play(1);
+      return true;
+    } catch (e) {
+      if (this.debugLogging) {
+        print('[FlowGardenTTS] audio playback failed: ' + e);
+      }
+      return false;
     }
   }
 

@@ -65,6 +65,19 @@ export function isIgnorableUtterance(text: string): boolean {
   return !/[a-z0-9\uac00-\ud7af\u4e00-\u9fff]{2,}/u.test(normalized);
 }
 
+/** Explicit agent capture must survive the global TTS echo-suppression tail. */
+export function shouldAcceptTranscriptUpdate(
+  suppressingVoiceCommands: boolean,
+  agentSessionActive: boolean,
+  postItCaptureActive: boolean
+): boolean {
+  return (
+    !suppressingVoiceCommands ||
+    agentSessionActive ||
+    postItCaptureActive
+  );
+}
+
 export function looksLikePossibleAgentWake(text: string): boolean {
   const normalized = canonicalizeAgentWakeNames(normalizeAsrTranscript(text));
   if (!normalized || isIgnorableUtterance(normalized)) {
@@ -281,7 +294,7 @@ export function parseArvisWakePhrase(text: string): ArvisWakeParseResult {
 
 /**
  * Find the last "hey arvis …" (or alias) even inside noisy / ambient transcripts.
- * VoiceML in editor often appends TV/mic bleed before the wake phrase.
+ * Preview audio can append TV/mic bleed before the wake phrase.
  */
 export function findArvisWakeInTranscript(text: string): ArvisWakeParseResult {
   const normalized = canonicalizeAgentWakeNames(normalizeAsrTranscript(text));
@@ -322,7 +335,7 @@ export function findArvisWakeInTranscript(text: string): ArvisWakeParseResult {
   };
 }
 
-/** Long non-wake finals are usually ambient TV / room bleed in editor VoiceML. */
+/** Long non-wake finals are usually ambient TV / room bleed in Preview. */
 export function isLikelyAmbientTranscript(text: string): boolean {
   const normalized = normalizeAsrTranscript(text);
   if (!normalized) {

@@ -1,0 +1,68 @@
+- !<AssetImportMetadata/2fa0057b-33c3-4ab1-b448-096ed7096f19>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> bac79f6c-cb9a-4891-b677-0ea2d24f1bcc
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> bac79f6c-cb9a-4891-b677-0ea2d24f1bcc
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> b925d765-9fda-4859-9654-85e83e552bb0
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/b925d765-9fda-4859-9654-85e83e552bb0>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: af60e876-5b43-45d1-b82a-3f6f7228cf42
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    claudePrefab: false
+    claudeTemplate: false
+    companionSideOffsetCm: false
+    cursorPrefab: false
+    cursorTemplate: false
+    friendPrefab: false
+    friendTemplate: false
+    spawnDistanceCm: false
+    spawnHeightOffsetCm: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - friendPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      cursorPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      claudePrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      friendTemplate: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      cursorTemplate: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      claudeTemplate: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnDistanceCm: !<float> 42.000000
+      spawnHeightOffsetCm: !<float> -2.000000
+      companionSideOffsetCm: !<float> 14.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Asset.ObjectPrefab friendPrefab {"hint":"Prefab captured from the scene friend / Buddy."}'
+    - '// @input Asset.ObjectPrefab cursorPrefab {"hint":"Prefab captured from the scene Cursor companion."}'
+    - '// @input Asset.ObjectPrefab claudePrefab {"hint":"Prefab captured from the scene Claude companion."}'
+    - '// @input SceneObject friendTemplate {"hint":"Authored scene Buddy. Visible in the editor; live object in Preview."}'
+    - // @input SceneObject cursorTemplate
+    - // @input SceneObject claudeTemplate
+    - // @input float spawnDistanceCm = 42
+    - // @input float spawnHeightOffsetCm = -2
+    - // @input float companionSideOffsetCm = 14

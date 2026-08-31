@@ -1,0 +1,246 @@
+- !<AssetImportMetadata/5db6bc35-2d75-4b1b-8ebe-a4ad9de5362e>
+  ImportedAssetIds:
+    ObjectPrefab: !<reference> bb0fd356-9842-4814-9b37-722c9db1b10c
+  ImporterName: ObjectPrefabImporter
+  PrimaryAsset: !<reference> bb0fd356-9842-4814-9b37-722c9db1b10c
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    ObjectPrefab: !<own> c80a8221-08a7-4c77-86bc-37e1c3ea6baf
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ScriptComponent/1782d399-bee8-4c79-6026-7e5768462d12>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: true
+      keepHoverOnTrigger: true
+      enableInstantDrag: true
+      isScrollable: false
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/37609bd9-40e4-40ee-5501-752b3dfe1df2>
+  PrefabRemaps:
+    []
+  Name: Claude
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 9.000000, y: -2.818398, z: -23.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 8.400000, y: 8.400000, z: 8.400000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 73a07e6b-d4d6-4fd3-47f9-bdfaeebfd60a
+    - !<own> 93c6c914-9d21-4bd3-5531-24c1b67014d0
+    - !<own> d03b9969-2cc6-4cbd-749a-c0f08c375b08
+    - !<own> 1782d399-bee8-4c79-6026-7e5768462d12
+    - !<own> 42001f52-a039-4c2b-4f97-d093d1ac7ac1
+    - !<own> 3af0645a-6a97-4326-5983-a088927a29a7
+- !<ScriptComponent/3af0645a-6a97-4326-5983-a088927a29a7>
+  PrefabRemaps:
+    []
+  Name: CursorBuddy
+  Enabled: true
+  ScriptAsset: !<reference> bcdd740e-ad08-41a2-b7cd-93b0f943f363
+  ScriptInputsDefault:
+    providerId: true
+    buddyName: true
+    workspaceId: true
+    agentModel: true
+    enableSpeechOutput: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      ghostBlob: !<MappingBased.AssignableType> 93c6c914-9d21-4bd3-5531-24c1b67014d0
+      specsApi: !<MappingBased.AssignableType_1> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_2> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      speechRecognition: !<MappingBased.AssignableType_3> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
+      agentTts: !<MappingBased.AssignableType_4> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      providerId: cursor_sdk
+      buddyName: Cursor
+      workspaceId: ""
+      agentModel: auto
+      enableSpeechOutput: true
+      debugLogging: false
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/42001f52-a039-4c2b-4f97-d093d1ac7ac1>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: false
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> 37609bd9-40e4-40ee-5501-752b3dfe1df2
+      enableTranslation: true
+      enableRotation: false
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: false
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: false
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}
+- !<RenderMeshVisual/73a07e6b-d4d6-4fd3-47f9-bdfaeebfd60a>
+  PrefabRemaps:
+    []
+  Name: Claude Ghost Visual
+  Enabled: true
+  RenderOrder: 2
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 845da6ca-6433-4848-be46-3d6803c44c5d
+  Mesh: !<reference> dc14ddf6-beb4-4506-bf99-d1178aab0072
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/93c6c914-9d21-4bd3-5531-24c1b67014d0>
+  PrefabRemaps:
+    []
+  Name: ArvisGhostBlob
+  Enabled: true
+  ScriptAsset: !<reference> 8b234eee-0cca-4876-83b9-77c5543e6c85
+  ScriptInputsDefault:
+    eyeMaterialTemplate: true
+    eyeScale: true
+    idlePulseSpeed: true
+    activePulseSpeed: true
+    thinkingPulseSpeed: true
+    debugLogging: true
+    releaseSoundVolume: true
+    enableGrabSounds: true
+    enableSpeechBubble: true
+    speechBubbleHideDelaySec: true
+    showNameTagWhenMultiple: true
+    lookAtExitPaddingMeters: true
+    lookAtTurnSpeed: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      ghostVisual: !<reference.RenderMeshVisual> 73a07e6b-d4d6-4fd3-47f9-bdfaeebfd60a
+      waterMaterialTemplate: !<reference.Material> 845da6ca-6433-4848-be46-3d6803c44c5d
+      accentBodyMaterialTemplate: !<reference.Material> afca2c2e-b0cf-4b1d-b02c-71c19b9780fd
+      eyeMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      baseScale: 8.400000
+      eyeScale: 0.160000
+      eyeSeparation: 0.280000
+      eyeHeight: 0.120000
+      eyeForwardOffset: 0.350000
+      idlePulseSpeed: 0.550000
+      activePulseSpeed: 1.350000
+      thinkingPulseSpeed: 2.100000
+      enablePinchToTalk: false
+      registerAsSharedArvis: false
+      useAccentColor: true
+      accentColor: !<Vec3> {x: 1.000000, y: 0.340000, z: 0.080000}
+      debugLogging: false
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
+      grabSoundVolume: 0.850000
+      releaseSoundVolume: 0.800000
+      enableGrabSounds: true
+      enableSpeechBubble: true
+      speechBubbleHideDelaySec: !<float> 14.000000
+      companionName: Claude
+      showNameTagWhenMultiple: true
+      enableLookAt: false
+      lookAtDistanceMeters: 0.400000
+      lookAtExitPaddingMeters: 0.050000
+      lookAtTurnSpeed: !<float> 6.000000
+      lookAtAlwaysActive: false
+  ScriptTypes:
+    "":
+      {}
+- !<ObjectPrefabAssetData/c80a8221-08a7-4c77-86bc-37e1c3ea6baf>
+  Prototype: !<ObjectOwner/85fce0e1-59d1-40cb-a6f2-095f069a219b>
+    PackagePath: ""
+    objects:
+      - !<own> 37609bd9-40e4-40ee-5501-752b3dfe1df2
+- !<ColliderComponent/d03b9969-2cc6-4cbd-749a-c0f08c375b08>
+  PrefabRemaps:
+    []
+  Name: Claude Grab Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 1.080000, y: 1.080000, z: 1.080000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false

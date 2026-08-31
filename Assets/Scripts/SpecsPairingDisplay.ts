@@ -28,12 +28,12 @@ export function formatSpecsPairingText3D(
   const code = String(deviceId || 'SPEC-????').trim() || 'SPEC-????';
   if (options?.editorMock) {
     if (paired) {
-      return code;
+      return '';
     }
     return `Editor preview\n${code}\nWebsite pairing needs Specs`;
   }
   if (paired) {
-    return code;
+    return '';
   }
   return `Go to ${SPECS_PAIRING_URL}\n${code}`;
 }
@@ -44,6 +44,7 @@ export function applySpecsPairingText3D(
   paired: boolean,
   options?: SpecsPairingDisplayOptions
 ): void {
+  text3d.enabled = !paired;
   text3d.text = formatSpecsPairingText3D(deviceId, paired, options);
   text3d.lineSpacing = 1.15;
   text3d.size = 72;

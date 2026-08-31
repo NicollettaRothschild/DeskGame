@@ -7,6 +7,7 @@ import {
   getSharedSpecsDeviceRegistry,
   getSharedSpeechRecognition,
   registerArvisAgentChat,
+  unregisterArvisAgentChat,
 } from './FlowGardenServiceRegistry';
 import {
   extractAgentPrompt,
@@ -64,7 +65,11 @@ type InteractableLike = ScriptComponent & {
   onInteractorTriggerStart?: { add: (cb: (event?: unknown) => void) => void };
   onTriggerStart?: { add: (cb: (event?: unknown) => void) => void };
   onInteractorTriggerEnd?: { add: (cb: (event?: unknown) => void) => void };
+  onInteractorTriggerEndOutside?: { add: (cb: (event?: unknown) => void) => void };
+  onInteractorTriggerCanceled?: { add: (cb: (event?: unknown) => void) => void };
   onTriggerEnd?: { add: (cb: (event?: unknown) => void) => void };
+  onTriggerEndOutside?: { add: (cb: (event?: unknown) => void) => void };
+  onTriggerCanceled?: { add: (cb: (event?: unknown) => void) => void };
 };
 
 @component
@@ -139,6 +144,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
   private emailDraftStatusPollCommandId = '';
   private emailDraftStatusPollAttempts = 0;
   private bridgeStatusSuccessMessage = '';
+  private deferredTalkStart = false;
+  private deferredTalkEnd = false;
+  private deferredTalkToggle = false;
 
   private static readonly LISTENING_CUE = 'Listening…';
   private static readonly VOICE_WAKE_DEDUPE_SEC = 2.5;
@@ -148,8 +156,10 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
   private nextVoiceWakePollAt = 0;
   private nextListeningBoardRefreshAt = 0;
+  private destroyed = false;
 
   onAwake(): void {
+    this.destroyed = false;
     registerArvisAgentChat(this);
     this.setStatus('Tap or pinch UserID to talk to ' + this.agentName);
     this.createEvent('OnStartEvent').bind(() => {
@@ -157,10 +167,62 @@ export class ArvisAgentChat extends BaseScriptComponent {
       this.bindTalkInteractable();
     });
     this.createEvent('UpdateEvent').bind(() => {
+      if (this.destroyed) {
+        return;
+      }
+      if (this.deferredTalkStart) {
+        this.deferredTalkStart = false;
+        if (this.useHoldToTalk) {
+          this.beginAgentTalk();
+        } else {
+          this.toggleAgentTalk();
+          // A pinch can also produce the global TapEvent. The interactable
+          // action already handled that gesture, so do not toggle twice.
+          this.deferredTalkToggle = false;
+        }
+      }
+      if (this.deferredTalkEnd) {
+        this.deferredTalkEnd = false;
+        if (this.useHoldToTalk) {
+          this.endAgentTalkAndSend();
+        }
+      }
+      if (this.deferredTalkToggle) {
+        this.deferredTalkToggle = false;
+        this.toggleAgentTalk();
+      }
       this.pollIdleVoiceWake();
       this.refreshListeningBoard();
     });
-    this.createEvent('TapEvent').bind(() => this.toggleAgentTalk());
+    this.createEvent('TapEvent').bind(() => {
+      if (this.destroyed) {
+        return;
+      }
+      this.deferredTalkToggle = true;
+    });
+  }
+
+  onDestroy(): void {
+    this.destroyed = true;
+    this.deferredTalkStart = false;
+    this.deferredTalkEnd = false;
+    this.deferredTalkToggle = false;
+    if (!isNull(this.emailDraftStatusPollEvent)) {
+      this.emailDraftStatusPollEvent.enabled = false;
+      this.emailDraftStatusPollEvent = null;
+    }
+    this.emailDraftStatusPollCommandId = '';
+    this.sending = false;
+    this.listening = false;
+    this.wakeAwaitingPrompt = false;
+    if (!isNull(this.speechRecognition)) {
+      try {
+        this.speechRecognition.cancelAgentSession();
+      } catch (_error) {
+        // Shared speech may already be tearing down.
+      }
+    }
+    unregisterArvisAgentChat(this);
   }
 
   private refreshListeningBoard(): void {
@@ -189,7 +251,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     const rawLive = this.speechRecognition.getLiveTranscript();
     // While waiting for a question after wake, stay on Listening… until a real prompt exists.
-    // Otherwise VoiceML interims like "hey" flicker the bubble.
+    // Otherwise short ASR interims like "hey" flicker the bubble.
     let display = '';
     if (this.wakeAwaitingPrompt) {
       const prompt = extractAgentPrompt(rawLive);
@@ -209,6 +271,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   private pollIdleVoiceWake(): void {
+    if (this.destroyed) {
+      return;
+    }
     const now = getTime();
     if (now < this.nextVoiceWakePollAt) {
       return;
@@ -322,7 +387,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   public beginWakeListening(): void {
-    if (this.listening || this.sending) {
+    if (this.destroyed || this.listening || this.sending) {
       return;
     }
 
@@ -403,7 +468,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   public sendUtterance(message: string): void {
-    if (this.listening || this.sending) {
+    if (this.destroyed || this.listening || this.sending) {
       return;
     }
 
@@ -417,7 +482,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   public beginAgentTalk(): void {
-    if (this.listening || this.sending) {
+    if (this.destroyed || this.listening || this.sending) {
       return;
     }
 
@@ -427,7 +492,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
       return;
     }
 
-    // Same open-mic path as "hey arvis" — clears ambient VoiceML junk first.
+    // Same open-mic path as "hey arvis" — clears ambient ASR junk first.
     this.listening = true;
     this.wakeAwaitingPrompt = true;
     this.resetListeningBoardCache();
@@ -445,7 +510,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
    * prompt so the user can address Arvis directly while holding Buddy.
    */
   public beginCompanionGrabTalk(): boolean {
-    if (this.listening || this.sending) {
+    if (this.destroyed || this.listening || this.sending) {
       return false;
     }
 
@@ -454,13 +519,12 @@ export class ArvisAgentChat extends BaseScriptComponent {
       this.setStatus('Speech recognition not wired');
       return false;
     }
-
     this.listening = true;
     this.wakeAwaitingPrompt = false;
     this.resetListeningBoardCache();
     this.consumedWakeFinal = '';
     this.speechRecognition.clearUtteranceState();
-    this.speechRecognition.beginAgentSession();
+    this.speechRecognition.beginAgentSession(true);
     this.lastListeningBoardTranscript = ArvisAgentChat.LISTENING_CUE;
     this.updateBoard('listening', ArvisAgentChat.LISTENING_CUE, null);
     this.setStatus(this.agentName + ' is listening — release to send');
@@ -468,7 +532,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   public endAgentTalkAndSend(): void {
-    if (!this.listening || isNull(this.speechRecognition)) {
+    if (this.destroyed || !this.listening || isNull(this.speechRecognition)) {
       return;
     }
 
@@ -493,6 +557,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   public cancelAgentTalk(): void {
+    if (this.destroyed) {
+      return;
+    }
     this.listening = false;
     this.wakeAwaitingPrompt = false;
     this.resetListeningBoardCache();
@@ -504,6 +571,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   public toggleAgentTalk(): void {
+    if (this.destroyed) {
+      return;
+    }
     if (this.listening) {
       this.endAgentTalkAndSend();
       return;
@@ -544,7 +614,6 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
     const interactable = this.talkInteractable as InteractableLike;
     const triggerStart = interactable.onInteractorTriggerStart || interactable.onTriggerStart;
-    const triggerEnd = interactable.onInteractorTriggerEnd || interactable.onTriggerEnd;
 
     if (!triggerStart) {
       if (this.debugLogging) {
@@ -554,12 +623,28 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
 
     if (this.useHoldToTalk) {
-      triggerStart.add(() => this.beginAgentTalk());
-      if (triggerEnd) {
-        triggerEnd.add(() => this.endAgentTalkAndSend());
+      triggerStart.add(() => {
+        this.deferredTalkStart = true;
+      });
+      const endEvents = [
+        interactable.onInteractorTriggerEnd,
+        interactable.onInteractorTriggerEndOutside,
+        interactable.onInteractorTriggerCanceled,
+        interactable.onTriggerEnd,
+        interactable.onTriggerEndOutside,
+        interactable.onTriggerCanceled,
+      ];
+      for (let i = 0; i < endEvents.length; i++) {
+        if (endEvents[i]) {
+          endEvents[i]!.add(() => {
+            this.deferredTalkEnd = true;
+          });
+        }
       }
     } else {
-      triggerStart.add(() => this.toggleAgentTalk());
+      triggerStart.add(() => {
+        this.deferredTalkStart = true;
+      });
     }
 
     this.interactableBound = true;
@@ -618,7 +703,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   private sendMessage(message: string): void {
-    if (this.sending) {
+    if (this.destroyed || this.sending) {
       return;
     }
 
@@ -695,6 +780,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
         this.agentName,
         payloadHistory,
         (result, error) => {
+          if (this.destroyed) {
+            return;
+          }
           this.sending = false;
           if (!result) {
             this.updateBoard('error', outbound, error || 'unknown');
@@ -753,6 +841,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
         emailDraftIntent.subject,
         emailDraftIntent.body,
         (result, error) => {
+          if (this.destroyed) {
+            return;
+          }
           if (!result) {
             this.sending = false;
             this.updateBoard('error', outbound, error || 'Could not reach the Arvis Mac bridge');
@@ -798,6 +889,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
         openAppIntent.requestId,
         openAppIntent.applicationName,
         (result, error) => {
+          if (this.destroyed) {
+            return;
+          }
           if (!result) {
             this.sending = false;
             this.updateBoard('error', outbound, error || 'Could not reach the Arvis Mac bridge');
@@ -930,6 +1024,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
     response: string,
     isError = false
   ): void {
+    if (this.destroyed) {
+      return;
+    }
     this.sending = false;
     this.pushHistory('user', transcript);
     this.pushHistory('assistant', response);
@@ -1048,6 +1145,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
 
   private pollEmailDraftStatus(transcript: string, commandId: string): void {
     if (
+      this.destroyed ||
       commandId !== this.emailDraftStatusPollCommandId ||
       isNull(this.specsApi) ||
       isNull(this.deviceRegistry)
@@ -1068,7 +1166,10 @@ export class ArvisAgentChat extends BaseScriptComponent {
       this.deviceRegistry.getDeviceSecret(),
       commandId,
       (status, error) => {
-        if (commandId !== this.emailDraftStatusPollCommandId) {
+        if (
+          this.destroyed ||
+          commandId !== this.emailDraftStatusPollCommandId
+        ) {
           return;
         }
 
@@ -1132,6 +1233,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
     }
     this.emailDraftStatusPollEvent = this.createEvent('DelayedCallbackEvent');
     this.emailDraftStatusPollEvent.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.emailDraftStatusPollEvent = null;
       this.pollEmailDraftStatus(transcript, commandId);
     });
@@ -1201,7 +1305,7 @@ export class ArvisAgentChat extends BaseScriptComponent {
   }
 
   private speakAgentResponse(response: string, label: string): void {
-    if (!this.enableSpeechOutput) {
+    if (this.destroyed || !this.enableSpeechOutput) {
       return;
     }
     if (isNull(this.agentTts)) {
@@ -1226,6 +1330,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
       label
     );
     this.agentTts.speak(spoken, (ok) => {
+      if (this.destroyed) {
+        return;
+      }
       // Keep the text reply visible — idle would hide the ghost bubble immediately.
       this.setGhostPhase('reply');
       this.updateGhostSpeechBubble(
@@ -1246,6 +1353,9 @@ export class ArvisAgentChat extends BaseScriptComponent {
       }
       const idleEvent = this.createEvent('DelayedCallbackEvent');
       idleEvent.bind(() => {
+        if (this.destroyed) {
+          return;
+        }
         const ghost = getSharedArvisGhostBlob();
         if (!isNull(ghost)) {
           ghost.setPhaseKeepBubble('idle');

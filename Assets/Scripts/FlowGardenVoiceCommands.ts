@@ -25,12 +25,6 @@ import { SpecsApiClient } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
 
-type TaskBerryManagerLike = {
-  forceSyncTasks?: () => void;
-  completeBerryBySpeech?: (spokenText: string) => boolean;
-  createVoiceTodo?: (text: string, onDone?: (ok: boolean) => void) => void;
-};
-
 type SpacePanelLike = {
   refreshPanel?: () => void;
   appendNote?: (text: string, onDone?: (ok: boolean) => void) => void;
@@ -51,8 +45,6 @@ type SpacePanelLike = {
 };
 
 type SpawnSourceLike = {
-  spawnSeedAtSource?: () => SceneObject | null;
-  spawnWaterAtSource?: () => SceneObject | null;
   spawnPotAtSource?: () => SceneObject | null;
 };
 
@@ -66,23 +58,11 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
 
   @input
   @allowUndefined
-  taskBerryManager!: ScriptComponent;
-
-  @input
-  @allowUndefined
   specsApi!: SpecsApiClient;
 
   @input
   @allowUndefined
   deviceRegistry!: SpecsDeviceRegistry;
-
-  @input
-  @allowUndefined
-  seedSource!: ScriptComponent;
-
-  @input
-  @allowUndefined
-  waterSource!: ScriptComponent;
 
   @input
   @allowUndefined
@@ -535,14 +515,6 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
         return true;
       }
 
-      const manager = this.taskBerryManager as unknown as TaskBerryManagerLike;
-      if (!isNull(this.taskBerryManager) && typeof manager.createVoiceTodo === 'function') {
-        manager.createVoiceTodo(todoText, (ok) => {
-          this.setStatus(ok ? `Todo added: ${todoText}` : `Could not add todo`);
-        });
-        return true;
-      }
-
       this.createTodoDirect(todoText);
       return true;
     }
@@ -567,9 +539,9 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
         }
 
         this.setStatus(`Todo added: ${todoText}`);
-        const manager = this.taskBerryManager as unknown as TaskBerryManagerLike;
-        if (!isNull(this.taskBerryManager) && typeof manager.forceSyncTasks === 'function') {
-          manager.forceSyncTasks();
+        const panel = this.spacePanel as unknown as SpacePanelLike;
+        if (!isNull(this.spacePanel) && typeof panel.refreshPanel === 'function') {
+          panel.refreshPanel();
         }
       }
     );
@@ -587,19 +559,7 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       return true;
     }
 
-    const manager = this.taskBerryManager as unknown as TaskBerryManagerLike;
-    if (isNull(this.taskBerryManager) || typeof manager.completeBerryBySpeech !== 'function') {
-      this.setStatus('No berries to complete');
-      return true;
-    }
-
-    const remainder = text
-      .replace(/\b(complete|done|finish|finished|the|task|todo|berry|goal|my|i|did|it)\b/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const ok = manager.completeBerryBySpeech(remainder);
-    this.setStatus(ok ? 'Berry completed' : 'No matching berry found');
+    this.setStatus('No matching active goal');
     return true;
   }
 
@@ -611,9 +571,9 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
       return false;
     }
 
-    const manager = this.taskBerryManager as unknown as TaskBerryManagerLike;
-    if (!isNull(this.taskBerryManager) && typeof manager.forceSyncTasks === 'function') {
-      manager.forceSyncTasks();
+    const panel = this.spacePanel as unknown as SpacePanelLike;
+    if (!isNull(this.spacePanel) && typeof panel.refreshPanel === 'function') {
+      panel.refreshPanel();
       this.setStatus('Syncing tasks…');
       return true;
     }
@@ -673,24 +633,6 @@ export class FlowGardenVoiceCommands extends BaseScriptComponent {
   }
 
   private trySpawnCommand(text: string): boolean {
-    if (/\b(seed|plant)\b/.test(text)) {
-      const source = this.seedSource as unknown as SpawnSourceLike;
-      if (!isNull(this.seedSource) && typeof source.spawnSeedAtSource === 'function') {
-        source.spawnSeedAtSource();
-        this.setStatus('Spawning seed');
-        return true;
-      }
-    }
-
-    if (/\bwater\b/.test(text)) {
-      const source = this.waterSource as unknown as SpawnSourceLike;
-      if (!isNull(this.waterSource) && typeof source.spawnWaterAtSource === 'function') {
-        source.spawnWaterAtSource();
-        this.setStatus('Spawning water');
-        return true;
-      }
-    }
-
     if (/\bpot\b/.test(text)) {
       const source = this.potSource as unknown as SpawnSourceLike;
       if (!isNull(this.potSource) && typeof source.spawnPotAtSource === 'function') {

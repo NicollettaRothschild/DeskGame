@@ -35,7 +35,6 @@
     distanceCullIncludeFriend: false
     distanceCullShowMeters: false
     enableDistanceCull: false
-    globeRoot: false
     growthCompleteTrack: false
     growthStartTrack: false
     hoverTrack: false
@@ -51,9 +50,6 @@
     planterRoot: false
     postItNotesRoot: false
     potPrefabs: false
-    sackMaterial: false
-    sackTexture: false
-    seedsRoot: false
     soundDebugLogging: false
     soundVolume: false
     spacePanel: false
@@ -64,7 +60,6 @@
     specsApi: false
     textlog: false
     trashBin: false
-    waterSourceRoot: false
     waterSplashIntensity: false
     waterSplashLifetime: false
     waterSplashMaxParticles: false
@@ -107,18 +102,13 @@
       waterSplashMaxParticles: 1000
       hoverTrack: !<reference.AudioTrackAsset> 00000000-0000-0000-0000-000000000000
       trashBin: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
-      waterSourceRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       planterRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      seedsRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       postItNotesRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       paletteRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      globeRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       clockRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       leaderboardRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       spacePanel: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       specsApi: !<MappingBased.AssignableType_3> 00000000-0000-0000-0000-000000000000
-      sackMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
-      sackTexture: !<reference.Texture> 00000000-0000-0000-0000-000000000000
       moveHandleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       moveHandleGlowMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       enableDistanceCull: true
@@ -156,18 +146,13 @@
     - // @input int waterSplashMaxParticles = 1000
     - // @input Asset.AudioTrackAsset hoverTrack
     - // @input Component.ScriptComponent trashBin
-    - // @input SceneObject waterSourceRoot
     - // @input SceneObject planterRoot
-    - // @input SceneObject seedsRoot
     - // @input SceneObject postItNotesRoot
     - // @input SceneObject paletteRoot
-    - // @input SceneObject globeRoot
     - // @input SceneObject clockRoot
     - // @input SceneObject leaderboardRoot
     - // @input Component.ScriptComponent spacePanel
     - // @input AssignableType_3 specsApi
-    - // @input Asset.Material sackMaterial
-    - // @input Asset.Texture sackTexture
     - // @input Asset.Material moveHandleMaterial
     - // @input Asset.Material moveHandleGlowMaterial
     - // @input bool enableDistanceCull = true

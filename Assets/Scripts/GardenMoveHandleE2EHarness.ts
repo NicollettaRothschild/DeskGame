@@ -1,4 +1,4 @@
-const GARDEN_SOURCE_NAMES = ['Water Source', 'Planter', 'Seeds', 'TrashBin'];
+const GARDEN_SOURCE_NAMES = ['Planter', 'PostItNotes', 'TrashBin'];
 const MOVE_HANDLE_NAME = 'MoveHandle';
 const TRASH_BIN_NAME = 'TrashBin';
 // Planter corner handle ~7cm on each axis → ~10cm Euclidean from pivot; trash matches that.

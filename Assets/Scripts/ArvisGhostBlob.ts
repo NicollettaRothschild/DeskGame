@@ -1,5 +1,6 @@
 import { Interactable } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable';
 import { InteractableManipulation } from 'SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation';
+import WorldCameraFinderProvider from 'SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider';
 import {
   GhostWaterDisplacementConfig,
   sampleGhostWaterDisplacementY,
@@ -7,11 +8,21 @@ import {
 import {
   getSharedArvisAgentChat,
   registerArvisGhostBlob,
+  unregisterArvisGhostBlob,
 } from './FlowGardenServiceRegistry';
 import {
   ArvisGhostSpeechBubble,
   CompanionNameTag,
 } from './ArvisGhostSpeechBubble';
+import {
+  cameraHasWorldDeviceTracking,
+  isEditorRuntime,
+  isWorldSpaceReady,
+  pickPreferredWorldCamera,
+  findRootObjectByName,
+  setSceneObjectVisualsEnabled,
+  whenWorldSpaceReady,
+} from './WorldSpaceReady';
 
 export type ArvisGhostPhase = 'idle' | 'listening' | 'thinking' | 'reply' | 'error';
 
@@ -66,7 +77,9 @@ type InteractableManipulationLike = ScriptComponent & {
 
 /**
  * Soft ghost blob avatar for Arvis.
- * Clones the garden water material (scene reference) and tints it white/transparent.
+ * Friend stays on the garden water material. Cursor (blue) and Claude (orange)
+ * use a solid accent body — ocean water has no baseColor, so Spectacles 2024
+ * environment lighting washes those companions to white/silver.
  */
 @component
 export class ArvisGhostBlob extends BaseScriptComponent {
@@ -77,6 +90,12 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   @input
   @allowUndefined
   waterMaterialTemplate!: Material;
+
+  @input
+  @allowUndefined
+  @label('Accent Body Material')
+  @hint('Solid color body for Cursor/Claude. Required on Spectacles 2024 — ocean water washes white.')
+  accentBodyMaterialTemplate!: Material;
 
   @input
   @allowUndefined
@@ -181,13 +200,17 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private phase: ArvisGhostPhase = 'idle';
   private baseLocalPosition: vec3 | null = null;
   private material: Material | null = null;
+  private edgeMaterial: Material | null = null;
   private eyeMaterial: Material | null = null;
   private motionRoot: SceneObject | null = null;
+  private edgeVisual: RenderMeshVisual | null = null;
+  private retiredAnchorVisual: RenderMeshVisual | null = null;
   private leftEye: SceneObject | null = null;
   private rightEye: SceneObject | null = null;
   private ghostColor = new vec4(1.0, 1.0, 1.0, 0.38);
   private phaseGhostColor = new vec4(1.0, 1.0, 1.0, 0.38);
   private usingWaterMaterial = false;
+  private usingAccentBodyMaterial = false;
   private waterScrollSpeed = ArvisGhostBlob.DEFAULT_WATER_SCROLL_SPEED;
   private waterNoiseScale = ArvisGhostBlob.DEFAULT_WATER_NOISE_SCALE;
   private waterOffsetAmount = ArvisGhostBlob.DEFAULT_WATER_OFFSET;
@@ -198,13 +221,17 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private lastEyePulse = 1;
   private moveInteractionWired = false;
   private moveActive = false;
+  private grabStartPending = false;
+  private grabReleasePending = false;
   private moveInteractionEpoch = 0;
   private manualMoveInteractor: InteractorLike | null = null;
   private manualMoveRayDistance = 0;
+  private pendingManualRootPosition: vec3 | null = null;
   private moveBindAttempts = 0;
   private talkBindAttempts = 0;
   private talkTapDownTime = 0;
   private talkDragStarted = false;
+  private talkTogglePending = false;
   private grabInteractable: InteractableLike | null = null;
   private grabManipulation: InteractableManipulationLike | null = null;
   private grabCollider: ColliderComponent | null = null;
@@ -215,6 +242,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private speechBubble: ArvisGhostSpeechBubble | null = null;
   private companionNameTag: CompanionNameTag | null = null;
   private lookAt: LookAtComponent | null = null;
+  private lookAtHost: SceneObject | null = null;
   private lookAtCamera: SceneObject | null = null;
   private lookAtTargetProxy: SceneObject | null = null;
   private lookAtActive = false;
@@ -223,6 +251,11 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private lastLookAtInvalidTargetLogAt = -9999;
   private nextLookAtRetryAt = 0;
   private nextCameraLookupAt = 0;
+  private nearUserRebaseEvent: DelayedCallbackEvent | null = null;
+  private nearUserRebaseAttempts = 0;
+  private worldPlacementReady = false;
+  private lastInvalidManualPositionLogAt = -9999;
+  private destroyed = false;
 
   private static readonly EYE_SQUASH_SMOOTH_SPEED = 14.0;
   private static readonly DEFAULT_WATER_SCROLL_SPEED = 2.2;
@@ -234,44 +267,76 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
   private static readonly MOTION_ROOT_NAME = 'ArvisGhostMotion';
   private static readonly BODY_ROOT_NAME = 'ArvisGhostBody';
+  private static readonly EDGE_ROOT_NAME = 'ArvisGhostEdge';
+  private static readonly EDGE_MATERIAL_PATH = 'Materials & Shaders/Mat_FriendBody.mat';
+  private static readonly ACCENT_PBR_MATERIAL_PATH = 'Materials & Shaders/Mat_MoveHandleYellow.mat';
   private static readonly EYE_LEFT_NAME = 'Eye_L';
   private static readonly EYE_RIGHT_NAME = 'Eye_R';
   private static readonly LEGACY_EYES_NAME = 'ArvisEyes';
+  private static readonly NEAR_USER_REBASE_DELAY_SEC = 0.15;
+  private static readonly NEAR_USER_REBASE_RETRY_SEC = 0.2;
+  private static readonly MAX_NEAR_USER_REBASE_ATTEMPTS = 24;
+  private static readonly NEAR_USER_DISTANCE_CM = 58;
+  private static readonly NEAR_USER_SIDE_OFFSET_CM = 10;
+  private static readonly NEAR_USER_HEIGHT_OFFSET_CM = -2;
+  private static readonly MAX_MANUAL_GRAB_DISTANCE_CM = 180;
 
   onAwake(): void {
+    this.destroyed = false;
+    this.worldPlacementReady = isEditorRuntime();
     if (this.registerAsSharedArvis) {
       registerArvisGhostBlob(this);
     }
-    this.ensureAnchorGrabComponents();
     this.createEvent('OnStartEvent').bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.cleanupLegacyHierarchy();
       this.ensureAuthoredScale();
       this.ensureVisual();
       this.ensureEyes();
       this.captureDefaults();
+      this.scheduleNearUserStartupRebase();
       this.ensureArvisSounds();
       this.ensureSpeechBubble();
       this.ensureCompanionNameTag();
-      this.ensureLookAt();
+      this.stripNativeLookAt();
       this.refreshGrabCollider();
       this.setPhase('idle');
       this.wireMoveInteraction();
       print('[ArvisGhostBlob] ready');
     });
-    this.createEvent('UpdateEvent').bind(() => this.tick());
+    this.createEvent('UpdateEvent').bind(() => {
+      if (!this.destroyed) {
+        this.tick();
+      }
+    });
     this.createEvent('LateUpdateEvent').bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.applyIdleAnchorPose();
       this.updateLookAt();
       this.syncEyesToGhostWorld();
       this.syncSpeechBubbleToGhostWorld();
+      this.syncCompanionNameTagToGhostBody();
     });
   }
 
   onDestroy(): void {
+    this.destroyed = true;
     this.moveInteractionEpoch++;
     this.moveActive = false;
+    this.grabStartPending = false;
+    this.grabReleasePending = false;
+    this.talkTogglePending = false;
     this.manualMoveInteractor = null;
     this.manualMoveRayDistance = 0;
+    this.pendingManualRootPosition = null;
+    if (!isNull(this.nearUserRebaseEvent)) {
+      this.nearUserRebaseEvent.enabled = false;
+      this.nearUserRebaseEvent = null;
+    }
     if (!isNull(this.companionNameTag)) {
       this.companionNameTag.dispose();
       this.companionNameTag = null;
@@ -284,6 +349,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       }
       this.lookAtTargetProxy = null;
     }
+    unregisterArvisGhostBlob(this);
   }
 
   public setPhase(phase: ArvisGhostPhase): void {
@@ -293,6 +359,12 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   /** Soft idle / phase change that does not dismiss an active reply bubble. */
   public setPhaseKeepBubble(phase: ArvisGhostPhase): void {
     this.applyPhaseVisuals(phase, false);
+  }
+
+  public requestNearUserRebase(): void {
+    if (!this.destroyed && !this.moveActive) {
+      this.scheduleNearUserStartupRebase();
+    }
   }
 
   private applyPhaseVisuals(phase: ArvisGhostPhase, hideBubbleOnIdle: boolean): void {
@@ -309,7 +381,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
         ? this.makePhaseColor(0.52)
         : new vec4(1.0, 0.88, 0.9, 0.52);
     } else {
-      this.phaseGhostColor = this.makePhaseColor(0.38);
+      this.phaseGhostColor = this.makePhaseColor(this.useAccentColor ? 0.52 : 0.38);
     }
 
     this.refreshGhostColor();
@@ -365,7 +437,9 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       return;
     }
 
-    this.companionNameTag = new CompanionNameTag(this.sceneObject, this, {
+    const body = this.getBodyObject();
+    const followRoot = !isNull(body) ? body : this.sceneObject;
+    this.companionNameTag = new CompanionNameTag(followRoot, this, {
       name: this.companionName,
       scaleCompensation: Math.max(0.1, this.baseScale),
       heightOffset: 1.35,
@@ -385,11 +459,15 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
     const anchorVisual = anchor.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
     if (!isNull(anchorVisual)) {
-      anchorVisual.enabled = true;
       this.ghostVisual = anchorVisual;
+      this.retiredAnchorVisual = anchorVisual;
+      anchorVisual.enabled = false;
     }
 
     this.motionRoot = null;
+    this.edgeVisual = null;
+    this.retiredAnchorVisual = null;
+    this.edgeMaterial = null;
     this.leftEye = null;
     this.rightEye = null;
     this.smoothedEyeYSquash = 1;
@@ -415,33 +493,41 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       print('[ArvisGhostBlob] assigned StarCatchSphere mesh');
     }
 
-    const template = this.resolveWaterMaterialTemplate();
+    const template = this.resolveBodyMaterialTemplate();
     if (isNull(template)) {
-      print('[ArvisGhostBlob] FAIL: water material template missing');
+      print('[ArvisGhostBlob] FAIL: body material template missing');
       return;
     }
 
-    const deviceSafeTemplate = this.resolveDeviceSafeMaterialTemplate();
-    if (this.shouldUseDeviceSafeMaterial() && !isNull(deviceSafeTemplate)) {
-      this.material = deviceSafeTemplate.clone();
-      this.usingWaterMaterial = false;
-      this.configureDeviceSafeAccentMaterial(this.material);
-      print('[ArvisGhostBlob] device-safe accent material applied');
-    } else {
-      this.material = template.clone();
-      this.usingWaterMaterial = this.isWaterLikeMaterial(template);
-      if (this.usingWaterMaterial) {
-        this.configureWaterGhostMaterial(this.material);
-        print('[ArvisGhostBlob] material applied from water template');
+    this.material = template.clone();
+    this.usingWaterMaterial = this.isWaterLikeMaterial(template);
+    this.usingAccentBodyMaterial = this.useAccentColor && !this.usingWaterMaterial;
+    if (this.usingWaterMaterial) {
+      this.configureWaterGhostMaterial(this.material);
+      if (this.useAccentColor) {
+        print(
+          '[ArvisGhostBlob] accent body missing; water will wash white on Spectacles 2024'
+        );
       } else {
-        this.applyFallbackGhostMaterial(this.material);
-        print('[ArvisGhostBlob] material applied from fallback template');
+        print('[ArvisGhostBlob] material applied from water template');
       }
+    } else if (this.usingAccentBodyMaterial) {
+      this.configureAccentBodyMaterial(this.material);
+      print(
+        '[ArvisGhostBlob] accent body applied (' +
+          String(this.companionName || 'companion') +
+          ')'
+      );
+    } else {
+      this.applyFallbackGhostMaterial(this.material);
+      print('[ArvisGhostBlob] material applied from fallback template');
     }
 
     this.ghostVisual.mainMaterial = this.material;
-    this.ghostVisual.renderOrder = 0;
+    this.ghostVisual.renderOrder = 1;
+    this.ensureEdgeVisual();
     this.applyMaterialColor(1);
+    this.suppressRetiredAnchorVisuals();
   }
 
   private ensureMotionRoot(): SceneObject {
@@ -507,11 +593,128 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       if (!isNull(anchorVisual.mesh)) {
         bodyVisual.mesh = anchorVisual.mesh;
       }
+      this.retiredAnchorVisual = anchorVisual;
       anchorVisual.enabled = false;
     }
 
     bodyVisual.enabled = true;
     this.ghostVisual = bodyVisual;
+  }
+
+  /**
+   * Adds a slightly expanded inverted-hull pass using the same custom
+   * material as Buddy. The water pass remains the visible body; this pass
+   * contributes only the silhouette edge around it.
+   */
+  private ensureEdgeVisual(): void {
+    if (
+      this.usingAccentBodyMaterial &&
+      !isNull(this.material) &&
+      this.isFriendBodyLikeMaterial(this.material)
+    ) {
+      // FriendBody already carries the colored rim; an inverted Add hull
+      // would fight the opaque accent body on Spectacles 2024.
+      this.disableLegacyEdgeVisual();
+      return;
+    }
+
+    if (isNull(this.ghostVisual) || isNull(this.ghostVisual.mesh)) {
+      return;
+    }
+
+    const body = this.ghostVisual.getSceneObject();
+    if (isNull(body)) {
+      return;
+    }
+
+    let edge = this.findNamedChild(body, ArvisGhostBlob.EDGE_ROOT_NAME);
+    if (isNull(edge)) {
+      edge = global.scene.createSceneObject(ArvisGhostBlob.EDGE_ROOT_NAME);
+      edge.setParent(body);
+    }
+
+    this.inheritAnchorLayer(edge);
+    edge.getTransform().setLocalPosition(new vec3(0, 0, 0));
+    edge.getTransform().setLocalRotation(quat.quatIdentity());
+    edge.getTransform().setLocalScale(new vec3(1.035, 1.035, 1.035));
+
+    let edgeVisual = edge.getComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+    if (isNull(edgeVisual)) {
+      edgeVisual = edge.createComponent('Component.RenderMeshVisual') as RenderMeshVisual;
+    }
+    if (isNull(edgeVisual)) {
+      return;
+    }
+
+    const template = this.resolveEdgeMaterialTemplate();
+    if (isNull(template)) {
+      edgeVisual.enabled = false;
+      return;
+    }
+
+    if (isNull(this.edgeMaterial)) {
+      try {
+        this.edgeMaterial = template.clone();
+        this.configureEdgeMaterial(this.edgeMaterial);
+      } catch (_error) {
+        this.edgeMaterial = null;
+      }
+    }
+    if (isNull(this.edgeMaterial)) {
+      edgeVisual.enabled = false;
+      print('[ArvisGhostBlob] edge highlight material clone failed');
+      return;
+    }
+
+    edgeVisual.mesh = this.ghostVisual.mesh as RenderMesh;
+    edgeVisual.mainMaterial = this.edgeMaterial;
+    edgeVisual.renderOrder = 0;
+    edgeVisual.enabled = true;
+    this.edgeVisual = edgeVisual;
+    this.applyEdgeMaterialColor();
+    print('[ArvisGhostBlob] Buddy-style edge highlight enabled');
+  }
+
+  private resolveEdgeMaterialTemplate(): Material | null {
+    if (
+      !isNull(this.accentBodyMaterialTemplate) &&
+      this.isFriendBodyLikeMaterial(this.accentBodyMaterialTemplate)
+    ) {
+      return this.accentBodyMaterialTemplate;
+    }
+
+    try {
+      return requireAsset(ArvisGhostBlob.EDGE_MATERIAL_PATH) as Material;
+    } catch (_error) {
+      print('[ArvisGhostBlob] Buddy edge material unavailable');
+      return null;
+    }
+  }
+
+  private configureEdgeMaterial(material: Material): void {
+    const pass = material.mainPass;
+    pass.depthTest = true;
+    pass.depthWrite = true;
+    pass.twoSided = false;
+    pass.cullMode = CullMode.Front;
+    pass.blendMode = BlendMode.Add;
+  }
+
+  private applyEdgeMaterialColor(): void {
+    if (isNull(this.edgeMaterial)) {
+      return;
+    }
+
+    const color = this.useAccentColor
+      ? this.clampAccentColor(this.accentColor)
+      : new vec3(0.988235, 1.0, 0.223529);
+    const pass = this.edgeMaterial.mainPass as unknown as Record<string, unknown>;
+    try {
+      // Tweak_N1 is the "Rim Color" parameter in SH_Friend_Body.
+      pass['Tweak_N1'] = new vec4(color.x, color.y, color.z, 1.0);
+    } catch (_error) {
+      // Keep the edge pass alive if a platform build omits the dynamic port.
+    }
   }
 
   private ensureEyes(): void {
@@ -532,15 +735,16 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     ]);
 
     const halfSeparation = this.eyeSeparation * 0.5;
+    const faceZ = this.getEyeFaceOffset();
     this.leftEye = this.createEyeMesh(
       body,
       ArvisGhostBlob.EYE_LEFT_NAME,
-      new vec3(-halfSeparation, this.eyeHeight, this.eyeForwardOffset)
+      new vec3(-halfSeparation, this.eyeHeight, faceZ)
     );
     this.rightEye = this.createEyeMesh(
       body,
       ArvisGhostBlob.EYE_RIGHT_NAME,
-      new vec3(halfSeparation, this.eyeHeight, this.eyeForwardOffset)
+      new vec3(halfSeparation, this.eyeHeight, faceZ)
     );
 
     if (this.debugLogging && !isNull(this.leftEye) && !isNull(this.rightEye)) {
@@ -577,9 +781,21 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
     visual.enabled = true;
     visual.mesh = requireAsset('Meshes/StarCatchSphere.mesh') as RenderMesh;
-    visual.renderOrder = 10;
+    visual.renderOrder = 12;
     visual.mainMaterial = this.resolveEyeMaterial();
     return eye;
+  }
+
+  /**
+   * Water ghosts do not write depth, so in-volume pupils still show through.
+   * Opaque accent bodies (Cursor/Claude) bury anything inside the sphere.
+   */
+  private getEyeFaceOffset(): number {
+    const authored = this.eyeForwardOffset;
+    if (!this.usingAccentBodyMaterial) {
+      return authored;
+    }
+    return Math.max(authored, 0.62);
   }
 
   private resolveEyeMaterial(): Material {
@@ -596,7 +812,9 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     const pass = this.eyeMaterial.mainPass;
     pass.depthWrite = true;
     if (typeof pass.depthTest !== 'undefined') {
-      pass.depthTest = true;
+      // Opaque jelly occludes in-volume pupils; skip the depth test so the
+      // eyes composite on the face the way they did through water.
+      pass.depthTest = !this.usingAccentBodyMaterial;
     }
     if (typeof pass.blendMode !== 'undefined') {
       pass.blendMode = BlendMode.Normal;
@@ -649,6 +867,57 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     return null;
   }
 
+  private resolveBodyMaterialTemplate(): Material | null {
+    if (this.useAccentColor) {
+      const accent = this.resolveAccentBodyMaterialTemplate();
+      if (!isNull(accent)) {
+        return accent;
+      }
+    }
+    return this.resolveWaterMaterialTemplate();
+  }
+
+  private resolveAccentBodyMaterialTemplate(): Material | null {
+    if (
+      !isNull(this.accentBodyMaterialTemplate) &&
+      !this.isWaterLikeMaterial(this.accentBodyMaterialTemplate)
+    ) {
+      return this.accentBodyMaterialTemplate;
+    }
+
+    const bundledPaths = [
+      ArvisGhostBlob.EDGE_MATERIAL_PATH,
+      ArvisGhostBlob.ACCENT_PBR_MATERIAL_PATH,
+    ];
+    for (let i = 0; i < bundledPaths.length; i++) {
+      try {
+        const loaded = requireAsset(bundledPaths[i]) as Material;
+        if (!isNull(loaded) && !this.isWaterLikeMaterial(loaded)) {
+          return loaded;
+        }
+      } catch (_error) {
+        // Device bundles often omit requireAsset paths; the inspector input
+        // is the reliable way to ship Mat_FriendBody with Cursor/Claude.
+      }
+    }
+
+    return this.findFriendBodyMaterialInScene();
+  }
+
+  private findFriendBodyMaterialInScene(): Material | null {
+    const rootCount = global.scene.getRootObjectsCount();
+    for (let i = 0; i < rootCount; i++) {
+      const visuals = this.collectRenderMeshVisuals(global.scene.getRootObject(i));
+      for (let j = 0; j < visuals.length; j++) {
+        const material = visuals[j].mainMaterial;
+        if (!isNull(material) && this.isFriendBodyLikeMaterial(material)) {
+          return material;
+        }
+      }
+    }
+    return null;
+  }
+
   private resolveWaterMaterialTemplate(): Material | null {
     if (!isNull(this.waterMaterialTemplate)) {
       return this.waterMaterialTemplate;
@@ -674,40 +943,19 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     return null;
   }
 
-  private resolveDeviceSafeMaterialTemplate(): Material | null {
-    try {
-      return requireAsset('Materials & Shaders/Mat_AIChatBlack.mat') as Material;
-    } catch (_e) {
-      return null;
-    }
-  }
-
-  private shouldUseDeviceSafeMaterial(): boolean {
-    try {
-      return (
-        !global.deviceInfoSystem.isEditor() &&
-        global.deviceInfoSystem.isSpectacles() &&
-        !this.registerAsSharedArvis
-      );
-    } catch (_e) {
-      return false;
-    }
-  }
-
-  private configureDeviceSafeAccentMaterial(material: Material): void {
-    const pass = material.mainPass;
-    pass.depthWrite = false;
-    if (typeof pass.depthTest !== 'undefined') {
-      pass.depthTest = true;
-    }
-    if (typeof pass.blendMode !== 'undefined') {
-      pass.blendMode = BlendMode.PremultipliedAlphaAuto;
-    }
-  }
-
   private isWaterLikeMaterial(material: Material): boolean {
     const pass = material.mainPass as unknown as Record<string, unknown>;
-    return pass['scrollSpeed'] !== undefined || pass['opacityTextureA'] !== undefined;
+    // FriendBody also exposes scrollSpeed for jelly wobble — do not treat
+    // that as ocean water. Ocean water is IBL/env-reflective (Port_AO_N170
+    // / opacityTextureA) and washes white on Spectacles 2024.
+    return (
+      pass['opacityTextureA'] !== undefined || pass['Port_AO_N170'] !== undefined
+    );
+  }
+
+  private isFriendBodyLikeMaterial(material: Material): boolean {
+    const pass = material.mainPass as unknown as Record<string, unknown>;
+    return pass['Tweak_N1'] !== undefined && !this.isWaterLikeMaterial(material);
   }
 
   private configureWaterGhostMaterial(material: Material): void {
@@ -790,6 +1038,17 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
   }
 
+  private configureAccentBodyMaterial(material: Material): void {
+    const pass = material.mainPass;
+    pass.depthTest = true;
+    pass.depthWrite = true;
+    pass.twoSided = false;
+    pass.cullMode = CullMode.Back;
+    if (typeof pass.blendMode !== 'undefined') {
+      pass.blendMode = BlendMode.Disabled;
+    }
+  }
+
   private captureDefaults(): void {
     this.captureCurrentAnchorPosition();
   }
@@ -798,6 +1057,259 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     const anchor = this.sceneObject;
     const localPos = anchor.getTransform().getLocalPosition();
     this.baseLocalPosition = new vec3(localPos.x, localPos.y, localPos.z);
+  }
+
+  private scheduleNearUserStartupRebase(): void {
+    if (this.destroyed || !isNull(this.nearUserRebaseEvent)) {
+      return;
+    }
+
+    const rebaseEvent = this.createEvent('DelayedCallbackEvent') as DelayedCallbackEvent;
+    rebaseEvent.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
+      this.nearUserRebaseEvent = null;
+      if (!isWorldSpaceReady()) {
+        whenWorldSpaceReady(this, () => {
+          if (!this.destroyed) {
+            this.tryRebaseNearUser();
+          }
+        });
+        return;
+      }
+      this.tryRebaseNearUser();
+    });
+    this.nearUserRebaseEvent = rebaseEvent;
+    rebaseEvent.reset(
+      isEditorRuntime() ? ArvisGhostBlob.NEAR_USER_REBASE_DELAY_SEC : 0.05
+    );
+  }
+
+  private tryRebaseNearUser(): void {
+    if (
+      this.destroyed ||
+      this.moveActive ||
+      !this.isValidSceneObject(this.sceneObject)
+    ) {
+      return;
+    }
+
+    if (!isWorldSpaceReady()) {
+      this.scheduleNearUserRebaseRetry();
+      return;
+    }
+
+    const camera = this.resolveCameraObject(true);
+    if (isNull(camera)) {
+      this.scheduleNearUserRebaseRetry();
+      return;
+    }
+    if (
+      !isEditorRuntime() &&
+      !cameraHasWorldDeviceTracking(camera) &&
+      this.nearUserRebaseAttempts < 8
+    ) {
+      this.scheduleNearUserRebaseRetry();
+      return;
+    }
+
+    try {
+      const cameraTransform = camera.getTransform();
+      const cameraPosition = cameraTransform.getWorldPosition();
+      const cameraForward = cameraTransform.forward;
+      if (isNull(cameraForward)) {
+        this.scheduleNearUserRebaseRetry();
+        return;
+      }
+
+      // Match SIK CameraProvider.getForwardPosition: offset along
+      // transform.forward so companions spawn in front of the headset.
+      let forwardX = cameraForward.x;
+      let forwardZ = cameraForward.z;
+      const forwardLength = Math.sqrt(
+        forwardX * forwardX + forwardZ * forwardZ
+      );
+      if (forwardLength < 0.001) {
+        this.scheduleNearUserRebaseRetry();
+        return;
+      }
+      forwardX /= forwardLength;
+      forwardZ /= forwardLength;
+
+      const side = this.getNearUserSideOffsetCm();
+      const rightX = -forwardZ;
+      const rightZ = forwardX;
+      const position = new vec3(
+        cameraPosition.x +
+          forwardX * ArvisGhostBlob.NEAR_USER_DISTANCE_CM +
+          rightX * side,
+        cameraPosition.y + ArvisGhostBlob.NEAR_USER_HEIGHT_OFFSET_CM,
+        cameraPosition.z +
+          forwardZ * ArvisGhostBlob.NEAR_USER_DISTANCE_CM +
+          rightZ * side
+      );
+      if (!this.isFiniteVector(position)) {
+        this.scheduleNearUserRebaseRetry();
+        return;
+      }
+
+      this.sceneObject.getTransform().setWorldPosition(position);
+      this.captureCurrentAnchorPosition();
+      this.markWorldPlacementReady();
+      print(
+        `[ArvisGhostBlob] startup rebase ${this.companionName} ` +
+          `at ${position.toString()} side=${side.toFixed(1)}cm`
+      );
+    } catch (_error) {
+      this.lookAtCamera = null;
+      this.scheduleNearUserRebaseRetry();
+    }
+  }
+
+  private scheduleNearUserRebaseRetry(): void {
+    this.nearUserRebaseAttempts++;
+    if (
+      !isNull(this.nearUserRebaseEvent) ||
+      this.nearUserRebaseAttempts >= ArvisGhostBlob.MAX_NEAR_USER_REBASE_ATTEMPTS
+    ) {
+      if (
+        this.nearUserRebaseAttempts >= ArvisGhostBlob.MAX_NEAR_USER_REBASE_ATTEMPTS
+      ) {
+        this.markWorldPlacementReady();
+      }
+      return;
+    }
+    const retry = this.createEvent('DelayedCallbackEvent') as DelayedCallbackEvent;
+    retry.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
+      this.nearUserRebaseEvent = null;
+      this.tryRebaseNearUser();
+    });
+    this.nearUserRebaseEvent = retry;
+    retry.reset(ArvisGhostBlob.NEAR_USER_REBASE_RETRY_SEC);
+  }
+
+  private markWorldPlacementReady(): void {
+    if (this.worldPlacementReady) {
+      this.setCompanionVisualState(true);
+      if (!isNull(this.companionNameTag)) {
+        this.companionNameTag.setSuppressed(false);
+      }
+      return;
+    }
+    this.worldPlacementReady = true;
+    this.captureCurrentAnchorPosition();
+    this.setCompanionVisualState(true);
+    if (!isNull(this.companionNameTag)) {
+      this.companionNameTag.setSuppressed(false);
+    }
+    print(
+      `[ArvisGhostBlob] world placement ready ${this.companionName} t=${getTime().toFixed(2)}`
+    );
+  }
+
+  private setCompanionVisualState(visible: boolean): void {
+    if (!visible) {
+      setSceneObjectVisualsEnabled(this.sceneObject, false);
+      this.suppressRetiredAnchorVisuals();
+      return;
+    }
+
+    this.suppressRetiredAnchorVisuals();
+    if (!isNull(this.ghostVisual)) {
+      this.ghostVisual.enabled = true;
+    }
+    this.setChildMeshEnabled(this.leftEye, true);
+    this.setChildMeshEnabled(this.rightEye, true);
+    if (!isNull(this.edgeVisual)) {
+      this.edgeVisual.enabled = !this.usingAccentBodyMaterial;
+    }
+  }
+
+  /** Authored water RMV on Cursor/Claude must stay off after the body migrate. */
+  private suppressRetiredAnchorVisuals(): void {
+    if (!isNull(this.retiredAnchorVisual)) {
+      this.retiredAnchorVisual.enabled = false;
+    }
+    const rootVisuals = this.sceneObject.getComponents(
+      'Component.RenderMeshVisual'
+    ) as RenderMeshVisual[];
+    for (let i = 0; i < rootVisuals.length; i++) {
+      const visual = rootVisuals[i];
+      if (isNull(visual) || visual === this.ghostVisual) {
+        continue;
+      }
+      visual.enabled = false;
+    }
+  }
+
+  private disableLegacyEdgeVisual(): void {
+    if (isNull(this.ghostVisual)) {
+      return;
+    }
+    const body = this.ghostVisual.getSceneObject();
+    if (isNull(body)) {
+      return;
+    }
+    const edge = this.findNamedChild(body, ArvisGhostBlob.EDGE_ROOT_NAME);
+    if (isNull(edge)) {
+      this.edgeVisual = null;
+      return;
+    }
+    const edgeVisual = edge.getComponent(
+      'Component.RenderMeshVisual'
+    ) as RenderMeshVisual;
+    if (!isNull(edgeVisual)) {
+      edgeVisual.enabled = false;
+    }
+    edge.enabled = false;
+    this.edgeVisual = null;
+  }
+
+  private setChildMeshEnabled(root: SceneObject | null, visible: boolean): void {
+    if (isNull(root)) {
+      return;
+    }
+    const visuals = root.getComponents(
+      'Component.RenderMeshVisual'
+    ) as RenderMeshVisual[];
+    for (let i = 0; i < visuals.length; i++) {
+      if (!isNull(visuals[i])) {
+        visuals[i].enabled = visible;
+      }
+    }
+  }
+
+  private getNearUserSideOffsetCm(): number {
+    const name = String(this.companionName || '').trim().toLowerCase();
+    if (name.indexOf('claude') >= 0) {
+      return ArvisGhostBlob.NEAR_USER_SIDE_OFFSET_CM;
+    }
+    if (name.indexOf('cursor') >= 0) {
+      return -ArvisGhostBlob.NEAR_USER_SIDE_OFFSET_CM;
+    }
+    return 0;
+  }
+
+  private isAcceptableManualWorldPosition(position: vec3): boolean {
+    if (!this.isFiniteVector(position)) {
+      return false;
+    }
+    const camera = this.resolveCameraObject();
+    if (isNull(camera)) {
+      return true;
+    }
+    const cameraPosition = camera.getTransform().getWorldPosition();
+    const dx = position.x - cameraPosition.x;
+    const dy = position.y - cameraPosition.y;
+    const dz = position.z - cameraPosition.z;
+    return (
+      Math.sqrt(dx * dx + dy * dy + dz * dz) <=
+      ArvisGhostBlob.MAX_MANUAL_GRAB_DISTANCE_CM
+    );
   }
 
   private wireMoveInteraction(): void {
@@ -814,7 +1326,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   private scheduleGrabWireRetry(delaySec: number): void {
     const retryEvent = this.createEvent('DelayedCallbackEvent');
     retryEvent.bind(() => {
-      if (!this.moveInteractionWired) {
+      if (!this.destroyed && !this.moveInteractionWired) {
         this.tryWireMoveInteraction();
       }
     });
@@ -879,7 +1391,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   private tryWireMoveInteraction(): void {
-    if (this.moveInteractionWired) {
+    if (this.destroyed || this.moveInteractionWired) {
       return;
     }
 
@@ -911,7 +1423,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
     if (!(manipulation as ScriptComponent).enabled) {
       // Coding buddies keep the native manipulation component disabled for
-      // Specs stability. Move them with the same trigger/update pattern as
+      // Spectacles 2024 stability. Move them with the same trigger/update pattern as
       // PostItNoteTranscript instead of mixing ASR with native manipulation.
       this.bindTriggerMoveInteraction(interactable);
       this.moveInteractionWired = true;
@@ -920,10 +1432,10 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
 
     const onGrabStart = (): void => {
-      this.onGhostGrabStart();
+      this.deferGhostGrabStart();
     };
     const onGrabRelease = (): void => {
-      this.onGhostGrabRelease();
+      this.deferGhostGrabRelease();
     };
 
     const hasManipulationEvents = !!manipulation.onManipulationStart;
@@ -997,7 +1509,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     for (let i = 0; i < endEvents.length; i++) {
       const event = endEvents[i];
       if (event) {
-        event.add(() => this.onGhostGrabRelease());
+        event.add(() => this.deferGhostGrabRelease());
       }
     }
 
@@ -1013,11 +1525,14 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       return;
     }
 
+    this.pendingManualRootPosition = null;
     const interactor = event && event.interactor ? event.interactor : null;
     this.manualMoveInteractor = interactor;
     this.manualMoveRayDistance = this.getTriggerMoveDistance(interactor);
-    this.onGhostGrabStart();
-    this.updateTriggerMovePosition();
+    this.deferGhostGrabStart();
+    // Let tick() perform the first transform write outside SIK's trigger
+    // callback. This is important on Spectacles when the same trigger also
+    // arms the shared speech capture.
   }
 
   private onTriggerMoveUpdate(event?: InteractorEventLike): void {
@@ -1027,7 +1542,8 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     if (event && event.interactor) {
       this.manualMoveInteractor = event.interactor;
     }
-    this.updateTriggerMovePosition();
+    // The per-frame update owns transform writes; do not mutate the scene
+    // hierarchy from inside a SIK callback.
   }
 
   private updateTriggerMovePosition(): void {
@@ -1036,21 +1552,46 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
 
     const interactor = this.manualMoveInteractor;
-    if (
-      interactor &&
-      typeof interactor.isActive === 'function' &&
-      !interactor.isActive()
-    ) {
-      this.onGhostGrabRelease();
-      return;
+    if (interactor && typeof interactor.isActive === 'function') {
+      try {
+        if (!interactor.isActive()) {
+          this.onGhostGrabRelease();
+          return;
+        }
+      } catch (_error) {
+        // SIK can invalidate an interactor one frame before its end event.
+        this.onGhostGrabRelease();
+        return;
+      }
     }
 
-    const position = this.getTriggerMovePosition(
-      interactor,
-      this.manualMoveRayDistance
-    );
-    if (!isNull(position)) {
-      this.sceneObject.getTransform().setWorldPosition(position);
+    let position: vec3 | null = null;
+    try {
+      position = this.getTriggerMovePosition(
+        interactor,
+        this.manualMoveRayDistance
+      );
+    } catch (_error) {
+      return;
+    }
+    if (
+      !isNull(position) &&
+      this.isAcceptableManualWorldPosition(position)
+    ) {
+      // Keep the authored interaction root/collider stationary while SIK is
+      // tracking the pinch. Moving an active collider itself is unstable on
+      // Spectacles; the visual body follows the hand and the root is
+      // committed once on release.
+      const motion = this.ensureMotionRoot();
+      if (!isNull(motion)) {
+        motion.getTransform().setWorldPosition(position);
+      }
+    } else if (
+      !isNull(position) &&
+      getTime() - this.lastInvalidManualPositionLogAt > 2
+    ) {
+      this.lastInvalidManualPositionLogAt = getTime();
+      print('[ArvisGhostBlob] rejected distant manual grab position');
     }
   }
 
@@ -1058,7 +1599,8 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     if (
       interactor &&
       interactor.distanceToTarget !== null &&
-      interactor.distanceToTarget !== undefined
+      interactor.distanceToTarget !== undefined &&
+      Number.isFinite(interactor.distanceToTarget)
     ) {
       return Math.max(0, interactor.distanceToTarget);
     }
@@ -1090,6 +1632,14 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     return this.sceneObject.getTransform().getWorldPosition();
   }
 
+  private isFiniteVector(value: vec3): boolean {
+    return (
+      Number.isFinite(value.x) &&
+      Number.isFinite(value.y) &&
+      Number.isFinite(value.z)
+    );
+  }
+
   private bindGhostTalkInteraction(interactable: InteractableLike): void {
     if (!this.enablePinchToTalk) {
       return;
@@ -1113,7 +1663,8 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       if (this.debugLogging) {
         print(`[ArvisGhostBlob] pinch-to-talk (${duration.toFixed(2)}s)`);
       }
-      this.toggleGhostAgentTalk();
+      // Keep all agent/session work out of SIK's native callback stack.
+      this.talkTogglePending = true;
     };
 
     if (interactable.onTriggerStart) {
@@ -1190,11 +1741,25 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     component.enabled = wasEnabled;
   }
 
-  private onGhostGrabStart(): void {
-    if (this.moveActive) {
+  private deferGhostGrabStart(): void {
+    if (this.moveActive || this.grabStartPending) {
       return;
     }
+    // SIK may dispatch this from its native trigger stack. Only set the
+    // movement guard/flag here; tick() performs component, audio, and
+    // transform mutations.
+    this.moveActive = true;
+    this.grabStartPending = true;
+  }
 
+  private deferGhostGrabRelease(): void {
+    if (!this.moveActive && !this.grabStartPending) {
+      return;
+    }
+    this.grabReleasePending = true;
+  }
+
+  private onGhostGrabStart(): void {
     this.moveActive = true;
     const epoch = ++this.moveInteractionEpoch;
     this.setLookAtActive(false);
@@ -1216,10 +1781,25 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       return;
     }
 
+    const heldWorldPosition = !isNull(this.motionRoot)
+      ? this.motionRoot.getTransform().getWorldPosition()
+      : null;
     this.moveActive = false;
     this.moveInteractionEpoch++;
     this.manualMoveInteractor = null;
     this.manualMoveRayDistance = 0;
+    if (
+      !isNull(heldWorldPosition) &&
+      this.isAcceptableManualWorldPosition(heldWorldPosition)
+    ) {
+      // Commit on the next UpdateEvent, after SIK has finished dispatching
+      // the release/cancel callback.
+      this.pendingManualRootPosition = new vec3(
+        heldWorldPosition.x,
+        heldWorldPosition.y,
+        heldWorldPosition.z
+      );
+    }
     this.refreshGhostColor();
     this.applyMaterialColor(1);
     this.captureCurrentAnchorPosition();
@@ -1408,39 +1988,88 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     const tintRgb = new vec3(tint.x, tint.y, tint.z);
 
     if (this.usingWaterMaterial) {
-      this.setPassFloat(pass, 'Tweak_N171', 0.025 + alpha * 0.07);
-      this.setPassFloat(pass, 'Tweak_N172', 0.012 + alpha * 0.035);
-      this.setPassFloat(pass, 'Port_Input1_N016', 0.45 + alpha * 0.45);
-      this.setPassFloat(pass, 'Port_Input1_N080', 0.55 + alpha * 0.35);
+      // Keep foam/fresnel low so the accent isn't drowned in white water.
+      this.setPassFloat(pass, 'Tweak_N171', 0.012 + alpha * 0.03);
+      this.setPassFloat(pass, 'Tweak_N172', 0.006 + alpha * 0.018);
+      this.setPassFloat(pass, 'Port_Input1_N016', 0.32 + alpha * 0.22);
+      this.setPassFloat(pass, 'Port_Input1_N080', 0.38 + alpha * 0.22);
       this.setPassVec3(pass, 'Port_AO_N170', tintRgb);
-      this.setPassVec3(
+      this.setPassVec3(pass, 'Port_SpecularAO_N170', tintRgb);
+      this.setPassVec3(pass, 'Port_Emissive_N170', this.getGhostEmissive());
+    }
+
+    if (this.usingAccentBodyMaterial) {
+      const color = this.useAccentColor
+        ? this.clampAccentColor(this.accentColor)
+        : tintRgb;
+      this.setPassVec4(pass, 'Tweak_N1', new vec4(color.x, color.y, color.z, 1.0));
+      this.setPassVec4(
         pass,
-        'Port_Emissive_N170',
-        this.moveActive ? this.getGrabGhostEmissive() : new vec3(0, 0, 0)
+        'Tweak_N15',
+        new vec4(color.x * 0.22, color.y * 0.18, color.z * 0.28, 1.0)
       );
+      this.setPassVec4(
+        pass,
+        'Tweak_N23',
+        new vec4(
+          Math.min(1, color.x * 0.55 + 0.08),
+          Math.min(1, color.y * 0.4),
+          Math.min(1, color.z * 0.85),
+          1.0
+        )
+      );
+      this.setPassVec3(pass, 'Port_Emissive_N006', this.getGhostEmissive());
     }
 
     if (typeof pass.baseColor !== 'undefined') {
-      const rgbScale = this.usingWaterMaterial ? alpha : 1;
-      pass.baseColor = new vec4(
-        tint.x * rgbScale,
-        tint.y * rgbScale,
-        tint.z * rgbScale,
-        alpha
-      );
+      const bodyAlpha = this.usingAccentBodyMaterial ? 1.0 : alpha;
+      pass.baseColor = new vec4(tint.x, tint.y, tint.z, bodyAlpha);
     }
+
+    this.applyEdgeMaterialColor();
+  }
+
+  private getGhostEmissive(): vec3 {
+    if (this.moveActive) {
+      return this.getGrabGhostEmissive();
+    }
+    if (!this.useAccentColor) {
+      return new vec3(0, 0, 0);
+    }
+    const color = this.clampAccentColor(this.accentColor);
+    return new vec3(color.x * 1.25, color.y * 1.1, color.z * 1.25);
   }
 
   private setPassFloat(pass: Pass, property: string, value: number): void {
-    (pass as unknown as Record<string, number>)[property] = value;
+    try {
+      (pass as unknown as Record<string, number>)[property] = value;
+    } catch (_error) {
+      // Specs builds omit some dynamic water ports.
+    }
   }
 
   private setPassTexture(pass: Pass, property: string, texture: Texture): void {
-    (pass as unknown as Record<string, Texture>)[property] = texture;
+    try {
+      (pass as unknown as Record<string, Texture>)[property] = texture;
+    } catch (_error) {
+      // Texture slots can be missing on a cloned pass.
+    }
   }
 
   private setPassVec3(pass: Pass, property: string, value: vec3): void {
-    (pass as unknown as Record<string, vec3>)[property] = value;
+    try {
+      (pass as unknown as Record<string, vec3>)[property] = value;
+    } catch (_error) {
+      // Spectacles 2024 builds omit some dynamic water ports.
+    }
+  }
+
+  private setPassVec4(pass: Pass, property: string, value: vec4): void {
+    try {
+      (pass as unknown as Record<string, vec4>)[property] = value;
+    } catch (_error) {
+      // FriendBody rim/fill ports can be missing on a cloned pass.
+    }
   }
 
   private collectRenderMeshVisuals(root: SceneObject): RenderMeshVisual[] {
@@ -1497,10 +2126,20 @@ export class ArvisGhostBlob extends BaseScriptComponent {
       return;
     }
 
-    if (this.moveActive && !isNull(this.manualMoveInteractor)) {
-      this.updateTriggerMovePosition();
+    if (this.grabStartPending) {
+      this.grabStartPending = false;
+      this.onGhostGrabStart();
+    }
+    if (this.grabReleasePending) {
+      this.grabReleasePending = false;
+      this.onGhostGrabRelease();
+    }
+    if (this.talkTogglePending) {
+      this.talkTogglePending = false;
+      this.toggleGhostAgentTalk();
     }
 
+    this.commitPendingManualRootPosition();
     const motion = this.ensureMotionRoot();
     if (isNull(motion)) {
       return;
@@ -1521,33 +2160,87 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     const alphaPulse = 0.85 + Math.sin(time * speed * 1.4) * 0.15;
 
     motion.getTransform().setLocalScale(new vec3(pulse, pulse * ySquash, pulse));
-    motion.getTransform().setLocalPosition(new vec3(wobbleX, wobbleY, 0));
-    motion.getTransform().setLocalRotation(quat.quatIdentity());
+    if (!this.enableLookAt || this.moveActive) {
+      motion.getTransform().setLocalRotation(quat.quatIdentity());
+    }
+    if (this.moveActive && !isNull(this.manualMoveInteractor)) {
+      // Apply the hand position after the idle wobble so the visual does not
+      // fight the manual drag position. The wobble remains in the body scale
+      // and shader/eye sync while the interaction root stays fixed.
+      this.updateTriggerMovePosition();
+    } else {
+      motion.getTransform().setLocalPosition(new vec3(wobbleX, wobbleY, 0));
+    }
 
     this.applyMaterialColor(alphaPulse);
     this.lastEyeYSquash = ySquash;
     this.updateEyePulse(time);
   }
 
+  private commitPendingManualRootPosition(): void {
+    if (this.moveActive || isNull(this.pendingManualRootPosition)) {
+      return;
+    }
+
+    const position = this.pendingManualRootPosition;
+    this.pendingManualRootPosition = null;
+    if (!this.isAcceptableManualWorldPosition(position)) {
+      if (getTime() - this.lastInvalidManualPositionLogAt > 2) {
+        this.lastInvalidManualPositionLogAt = getTime();
+        print('[ArvisGhostBlob] rejected invalid committed grab position');
+      }
+      return;
+    }
+
+    this.sceneObject.getTransform().setWorldPosition(position);
+    if (!isNull(this.motionRoot)) {
+      this.motionRoot.getTransform().setLocalPosition(new vec3(0, 0, 0));
+    }
+    this.captureCurrentAnchorPosition();
+  }
+
   private applyIdleAnchorPose(): void {
-    if (isNull(this.baseLocalPosition)) {
+    if (isNull(this.baseLocalPosition) || !this.worldPlacementReady) {
       return;
     }
 
     if (!this.moveActive) {
       const anchor = this.sceneObject;
       anchor.getTransform().setLocalPosition(this.baseLocalPosition);
-      if (!this.enableLookAt) {
-        anchor.getTransform().setLocalRotation(quat.quatIdentity());
-      }
     }
   }
 
+  /** Disable LookAt on the grab root only. The motion-root LookAt stays. */
+  private stripNativeLookAt(): void {
+    try {
+      const lookAt = this.getSceneObject().getComponent(
+        'Component.LookAtComponent'
+      ) as LookAtComponent;
+      if (!isNull(lookAt)) {
+        lookAt.enabled = false;
+      }
+    } catch (_error) {
+      // Ignore missing component during teardown.
+    }
+  }
+
+  /**
+   * Cursor/Claude meshes live under ArvisGhostMotion. LookAt must rotate that
+   * child, never the grab root — LookAtComponent on the SIK manipulate root
+   * writes the same transform as grab and crashes Spectacles 2024.
+   */
   private ensureLookAt(): void {
     const now = getTime();
     if (now < this.nextLookAtRetryAt) {
       return;
     }
+
+    const host = this.ensureMotionRoot();
+    if (isNull(host) || host === this.getSceneObject()) {
+      this.nextLookAtRetryAt = now + 1.0;
+      return;
+    }
+    this.lookAtHost = host;
 
     const targetProxy = this.ensureLookAtTargetProxy();
     if (isNull(targetProxy)) {
@@ -1556,10 +2249,13 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     }
     this.refreshLookAtTargetProxyPosition();
 
-    const anchor = this.getSceneObject();
-    let lookAt = anchor.getComponent('Component.LookAtComponent') as LookAtComponent;
+    let lookAt = host.getComponent('Component.LookAtComponent') as LookAtComponent;
     if (isNull(lookAt)) {
-      lookAt = anchor.createComponent('Component.LookAtComponent') as LookAtComponent;
+      lookAt = host.createComponent('Component.LookAtComponent') as LookAtComponent;
+    }
+    if (isNull(lookAt)) {
+      this.nextLookAtRetryAt = now + 1.5;
+      return;
     }
 
     try {
@@ -1575,7 +2271,6 @@ export class ArvisGhostBlob extends BaseScriptComponent {
 
     this.nextLookAtRetryAt = 0;
     lookAt.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint;
-    // Arvis' eyes face +Z, matching the Buddy mesh orientation.
     lookAt.aimVectors = LookAtComponent.AimVectors.ZAimYUp;
     lookAt.worldUpVector = LookAtComponent.WorldUpVector.SceneY;
     lookAt.enabled = false;
@@ -1583,13 +2278,14 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   private updateLookAt(): void {
-    if (!this.enableLookAt) {
-      this.setLookAtActive(false);
-      return;
-    }
     if (this.moveActive) {
       this.setLookAtActive(false);
       this.setLookAtEnabled(false);
+      return;
+    }
+
+    if (!this.enableLookAt) {
+      this.setLookAtActive(false);
       return;
     }
 
@@ -1634,7 +2330,8 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     if (!this.lookAtLoggedSetup) {
       this.lookAtLoggedSetup = true;
       print(
-        `[ArvisGhostBlob] look-at setup dist=${distanceCm.toFixed(1)}cm threshold=${enterCm.toFixed(0)}cm`
+        `[ArvisGhostBlob] look-at setup dist=${distanceCm.toFixed(1)}cm ` +
+          `threshold=${enterCm.toFixed(0)}cm host=${this.lookAtHost ? this.lookAtHost.name : '?'}`
       );
     }
 
@@ -1642,7 +2339,8 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     if (this.debugLogging && this.lookAtDistanceLogTimer >= 1.5) {
       this.lookAtDistanceLogTimer = 0;
       print(
-        `[ArvisGhostBlob] look-at dist=${distanceCm.toFixed(1)}cm active=${this.lookAtActive} (on<=${enterCm.toFixed(0)} off>${exitCm.toFixed(0)})`
+        `[ArvisGhostBlob] look-at dist=${distanceCm.toFixed(1)}cm active=${this.lookAtActive} ` +
+          `(on<=${enterCm.toFixed(0)} off>${exitCm.toFixed(0)})`
       );
     }
 
@@ -1663,15 +2361,12 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     if (this.lookAtActive === active) {
       return;
     }
-
     this.lookAtActive = active;
     if (active) {
       this.setLookAtEnabled(true);
       print('[ArvisGhostBlob] look-at ON');
       return;
     }
-
-    // Keep the last facing direction when proximity look-at turns off.
     this.setLookAtEnabled(false);
     print('[ArvisGhostBlob] look-at OFF');
   }
@@ -1683,28 +2378,61 @@ export class ArvisGhostBlob extends BaseScriptComponent {
   }
 
   private findCameraObject(): SceneObject | null {
-    const preferredNames = ['Camera Object', 'Device Camera', 'Camera'];
-    for (let i = 0; i < preferredNames.length; i++) {
-      const found = this.findSceneObjectByName(preferredNames[i]);
-      if (this.isUsableCameraObject(found)) {
-        return found;
+    const picked = pickPreferredWorldCamera([
+      findRootObjectByName('Camera Object'),
+      findRootObjectByName('Device Camera'),
+      this.findTrackedWorldCamera(),
+    ]);
+    return this.isUsableCameraObject(picked) ? picked : null;
+  }
+
+  private findTrackedWorldCamera(): SceneObject | null {
+    try {
+      const provider = WorldCameraFinderProvider.getInstance() as unknown as {
+        getComponent?: () => Camera;
+        getTransform?: () => Transform;
+      };
+      if (provider && typeof provider.getComponent === 'function') {
+        const camera = provider.getComponent();
+        if (!isNull(camera) && typeof camera.getSceneObject === 'function') {
+          const object = camera.getSceneObject();
+          if (this.isUsableCameraObject(object)) {
+            return object;
+          }
+        }
       }
+      if (provider && typeof provider.getTransform === 'function') {
+        const transform = provider.getTransform();
+        if (!isNull(transform) && typeof transform.getSceneObject === 'function') {
+          const object = transform.getSceneObject();
+          if (this.isUsableCameraObject(object)) {
+            return object;
+          }
+        }
+      }
+    } catch (_error) {
+      // Fall through to named scene cameras.
     }
-    const fallback = this.findObjectWithCameraComponent();
-    return this.isUsableCameraObject(fallback) ? fallback : null;
+    return null;
   }
 
   private resolveCameraObject(forceSearch: boolean = false): SceneObject | null {
     const now = getTime();
-    if (!forceSearch && this.isValidSceneObject(this.lookAtCamera)) {
+    if (
+      !forceSearch &&
+      this.isValidSceneObject(this.lookAtCamera) &&
+      (isEditorRuntime() ||
+        cameraHasWorldDeviceTracking(this.lookAtCamera) ||
+        now > 3.0)
+    ) {
       return this.lookAtCamera;
     }
     if (!forceSearch && now < this.nextCameraLookupAt) {
-      return null;
+      return this.isValidSceneObject(this.lookAtCamera) ? this.lookAtCamera : null;
     }
 
     const camera = this.findCameraObject();
-    this.nextCameraLookupAt = now + (isNull(camera) ? 1.0 : 5.0);
+    this.nextCameraLookupAt = now + (isNull(camera) ? 0.4 : 5.0);
     if (this.isValidSceneObject(camera)) {
       this.lookAtCamera = camera;
       return camera;
@@ -1861,6 +2589,24 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     );
   }
 
+  private syncCompanionNameTagToGhostBody(): void {
+    if (isNull(this.companionNameTag)) {
+      return;
+    }
+
+    const body = this.getBodyObject();
+    if (isNull(body)) {
+      return;
+    }
+
+    this.companionNameTag.syncToGhostBody(
+      body,
+      this.getWaterDisplacementConfig(),
+      this.shouldApplyEyeShaderDisplacement(),
+      this.smoothedEyeYSquash
+    );
+  }
+
   private syncEyesToGhostWorld(): void {
     if (isNull(this.leftEye) || isNull(this.rightEye) || isNull(this.ghostVisual)) {
       return;
@@ -1879,7 +2625,7 @@ export class ArvisGhostBlob extends BaseScriptComponent {
     const invWorldScaleY = 1.0 / Math.max(0.001, bodyWorldScale.y);
     const halfSep = this.eyeSeparation * 0.5;
     const baseY = this.eyeHeight * this.smoothedEyeYSquash;
-    const baseZ = this.eyeForwardOffset;
+    const baseZ = this.getEyeFaceOffset();
     const time = getTime();
     const displacementConfig = this.getWaterDisplacementConfig();
     const applyShaderDisplacement = this.shouldApplyEyeShaderDisplacement();

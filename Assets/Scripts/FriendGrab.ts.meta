@@ -32,7 +32,6 @@
     bubbleHeightOffset: false
     bubbleScaleCompensation: false
     colliderSize: false
-    companionName: false
     debugLogging: false
     enableFollowAfterOnboarding: false
     enableGoalLeaderboard: false
@@ -109,7 +108,6 @@
     releaseSoundTrack: false
     releaseSoundVolume: false
     releaseSpeechTrack: false
-    showNameTagWhenMultiple: false
     speechBubbleHideDelaySec: false
     treatAsNewUser: false
     workspaceResetLine: false
@@ -139,8 +137,6 @@
         - That tickles!
         - "Hehe, I like that!"
         - "You're a good friend."
-      companionName: Buddy
-      showNameTagWhenMultiple: true
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: false
@@ -154,17 +150,17 @@
       onboardingPresentDistanceCm: !<float> 22.000000
       onboardingPresentHeightCm: !<float> 0.000000
       onboardingObjectSpacingCm: !<float> 18.000000
-      onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
+      onboardingWelcomeLine: "Hi! I'm your buddy. I'll show you sticky notes, your pot stack, and a clock one by one."
       onboardingClosingLine: "You're all set! Say hey Arvis if you need help. Have fun!"
       onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
       onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
       onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      onboardingIncludePalette: false
       onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
+      onboardingIncludePalette: false
       onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
+      onboardingPlanterLine: "Here's your pot stack. Each goal pot arrives with a seed already planted. Put the stack somewhere easy to reach."
       onboardingPostIt: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
       onboardingTrash: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
@@ -173,7 +169,7 @@
       onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
       enableLeaderboardPanel: false
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
-      onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
+      onboardingGoalSeedLine: "There it is! Your goal pot already has a seed planted. Place it where you like; it waters itself and grows as you make progress. Tell me when you finish the goal, and it will fully bloom!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
       onboardingGoalFallback: I want to run one kilometer
       onboardingAutoGoalFallbackOnTimeout: false
@@ -224,14 +220,12 @@
     - // @input float grabSoundVolume = 0.85
     - // @input float releaseSoundVolume = 0.8
     - // @input bool enableGrabSounds = true
-    - '// @input bool enablePetReaction {"hint":"Temporarily disabled: the nested poke target conflicts with Buddy manipulation on device."}'
+    - // @input bool enablePetReaction = true
     - // @input Asset.AudioTrackAsset petSoundTrack
     - // @input float petReactionCooldownSec = 2.5
     - '// @input vec3 petPokeColliderSize = {3.4,4.2,3.4} {"label":"Pet Poke Collider Size"}'
     - '// @input vec3 petPokeLocalPosition = {0,0,0.8} {"label":"Pet Poke Local Position"}'
     - "// @input string[] petDialogueLines = {\"Aww, thank you!\",\"That tickles!\",\"Hehe, I like that!\",\"You're a good friend.\"}"
-    - '// @input string companionName = "Buddy" {"label":"Companion Name", "hint":"Name shown above this companion when multiple AI companions are active."}'
-    - '// @input bool showNameTagWhenMultiple = true {"label":"Show Name Tag With Multiple Companions", "hint":"Display this name tag when more than one enabled companion is present."}'
     - // @input bool enableSpeechBubble = true
     - // @input bool enableTts = true
     - '// @input bool enableOnboarding {"label":"Enable Onboarding", "hint":"First launch: guided tour. Later sessions restore anchors unless user asks to reset."}'
@@ -245,26 +239,26 @@
     - '// @input float onboardingPresentDistanceCm = 22 {"label":"Present Distance (cm)"}'
     - '// @input float onboardingPresentHeightCm {"label":"Present Height Offset (cm)"}'
     - '// @input float onboardingObjectSpacingCm = 18 {"label":"Onboarding Object Spacing (cm)"}'
-    - '// @input string onboardingWelcomeLine = "Hi! I’m your companion. Let’s set up your space! I’ll give you a few tools, and you can put them wherever they work best for you." {"label":"Welcome Line"}'
+    - "// @input string onboardingWelcomeLine = \"Hi! I'm your buddy. Sticky notes, your pot stack, trash, and a clock are already here. Put them where you like.\" {\"label\":\"Welcome Line\"}"
     - "// @input string onboardingClosingLine = \"You're all set! Say hey friend if you want to talk again. When you finish your goal, say I finished my goal. Have fun!\" {\"label\":\"Closing Line\"}"
     - '// @input SceneObject onboardingGlobe {"label":"Tour Globe"}'
     - "// @input string onboardingGlobeLine = \"Here's the globe. Pinch to grab it, move it, then release.\" {\"label\":\"Globe Line\"}"
     - '// @input SceneObject onboardingClock {"label":"Tour Clock"}'
-    - '// @input string onboardingClockLine = "Here’s your clock. Put it somewhere easy to check while you work." {"label":"Clock Line"}'
+    - "// @input string onboardingClockLine = \"Here's the clock. Grab it, move it, then let go.\" {\"label\":\"Clock Line\"}"
     - '// @input SceneObject onboardingPalette {"label":"Tour Palette"}'
-    - '// @input bool onboardingIncludePalette {"label":"Include Palette In Onboarding", "hint":"Archived for now. Enable this only when the palette tour returns."}'
-    - '// @input string onboardingPaletteLine = "This is your palette. Paint your world with it! Put it somewhere you can reach while you work." {"label":"Palette Line"}'
+    - "// @input string onboardingPaletteLine = \"Here's the palette. Grab and release to place it where you like.\" {\"label\":\"Palette Line\"}"
+    - '// @input bool onboardingIncludePalette {"label":"Include Palette In Tour"}'
     - '// @input SceneObject onboardingPlanter {"label":"Tour Planter"}'
-    - '// @input string onboardingPlanterLine = "This is your garden. Your goals will grow into plants here. Find a good spot for your extra planters." {"label":"Planter Line"}'
+    - "// @input string onboardingPlanterLine = \"Here's the planter stack for extra pots later.\" {\"label\":\"Planter Line\"}"
     - '// @input SceneObject onboardingPostIt {"label":"Tour Post-its"}'
-    - '// @input string onboardingPostItLine = "These are your sticky notes. Pull one out and start speaking, and I’ll write down what you say." {"label":"Post-it Line"}'
+    - "// @input string onboardingPostItLine = \"Here's the sticky notes. Pull one and speak — your words appear on it.\" {\"label\":\"Post-it Line\"}"
     - '// @input SceneObject onboardingTrash {"label":"Tour Trash"}'
-    - '// @input string onboardingTrashLine = "And here’s the trash. Put it wherever you like, then drop things in when you don’t need them anymore." {"label":"Trash Line"}'
+    - "// @input string onboardingTrashLine = \"Here's the trash. Drop things into it to clean up.\" {\"label\":\"Trash Line\"}"
     - '// @input SceneObject onboardingLeaderboard {"label":"Tour Leaderboard"}'
     - "// @input string onboardingLeaderboardLine = \"And here's your distance leaderboard. Grab it to place it anywhere in your space.\" {\"label\":\"Leaderboard Line\"}"
     - '// @input bool enableLeaderboardPanel {"label":"Enable Leaderboard Panel", "hint":"Archived while disabled; re-enable when the leaderboard returns."}'
     - '// @input string onboardingGoalPromptLine = "What goal should we grow together? Say something like: I want to walk 20 meters." {"label":"Goal Prompt Line", "hint":"Spoken after the tour; Friend waits for the player to say a goal"}'
-    - '// @input string onboardingGoalSeedLine = "There it is! Every goal starts as a seed. Put your planter somewhere you’ll see it, then give it some water. Your plant will grow as you make progress." {"label":"Goal Planted Pot Line"}'
+    - "// @input string onboardingGoalSeedLine = \"Here's your goal planter — the seed is already planted. Grab it, place it where you like, then water it. Walk goals grow automatically when you finish the distance. Or tell me when you're done!\" {\"label\":\"Goal Planted Pot Line\"}"
     - '// @input float onboardingGoalListenTimeoutSec = 22 {"label":"Goal Listen Timeout (sec)"}'
     - '// @input string onboardingGoalFallback = "I want to walk 20 meters" {"label":"Goal Fallback Example"}'
     - '// @input bool onboardingAutoGoalFallbackOnTimeout {"label":"Auto Goal Fallback On Timeout", "hint":"When enabled, uses Goal Fallback Example if no goal is heard before timeout."}'
@@ -297,10 +291,10 @@
     - '// @input int leaderboardUsersLimit = 5 {"label":"Leaderboard Users Limit"}'
     - '// @input bool leaderboardUseGlobal = true {"label":"Leaderboard Use Global", "hint":"When off, fetches friends leaderboard instead of global."}'
     - '// @input bool announceLeaderboardRank {"label":"Announce Leaderboard Rank", "hint":"Speak the user rank after a successful score submit."}'
-    - '// @input bool enableFollowAfterOnboarding {"hint":"Optional camera following. Disabled on Spectacles 2024 for stable, predictable placement."}'
+    - '// @input bool enableFollowAfterOnboarding = true {"hint":"Buddy follows the camera in all sessions (paused only while grabbed)"}'
     - // @input float followDistanceCm = 45
     - // @input float followSideOffsetCm = 4
-    - // @input float followHeightOffsetCm = -18
+    - // @input float followHeightOffsetCm = 5
     - // @input float followLerpSpeed = 3.5
     - // @input float followMinMoveCm = 4
     - "// @input string workspaceResetLine = \"Got it — let's set this space up again. I'll clear the anchors and walk you through onboarding.\" {\"hint\":\"Spoken when the user asks to reset anchors / restart setup\"}"

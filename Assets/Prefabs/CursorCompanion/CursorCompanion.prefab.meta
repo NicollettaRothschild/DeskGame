@@ -1,0 +1,246 @@
+- !<AssetImportMetadata/5dd68c6f-6ea6-4933-9d85-ddca9ac7efad>
+  ImportedAssetIds:
+    ObjectPrefab: !<reference> ea86bc43-261a-4bce-be16-565b333343d3
+  ImporterName: ObjectPrefabImporter
+  PrimaryAsset: !<reference> ea86bc43-261a-4bce-be16-565b333343d3
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    ObjectPrefab: !<own> 6efe74d1-d986-40b5-8ae5-212d7a7df844
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ScriptComponent/3d0c239a-7e75-4cdd-4ca9-58dd8e63b04e>
+  PrefabRemaps:
+    []
+  Name: CursorBuddy
+  Enabled: true
+  ScriptAsset: !<reference> bcdd740e-ad08-41a2-b7cd-93b0f943f363
+  ScriptInputsDefault:
+    providerId: true
+    buddyName: true
+    workspaceId: true
+    agentModel: true
+    enableSpeechOutput: true
+    debugLogging: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      ghostBlob: !<MappingBased.AssignableType> 90374619-31ae-4e1e-79e7-33f432963573
+      specsApi: !<MappingBased.AssignableType_1> 0b29b3d7-c41c-41c5-839c-90c6faa5112d
+      deviceRegistry: !<MappingBased.AssignableType_2> c33cf58b-fff6-4a7d-a112-71b1a506b4bc
+      speechRecognition: !<MappingBased.AssignableType_3> 4c0f8a6b-3d5e-6f7a-0b1c-2d3e4f607182
+      agentTts: !<MappingBased.AssignableType_4> a1b2c3d4-e5f6-7890-abcd-ef1234567892
+      providerId: cursor_sdk
+      buddyName: Cursor
+      workspaceId: ""
+      agentModel: auto
+      enableSpeechOutput: true
+      debugLogging: false
+  ScriptTypes:
+    "":
+      {}
+- !<SceneObject/4011edc1-f870-4b4d-48ef-41fb5220de5f>
+  PrefabRemaps:
+    []
+  Name: Cursor
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -9.000000, y: -2.818398, z: -23.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 8.400000, y: 8.400000, z: 8.400000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> ea41fe10-4057-4edd-5d52-0ebe734851ac
+    - !<own> 90374619-31ae-4e1e-79e7-33f432963573
+    - !<own> c91fd063-e86f-4147-4dc9-22a707da50d2
+    - !<own> df854f4d-269c-46b5-5102-5dbd9a27ea6a
+    - !<own> f9c4648a-851d-4239-566a-403592701f1d
+    - !<own> 3d0c239a-7e75-4cdd-4ca9-58dd8e63b04e
+- !<ObjectPrefabAssetData/6efe74d1-d986-40b5-8ae5-212d7a7df844>
+  Prototype: !<ObjectOwner/250e2a86-87ec-46c5-8545-faa99ebb1fe7>
+    PackagePath: ""
+    objects:
+      - !<own> 4011edc1-f870-4b4d-48ef-41fb5220de5f
+- !<ScriptComponent/90374619-31ae-4e1e-79e7-33f432963573>
+  PrefabRemaps:
+    []
+  Name: ArvisGhostBlob
+  Enabled: true
+  ScriptAsset: !<reference> 8b234eee-0cca-4876-83b9-77c5543e6c85
+  ScriptInputsDefault:
+    eyeMaterialTemplate: true
+    eyeScale: true
+    idlePulseSpeed: true
+    activePulseSpeed: true
+    thinkingPulseSpeed: true
+    debugLogging: true
+    releaseSoundVolume: true
+    enableGrabSounds: true
+    enableSpeechBubble: true
+    speechBubbleHideDelaySec: true
+    showNameTagWhenMultiple: true
+    lookAtExitPaddingMeters: true
+    lookAtTurnSpeed: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      ghostVisual: !<reference.RenderMeshVisual> ea41fe10-4057-4edd-5d52-0ebe734851ac
+      waterMaterialTemplate: !<reference.Material> 845da6ca-6433-4848-be46-3d6803c44c5d
+      accentBodyMaterialTemplate: !<reference.Material> afca2c2e-b0cf-4b1d-b02c-71c19b9780fd
+      eyeMaterialTemplate: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      baseScale: 8.400000
+      eyeScale: 0.160000
+      eyeSeparation: 0.280000
+      eyeHeight: 0.120000
+      eyeForwardOffset: 0.350000
+      idlePulseSpeed: 0.550000
+      activePulseSpeed: 1.350000
+      thinkingPulseSpeed: 2.100000
+      enablePinchToTalk: false
+      registerAsSharedArvis: false
+      useAccentColor: true
+      accentColor: !<Vec3> {x: 0.140000, y: 0.420000, z: 1.000000}
+      debugLogging: false
+      grabSoundTrack: !<reference.AudioTrackAsset> 984e79e1-54c7-4c65-bebc-411a6ef67d7e
+      releaseSoundTrack: !<reference.AudioTrackAsset> cc7fbf30-c9bc-44b7-93bf-aa6a8cc6264a
+      grabSoundVolume: 0.850000
+      releaseSoundVolume: 0.800000
+      enableGrabSounds: true
+      enableSpeechBubble: true
+      speechBubbleHideDelaySec: !<float> 14.000000
+      companionName: Cursor
+      showNameTagWhenMultiple: true
+      enableLookAt: false
+      lookAtDistanceMeters: 0.400000
+      lookAtExitPaddingMeters: 0.050000
+      lookAtTurnSpeed: !<float> 6.000000
+      lookAtAlwaysActive: false
+  ScriptTypes:
+    "":
+      {}
+- !<ColliderComponent/c91fd063-e86f-4147-4dc9-22a707da50d2>
+  PrefabRemaps:
+    []
+  Name: Cursor Grab Collider
+  Enabled: true
+  Shape: !<Box>
+    FitVisual: false
+    Size: {x: 1.080000, y: 1.080000, z: 1.080000}
+  Matter: !<reference> 00000000-0000-0000-0000-000000000000
+  Filter: !<reference> 00000000-0000-0000-0000-000000000000
+  OverlapFilter: !<reference> 00000000-0000-0000-0000-000000000000
+  WorldSettings: !<reference> 00000000-0000-0000-0000-000000000000
+  EnableSmoothing: false
+  PositionTension: 30.000000
+  RotationTension: 30.000000
+  ForceCompound: false
+  Intangible: false
+  ShowCollider: false
+- !<ScriptComponent/df854f4d-269c-46b5-5102-5dbd9a27ea6a>
+  PrefabRemaps:
+    []
+  Name: Interactable
+  Enabled: true
+  ScriptAsset: !<reference> 652e631a-22d0-4941-9f74-2943df59f34c
+  ScriptInputsDefault:
+    targetingMode: true
+    targetingVisual: true
+    isScrollable: true
+    allowMultipleInteractors: true
+    enablePokeDirectionality: true
+    acceptableXDirections: true
+    acceptableYDirections: true
+    acceptableZDirections: true
+    useFilteredPinch: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      targetingMode: !<float> 3.000000
+      targetingVisual: !<float> 1.000000
+      ignoreInteractionPlane: true
+      keepHoverOnTrigger: true
+      enableInstantDrag: true
+      isScrollable: false
+      allowMultipleInteractors: true
+      enablePokeDirectionality: false
+      acceptableXDirections: !<float> 0.000000
+      acceptableYDirections: !<float> 0.000000
+      acceptableZDirections: !<float> 1.000000
+      useFilteredPinch: false
+  ScriptTypes:
+    "":
+      {}
+- !<RenderMeshVisual/ea41fe10-4057-4edd-5d52-0ebe734851ac>
+  PrefabRemaps:
+    []
+  Name: Cursor Ghost Visual
+  Enabled: true
+  RenderOrder: 2
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Materials:
+    - !<reference> 845da6ca-6433-4848-be46-3d6803c44c5d
+  Mesh: !<reference> dc14ddf6-beb4-4506-bf99-d1178aab0072
+  Skin: !<reference> 00000000-0000-0000-0000-000000000000
+  BlendShapesEnabled: true
+  BlendNormals: false
+  BlendShapes:
+    {}
+- !<ScriptComponent/f9c4648a-851d-4239-566a-403592701f1d>
+  PrefabRemaps:
+    []
+  Name: InteractableManipulation
+  Enabled: false
+  ScriptAsset: !<reference> 664b556b-1946-4c2c-866a-e675b4e86006
+  ScriptInputsDefault:
+    enableTranslation: true
+    minimumScaleFactor: true
+    maximumScaleFactor: true
+    zStretchFactorMin: true
+    zStretchFactorMax: true
+    showTranslationProperties: true
+    _enableXTranslation: true
+    _enableYTranslation: true
+    _enableZTranslation: true
+    showRotationProperties: true
+    _rotationAxis: true
+    isSynced: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      manipulateRootSceneObject: !<reference.SceneObject> 4011edc1-f870-4b4d-48ef-41fb5220de5f
+      enableTranslation: true
+      enableRotation: false
+      enableScale: false
+      minimumScaleFactor: 0.250000
+      maximumScaleFactor: !<float> 20.000000
+      enableStretchZ: false
+      zStretchFactorMin: !<float> 1.000000
+      zStretchFactorMax: !<float> 12.000000
+      useFilter: false
+      showTranslationProperties: false
+      _enableXTranslation: true
+      _enableYTranslation: true
+      _enableZTranslation: true
+      showRotationProperties: false
+      _rotationAxis: All
+      isSynced: false
+  ScriptTypes:
+    "":
+      {}

@@ -48,6 +48,10 @@ type AnchorPotSpawner = {
     potPrefabIndex: number,
     worldPos: vec3
   ): SceneObject | null;
+  getValidatedSpawnWorldPosition?: (
+    preferredWorldPos?: vec3 | null,
+    index?: number
+  ) => vec3;
   saveObjectPosition?: () => void;
   setActiveManipulatedRoot?: (root: SceneObject | null) => void;
   notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
@@ -71,6 +75,7 @@ type PlantPotLike = ScriptComponent & {
 
 type PlantLifecycleLike = {
   getGoalText?: () => string;
+  bindGoal?: (goalText: string) => void;
 };
 
 type PullState = {
@@ -113,7 +118,7 @@ export class MainPotSource extends BaseScriptComponent {
 
   @input('float')
   @hint('Keep goal transcript capture active briefly after release')
-  postReleaseCaptureSec: number = 12;
+  postReleaseCaptureSec: number = 2.5;
 
   private activePull: PullState | null = null;
   private updateEvent: UpdateEvent | null = null;
@@ -129,6 +134,66 @@ export class MainPotSource extends BaseScriptComponent {
 
   public setSpawnSuppressed(suppressed: boolean): void {
     this.spawnSuppressed = suppressed;
+  }
+
+  /**
+   * A hidden source can miss its normal OnStartEvent during preview startup.
+   * Re-run the idempotent SIK binding when the onboarding step reveals it.
+   */
+  public prepareForOnboarding(): void {
+    this.ensurePotStackVisible();
+    this.tryBindInteractable();
+  }
+
+  private ensurePotStackVisible(): void {
+    const root = this.getSceneObject();
+    const potNames = ['Pot1', 'Pot2', 'Pot3'];
+    let enabledPots = 0;
+    let enabledRenderables = 0;
+
+    for (let i = 0; i < potNames.length; i++) {
+      const pot = this.findPotStackChild(root, potNames[i]);
+      if (isNull(pot)) {
+        continue;
+      }
+      pot.enabled = true;
+      enabledPots += 1;
+      const visuals = pot.getComponents('Component.RenderMeshVisual');
+      for (let v = 0; v < visuals.length; v++) {
+        const visual = visuals[v] as RenderMeshVisual;
+        if (isNull(visual)) {
+          continue;
+        }
+        visual.enabled = true;
+        enabledRenderables += 1;
+      }
+    }
+
+    print(
+      `[MainPotSource] pot stack ready: ${enabledPots}/3 pots, ${enabledRenderables} renderables`
+    );
+  }
+
+  private findPotStackChild(root: SceneObject, name: string): SceneObject | null {
+    if (isNull(root)) {
+      return null;
+    }
+
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (isNull(current)) {
+        continue;
+      }
+      if (String(current.name || '') === name) {
+        return current;
+      }
+      for (let i = 0; i < current.getChildrenCount(); i++) {
+        stack.push(current.getChild(i));
+      }
+    }
+
+    return null;
   }
 
   public abortActiveSpawnPull(): void {
@@ -399,22 +464,22 @@ export class MainPotSource extends BaseScriptComponent {
       return;
     }
 
-    const pendingGoal =
-      typeof pot.getPendingGoalText === 'function'
-        ? String(pot.getPendingGoalText() || '').trim()
-        : '';
-    if (pendingGoal === goalText) {
-      return;
-    }
-
     const plantedPlant =
       typeof pot.getPlantedLifecycle === 'function' ? pot.getPlantedLifecycle() : null;
-    if (
-      !isNull(plantedPlant) &&
-      typeof plantedPlant.getGoalText === 'function' &&
-      String(plantedPlant.getGoalText() || '').trim()
-    ) {
-      this.debugLog(`skipped goal rebind: ${potObject.name} already has a plant goal`);
+    if (!isNull(plantedPlant) && typeof plantedPlant.bindGoal === 'function') {
+      const existingGoal =
+        typeof plantedPlant.getGoalText === 'function'
+          ? String(plantedPlant.getGoalText() || '').trim()
+          : '';
+      if (existingGoal === goalText) {
+        return;
+      }
+      if (existingGoal) {
+        this.debugLog(`skipped goal rebind: ${potObject.name} already has a plant goal`);
+        return;
+      }
+      plantedPlant.bindGoal(goalText);
+      this.debugLog(`assigned goal "${goalText}" directly to ${potObject.name}`);
       return;
     }
 
@@ -512,9 +577,15 @@ export class MainPotSource extends BaseScriptComponent {
       return null;
     }
 
-    const prefab = this.potPrefabs[prefabIndex];
-    const spawnPosition = this.applySpawnOffset(worldPosition, interactor);
     const anchorSpawner = this.getAnchorPotSpawner();
+    const prefab = this.potPrefabs[prefabIndex];
+    const resolvedWorldPosition =
+      !isNull(anchorSpawner) &&
+      typeof (anchorSpawner as AnchorPotSpawner).getValidatedSpawnWorldPosition ===
+        'function'
+        ? (anchorSpawner as AnchorPotSpawner).getValidatedSpawnWorldPosition(worldPosition)
+        : worldPosition;
+    const spawnPosition = this.applySpawnOffset(resolvedWorldPosition, interactor);
     let potObject: SceneObject | null = null;
     if (!isNull(anchorSpawner)) {
       potObject = (anchorSpawner as AnchorPotSpawner).createPotAtWorldPosition(prefab, prefabIndex, spawnPosition);
@@ -686,6 +757,9 @@ export class MainPotSource extends BaseScriptComponent {
 
     this.debugLog('released active pot pull.');
     const releasedPot = this.activePull.potObject;
+    // Bind text that is already available, then retain the delayed retry for
+    // final ASR updates that arrive just after release.
+    this.finalizePotGoal(releasedPot);
     this.schedulePotGoalFinalization(releasedPot);
     this.abandonActivePull();
 

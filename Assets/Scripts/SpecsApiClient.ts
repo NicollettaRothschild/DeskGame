@@ -1,4 +1,7 @@
-import { registerSpecsApi } from './FlowGardenServiceRegistry';
+import {
+  registerSpecsApi,
+  unregisterSpecsApi,
+} from './FlowGardenServiceRegistry';
 import { resolveAgentSkillsForMessage } from './ArvisAgentSkills';
 import {
   extractImageUrlFromAgentResponse,
@@ -215,10 +218,21 @@ export class SpecsApiClient extends BaseScriptComponent {
   private editorAutoPairScheduled = false;
   private simulatedPlatformWarned = false;
   private explicitDemoMode = false;
+  private destroyed = false;
 
   onAwake(): void {
+    this.destroyed = false;
     registerSpecsApi(this);
-    this.resolveInternetModule();
+  }
+
+  onDestroy(): void {
+    this.destroyed = true;
+    if (!isNull(this.editorAutoPairEvent)) {
+      this.editorAutoPairEvent.enabled = false;
+      this.editorAutoPairEvent = null;
+    }
+    this.editorAutoPairScheduled = false;
+    unregisterSpecsApi(this);
   }
 
   /** Preview without Device Type Override = Spectacles blocks InternetModule.fetch/create. */
@@ -310,10 +324,27 @@ export class SpecsApiClient extends BaseScriptComponent {
     if (this.explicitDemoMode) {
       return true;
     }
-    if (!this.useEditorMockWhenOffline) {
+    if (!this.useEditorMockWhenOffline || !this.isEditorRuntime()) {
       return false;
     }
     return !this.isNetworkAvailable();
+  }
+
+  private isEditorRuntime(): boolean {
+    try {
+      const deviceInfo = (
+        global as unknown as {
+          deviceInfoSystem?: { isEditor?: () => boolean };
+        }
+      ).deviceInfoSystem;
+      return (
+        !!deviceInfo &&
+        typeof deviceInfo.isEditor === 'function' &&
+        !!deviceInfo.isEditor()
+      );
+    } catch (_error) {
+      return false;
+    }
   }
 
   public setExplicitDemoMode(enabled: boolean): void {
@@ -1939,6 +1970,9 @@ export class SpecsApiClient extends BaseScriptComponent {
     onDone: (data: JsonRecord | null, error?: string) => void,
     timeoutSec?: number
   ): void {
+    if (this.destroyed) {
+      return;
+    }
     this.resolveInternetModule();
     if (isNull(this.internetModule)) {
       onDone(null, 'InternetModule not configured (enable Internet Access capability)');
@@ -1994,6 +2028,9 @@ export class SpecsApiClient extends BaseScriptComponent {
       }
       settled = true;
       timeoutEvent.enabled = false;
+      if (this.destroyed) {
+        return;
+      }
       onDone(data, error);
     };
     timeoutEvent.bind(() => {
@@ -2069,6 +2106,9 @@ export class SpecsApiClient extends BaseScriptComponent {
       }
       settled = true;
       timeoutEvent.enabled = false;
+      if (this.destroyed) {
+        return;
+      }
       onDone(data, error);
     };
     timeoutEvent.bind(() => {
@@ -2164,6 +2204,9 @@ export class SpecsApiClient extends BaseScriptComponent {
     );
     const delayEvent = this.createEvent('DelayedCallbackEvent');
     delayEvent.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       onDone({
         response: mock.response,
         agentName: mock.agent.name,
@@ -2197,6 +2240,9 @@ export class SpecsApiClient extends BaseScriptComponent {
     response: RemoteServiceHttpResponse,
     onDone: (data: JsonRecord | null, error?: string) => void
   ): void {
+    if (this.destroyed) {
+      return;
+    }
     const status = response.statusCode;
     const raw = String(response.body || '');
     if (this.debugLogging) {

@@ -376,8 +376,6 @@
     onboardingObjectSpacingCm: true
     onboardingWelcomeLine: true
     onboardingClosingLine: true
-    onboardingGlobe: true
-    onboardingGlobeLine: true
     onboardingClock: true
     onboardingClockLine: true
     onboardingPalette: true
@@ -465,17 +463,15 @@
       onboardingPresentDistanceCm: !<float> 22.000000
       onboardingPresentHeightCm: !<float> 0.000000
       onboardingObjectSpacingCm: !<float> 18.000000
-      onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
+      onboardingWelcomeLine: "Hi! I'm your buddy. Sticky notes, your pot stack, trash, and a clock are already here. Put them where you like."
       onboardingClosingLine: "You're all set! Say hey Arvis if you need help. Have fun!"
-      onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
       onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
       onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingIncludePalette: false
       onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
       onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
+      onboardingPlanterLine: "Here's your pot stack. Each goal pot arrives with a seed already planted. Put the stack somewhere easy to reach."
       onboardingPostIt: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
       onboardingTrash: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
@@ -484,7 +480,7 @@
       onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
       enableLeaderboardPanel: false
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
-      onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
+      onboardingGoalSeedLine: "There it is! Your goal pot already has a seed planted. Place it where you like; it waters itself and grows as you make progress. Tell me when you finish the goal, and it will fully bloom!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
       onboardingGoalFallback: I want to run one kilometer
       onboardingAutoGoalFallbackOnTimeout: false
@@ -517,10 +513,10 @@
       leaderboardUsersLimit: 5
       leaderboardUseGlobal: true
       announceLeaderboardRank: false
-      enableFollowAfterOnboarding: false
-      followDistanceCm: !<float> 55.000000
-      followSideOffsetCm: !<float> 18.000000
-      followHeightOffsetCm: !<float> -25.000000
+      enableFollowAfterOnboarding: true
+      followDistanceCm: !<float> 45.000000
+      followSideOffsetCm: !<float> 4.000000
+      followHeightOffsetCm: !<float> -5.000000
       followLerpSpeed: 3.500000
       followMinMoveCm: !<float> 4.000000
       workspaceResetLine: "Got it — let's set this space up again. I'll clear the anchors and walk you through onboarding."
@@ -700,7 +696,7 @@
       acceptableXDirections: !<float> 0.000000
       acceptableYDirections: !<float> 0.000000
       acceptableZDirections: !<float> 1.000000
-      useFilteredPinch: true
+      useFilteredPinch: false
   ScriptTypes:
     "":
       {}

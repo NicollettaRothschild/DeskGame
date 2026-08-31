@@ -45,6 +45,10 @@ type AnchorWaterSpawner = {
   notifyTrashSpawnGrace?: (root: SceneObject, graceSeconds?: number) => void;
   syncTrackedWrapperToContent?: (content: SceneObject) => void;
   placeTrackedContentAtWorld?: (content: SceneObject, worldPos: vec3, worldRot?: quat) => void;
+  getValidatedSpawnWorldPosition?: (
+    preferredWorldPos?: vec3 | null,
+    index?: number
+  ) => vec3;
 };
 
 type PullState = {
@@ -304,10 +308,13 @@ export class MainWaterSource extends BaseScriptComponent {
       return null;
     }
 
+    const resolvedWorldPosition = this.resolveSpawnPosition(worldPosition);
     const parent = this.getSpawnParent();
     const waterObject = this.wateringObjectPrefab.instantiate(parent);
     waterObject.name = 'WateringObject';
-    waterObject.getTransform().setWorldPosition(this.applySpawnOffset(worldPosition, interactor));
+    waterObject
+      .getTransform()
+      .setWorldPosition(this.applySpawnOffset(resolvedWorldPosition, interactor));
     playInteractionSound((sounds) => sounds.playSpawnWater());
     this.debugLog(`spawned ${waterObject.name}.`);
     return waterObject;
@@ -367,6 +374,17 @@ export class MainWaterSource extends BaseScriptComponent {
     }
 
     return null;
+  }
+
+  private resolveSpawnPosition(preferredWorldPosition: vec3): vec3 {
+    const anchorSpawner = this.getAnchorWaterSpawner();
+    if (
+      !isNull(anchorSpawner) &&
+      typeof anchorSpawner.getValidatedSpawnWorldPosition === 'function'
+    ) {
+      return anchorSpawner.getValidatedSpawnWorldPosition(preferredWorldPosition);
+    }
+    return preferredWorldPosition;
   }
 
   private notifyTrashSpawnGrace(root: SceneObject, graceSeconds: number): void {

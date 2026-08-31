@@ -30,3 +30,93 @@ Important Notes:
 - [Performance Best Practices](.agents/LensStudio/performance.md): Guidelines for frame-rate optimization and texture memory usage.
 
 <!-- Shipped by Lens Studio -->
+
+# DeskGame — Spectacles 2024
+
+This Lens targets **Spectacles 2024** (the current glasses) in **Lens Studio 5.15.x**. Preview simulation mode is `Spectacles (2024)`.
+
+## How to work here (mandatory — read this first)
+
+Use **first-principles thinking**. Never assume anything. Never “fix forward” from an unverified story about why something broke.
+
+Every change must be **proven** against (a) a previously working DeskGame send, and (b) official Spectacles 2024 / Lens Studio 5.15.x sources. If those disagree with a hunch, the hunch is wrong.
+
+### Never assume
+
+Treat every belief as unproven until you have a file, an API definition, a sample, or a device log that shows it.
+
+- Do not assume Preview equals Spectacles 2024. They diverge on tracking, grab, LookAt, ASR, and crashes.
+- Do not assume a Lens Studio / SIK / LookAt / ASR / DeviceTracking API works like a phone, browser, Unity, or SPECS 27 API. Read `Support/StudioLib.d.ts` (Editor `Support/editor.d.ts` only for editor scripts).
+- Do not assume Inspector values, comments, chat history, or a previous agent’s diagnosis are still true. Re-read the scene object and the script that actually runs.
+- Do not assume a crash dump is “just Preview hot-reload” or “just tracking warmup” without matching a **device** line to a call site.
+- Do not assume a change is safe because it compiled, the Preview looked fine, or TypeScript is clean. Compile is not a device test.
+- Do not assume SPECS 27, newer Lens Studio, Stack Overflow, or a generic AR snippet applies to this **5.15.x / Spectacles 2024** Lens.
+- Do not invent new speech, grab, tracking, camera, LookAt, or networking patterns when a 5.15.4 sample, Lens Studio template, or a previously working commit already has one.
+
+### Cross-reference before you write code
+
+Do these **in order**. Do not skip to a speculative patch.
+
+1. **Name the mechanism.** Which SceneObject, component, and API run on device? Quote the file and the official type — not a guess.
+2. **Diff a known-good DeskGame build.** Find the last commit / send that ran stably on Spectacles 2024 (`git log`, `git diff <good> -- <path>`, and the working scene/script at that revision). If the bug appeared after a local change, **restore the working pattern first**, then re-apply the smallest justified delta. Do not stack new code on a broken branch of history.
+3. **Cross-check official Spectacles 2024 sources** before new runtime code:
+   - Samples / templates: https://github.com/specs-devs/samples/tree/5.15.4 (clone with Git LFS — ZIP omits large assets). Match AI Playground, Agent Center, Essentials, Spatial Anchors, Voice Playback, Fetch as relevant.
+   - Docs: https://developers.snap.com/spectacles
+   - This repo: `Support/StudioLib.d.ts`, `.agents/LensStudio/`, Lens Studio presets in the scene, and the sample table below
+4. **Prefer copy-from-working over clever.** If a 5.15.4 sample, a DeskGame commit that already shipped to the glasses, or an authored scene component already does the job, match that structure. Do not `createComponent` for SIK or `LookAtComponent` on grab roots unless a 5.15.4 sample does the same thing on Spectacles 2024.
+5. **Verify on the path that failed.** Spectacles 2024 device logs beat Preview. A fix is not done until the failing log line is gone **and** grab, speech, world placement, and visuals still match the last known-good send.
+
+### When you are stuck
+
+Stop stacking speculative patches. Re-read the sample **and** the last working DeskGame version, list the exact diffs, and change one causal thing. If Preview is hot-reloading (`Source file was changed`, `Lens has been reset`), that is not a device crash — wait for a clean send and read the Spectacles 2024 log from `The sent Lens has successfully started` onward.
+
+### Memtrace (do not retry if missing)
+
+Memtrace is **not installed in this project**. Do not call Memtrace, fleet, or `mcp__memtrace__*` tools. Do not probe for them at session start. Do not keep retrying after a missing namespace / empty catalog / failed call.
+
+If a Memtrace skill or rule says to use it first: **skip it**. Use `Read`, `Grep`, `git log` / `git diff`, `Support/StudioLib.d.ts`, and the 5.15.4 samples instead. One failed discovery is enough — never loop.
+
+## Hardware naming (mandatory)
+
+| Name | Meaning |
+|---|---|
+| **Spectacles 2024** | The glasses this project runs on. Use this in chat, docs, and comments. |
+| **SPECS** | The *new* glasses shipping later. Do **not** call this project SPECS or Specs. |
+| Package / API identifiers | Leave as-is: `SpectaclesInteractionKit`, `Editor.TargetPlatform.Spectacles`, `SpectaclesSyncKit`, etc. |
+
+Never say “Specs” when you mean this device. Say **Spectacles 2024**. Do not apply SPECS 27 / new-glasses APIs here.
+
+## Official samples (check these first)
+
+Canonical working examples for this Lens Studio line:
+
+**https://github.com/specs-devs/samples/tree/5.15.4**
+
+Clone with Git LFS (`git lfs install` then `git clone`). A GitHub ZIP will miss large assets.
+
+Before changing speech recognition, TTS, Remote Service Gateway, Fetch, or the Mac coding-agent bridge, read the matching sample instead of inventing a new pattern.
+
+### Speech, ASR, microphone, AI
+
+| Sample | Use when |
+|---|---|
+| [AI Playground](https://github.com/specs-devs/samples/tree/5.15.4/AI%20Playground) | ASR (`ASRQueryController.ts`), TTS, Gemini Live / OpenAI Realtime, Remote Service Gateway credentials, voice-driven image/3D gen |
+| [Agent Center](https://github.com/specs-devs/samples/tree/5.15.4/Agent%20Center) | Voice + text chat with coding agents, on-device ASR (`VoiceInputController.ts`), Mac bridge daemon, Cursor/Claude CLI, pairing |
+| [Agentic Playground](https://github.com/specs-devs/samples/tree/5.15.4/Agentic%20Playground) | Agentic RSG loops and tool-calling assistants |
+| [Voice Playback](https://github.com/specs-devs/samples/tree/5.15.4/Voice%20Playback) | Microphone record / playback (`MicrophoneRecorder.ts`) |
+| [Fetch](https://github.com/specs-devs/samples/tree/5.15.4/Fetch) | HTTPS from the glasses |
+
+AI Playground key scripts: `ASRQueryController.ts`, `GeminiAssistant.ts`, `OpenAIAssistant.ts`, `AIAssistantUIBridge.ts`. Preview must be **Spectacles (2024)**; RSG needs a token on `RemoteServiceGatewayCredentials`.
+
+Agent Center is the closest sample to DeskGame’s Cursor/Claude companions (Lens + local Mac bridge).
+
+### Also useful for this project
+
+| Sample | Use when |
+|---|---|
+| [Essentials](https://github.com/specs-devs/samples/tree/5.15.4/Essentials) | Scene, camera, SIK basics |
+| [Spatial Anchors](https://github.com/specs-devs/samples/tree/5.15.4/Spatial%20Anchors) | World placement / anchors |
+| [Depth Cache](https://github.com/specs-devs/samples/tree/5.15.4/Depth%20Cache) | Depth + vision models |
+| [AI Music Gen](https://github.com/specs-devs/samples/tree/5.15.4/AI%20Music%20Gen) | RSG music generation |
+
+Docs: [Spectacles developer site](https://developers.snap.com/spectacles) (hardware pages still say “Spectacles”; this project means **Spectacles 2024**).

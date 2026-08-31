@@ -206,8 +206,6 @@
     petPokeColliderSize: true
     petPokeLocalPosition: true
     petDialogueLines: true
-    companionName: true
-    showNameTagWhenMultiple: true
     enableSpeechBubble: true
     enableTts: true
     enableOnboarding: true
@@ -228,8 +226,8 @@
     onboardingClock: true
     onboardingClockLine: true
     onboardingPalette: true
-    onboardingIncludePalette: true
     onboardingPaletteLine: true
+    onboardingIncludePalette: true
     onboardingPlanter: true
     onboardingPlanterLine: true
     onboardingPostIt: true
@@ -297,8 +295,6 @@
         - That tickles!
         - "Hehe, I like that!"
         - "You're a good friend."
-      companionName: Buddy
-      showNameTagWhenMultiple: true
       enableSpeechBubble: true
       enableTts: true
       enableOnboarding: false
@@ -312,17 +308,17 @@
       onboardingPresentDistanceCm: !<float> 22.000000
       onboardingPresentHeightCm: !<float> 0.000000
       onboardingObjectSpacingCm: !<float> 18.000000
-      onboardingWelcomeLine: "Hi! I'm your desk buddy. I'll show you the desk one piece at a time."
+      onboardingWelcomeLine: "Hi! I'm your buddy. I'll show you sticky notes, your pot stack, and a clock one by one."
       onboardingClosingLine: "You're all set! Say hey Arvis if you need help. Have fun!"
       onboardingGlobe: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingGlobeLine: "Here's the globe. Pinch to grab it, move it, then release."
       onboardingClock: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingClockLine: "Here's the clock. Grab it, move it, then let go."
       onboardingPalette: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      onboardingIncludePalette: false
       onboardingPaletteLine: "Here's the palette. Grab and release to place it where you like."
+      onboardingIncludePalette: false
       onboardingPlanter: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      onboardingPlanterLine: "Here's the planter stack. Pinch it to grab a pot for your garden."
+      onboardingPlanterLine: "Here's your pot stack. Each goal pot arrives with a seed already planted. Put the stack somewhere easy to reach."
       onboardingPostIt: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       onboardingPostItLine: "Here's the sticky notes. Pull one and speak — your words appear on it."
       onboardingTrash: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
@@ -331,7 +327,7 @@
       onboardingLeaderboardLine: "And here's your distance leaderboard. Grab it to place it anywhere in your space."
       enableLeaderboardPanel: false
       onboardingGoalPromptLine: "What goal should we grow together? Say something like: I want to run one kilometer."
-      onboardingGoalSeedLine: "Here's a seed for that goal. Grab a pot from the planter, plant the seed, and water it. When you finish the goal, tell me — and your plant will fully grow!"
+      onboardingGoalSeedLine: "There it is! Your goal pot already has a seed planted. Place it where you like; it waters itself and grows as you make progress. Tell me when you finish the goal, and it will fully bloom!"
       onboardingGoalListenTimeoutSec: !<float> 22.000000
       onboardingGoalFallback: I want to run one kilometer
       onboardingAutoGoalFallbackOnTimeout: false

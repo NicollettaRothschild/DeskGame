@@ -142,7 +142,9 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
     }
 
     this.handleManipulation = manipulation;
-    this.bindManipulationRoot(manipulation, sourceRoot);
+    if (manipulation.manipulateRootSceneObject !== sourceRoot) {
+      this.bindManipulationRoot(manipulation, sourceRoot);
+    }
   }
 
   public refreshHandlePresentation(): void {
@@ -198,26 +200,17 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       return;
     }
 
-    // Keep interaction disabled while changing the serialized component from
-    // any stale Poke mode to the supported direct/indirect pinch path.
-    (interactable as ScriptComponent).enabled = false;
-    (manipulation as ScriptComponent).enabled = false;
-    this.bindManipulationRoot(manipulation, sourceRoot);
-    manipulation.enableTranslation = true;
-    manipulation.enableRotation = true;
-    manipulation.enableScale = false;
-    // Configure targeting before enabling either SIK component. Enabling an
-    // Interactable first leaves its serialized Poke mode active for one frame.
-    interactable.targetingMode = 3;
-    interactable.ignoreInteractionPlane = true;
+    // Source handles must be fully configured in the scene/prefab before SIK
+    // registers them. Only a copied TrashBin handle needs its manipulation
+    // root repaired dynamically because its source root is not known until
+    // the copy is attached.
+    if (manipulation.manipulateRootSceneObject !== sourceRoot) {
+      this.bindManipulationRoot(manipulation, sourceRoot);
+    }
     const manipulationLike = manipulation as ScriptComponent & {
-      useFilter?: boolean;
       onManipulationStart?: { add: (cb: (arg: unknown) => void) => void };
       onManipulationEnd?: { add: (cb: (arg: unknown) => void) => void };
     };
-    if (manipulationLike.useFilter !== undefined) {
-      manipulationLike.useFilter = false;
-    }
     this.handleInteractable = interactable;
     this.handleManipulation = manipulation;
     // Collider before enabling Interactable — trash needs independent (non-compound) collider.
@@ -291,8 +284,6 @@ export class GardenSourceMoveHandle extends BaseScriptComponent {
       interactable.onInteractorTriggerEndOutside.add(onRelease);
     }
 
-    (manipulation as ScriptComponent).enabled = true;
-    (interactable as ScriptComponent).enabled = true;
     this.sourceSpawner = this.findSourceSpawner(sourceRoot);
     this.wireContainerHover(sourceRoot);
     this.wireHandleHover(interactable, sourceRoot);

@@ -6,8 +6,8 @@ type AnchorControllerLike = {
 };
 
 /**
- * End-to-end harness: place tour props, spawn a walk-20m goal plant, water it,
- * simulate walking 20 meters, assert the plant reaches Adult.
+ * End-to-end harness: place the guided tour props, spawn a walk-20m goal
+ * plant, simulate progress-driven watering and walking, then assert Adult.
  */
 @component
 export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
@@ -81,7 +81,7 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
     this.disableFriendOnboarding();
 
     // Palette is archived from the onboarding tour until explicitly restored.
-    const tourNames = ['Clock', 'PostItNotes', 'TrashBin'];
+    const tourNames = ['PostItNotes', 'Planter', 'Clock'];
     if (this.placeTourObjects) {
       for (let i = 0; i < tourNames.length; i++) {
         const obj = this.findSceneObjectByName(tourNames[i]);
@@ -143,11 +143,14 @@ export class OnboardingWalkGoalE2EHarness extends BaseScriptComponent {
     // Speed up growth so the pause/cap is reachable quickly in preview.
     plant.setGrowthTimeForTests(Math.max(0.4, this.fastGrowthTimeSec));
 
-    const watered = plant.water();
-    if (!watered) {
-      failures.push('water() failed on goal plant');
+    // Goal plants are watered by progress; the harness deliberately does not
+    // call PlantLifecycle.water() so a legacy water container cannot mask a
+    // regression in the new flow.
+    plant.addWalkedMeters(Math.min(0.1, Math.max(0.01, this.walkMeters * 0.01)));
+    if (!plant.getSaveState().hasBeenWatered) {
+      failures.push('goal progress did not auto-water the planted seed');
     } else {
-      print('[OnboardingWalkGoalE2E] watered goal plant');
+      print('[OnboardingWalkGoalE2E] goal progress auto-watered plant');
     }
 
     const waitGrow = this.createEvent('DelayedCallbackEvent');

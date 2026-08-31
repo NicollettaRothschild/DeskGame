@@ -1,0 +1,47 @@
+---
+description: Spectacles 2024 naming, first-principles work rules, and official 5.15.4 samples for ASR, AI, and the Mac agent bridge
+alwaysApply: true
+---
+
+# Spectacles 2024 (not SPECS)
+
+This Lens runs on **Spectacles 2024** in Lens Studio 5.15.x. Preview mode: `Spectacles (2024)`.
+
+- Say **Spectacles 2024** in chat and docs. Never call this device Specs or SPECS.
+- **SPECS** = the new glasses shipping later. Do not use SPECS 27 APIs here.
+- Keep code identifiers unchanged (`SpectaclesInteractionKit`, `Editor.TargetPlatform.Spectacles`, …).
+
+# Official samples
+
+Before changing ASR, TTS, RSG, Fetch, or the Cursor/Claude Mac bridge, read:
+
+https://github.com/specs-devs/samples/tree/5.15.4
+
+Clone with Git LFS (ZIP downloads omit large assets).
+
+| Task | Sample |
+|---|---|
+| ASR / STT, Gemini Live, OpenAI Realtime, RSG | `AI Playground` (`ASRQueryController.ts`) |
+| Voice + coding agents, Mac bridge, Cursor/Claude CLI | `Agent Center` (`VoiceInputController.ts`, `Bridge/`) |
+| Agentic RSG / tool calling | `Agentic Playground` |
+| Microphone record/playback | `Voice Playback` |
+| HTTPS | `Fetch` |
+
+Prefer those patterns over new speech or AI wiring. Full table lives in `AGENTS.md` (below the Lens Studio shipped block).
+
+# How to work (mandatory)
+
+First principles. **Never assume anything.** Preview ≠ Spectacles 2024. Compile ≠ it works on device.
+
+Before changing ASR, grab, LookAt, tracking, camera, or networking:
+
+1. Name the actual SceneObject / component / API. Quote `Support/StudioLib.d.ts` — not a hunch.
+2. Diff the last **known-good Spectacles 2024 send** (`git log` / `git diff`). Restore that pattern first.
+3. Cross-check **5.15.4 samples/templates** (https://github.com/specs-devs/samples/tree/5.15.4), https://developers.snap.com/spectacles, and this repo’s presets. Copy from working; do not invent.
+4. Do not `createComponent` SIK or LookAt on grab roots unless a 5.15.4 sample does it on this hardware.
+
+A fix is not done until the failing **device** log is gone and grab / speech / placement still match the last known-good send. Full rules: `AGENTS.md` → “How to work here”.
+
+# Memtrace
+
+Memtrace is **not available** in this repo. Do not call it, probe for it, or retry it. Skip Memtrace/fleet skills; use files + git + `Support/StudioLib.d.ts` + 5.15.4 samples.

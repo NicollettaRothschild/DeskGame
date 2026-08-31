@@ -1,4 +1,9 @@
-import { registerFlowGardenSpacePanel } from './FlowGardenServiceRegistry';
+import {
+  getSharedSpecsApi,
+  getSharedSpecsDeviceRegistry,
+  registerFlowGardenSpacePanel,
+  unregisterFlowGardenSpacePanel,
+} from './FlowGardenServiceRegistry';
 import { SpecsApiClient, SpecsSpaceItem, SpecsSpacePanel } from './SpecsApiClient';
 import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { AgentCenterStateStore } from './AgentCenterStateStore';
@@ -165,7 +170,6 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private lastPairedState = false;
   private panelFixedWorldPosition: vec3 | null = null;
   private panelFixedWorldRotation: quat | null = null;
-  private deskFixedParent: SceneObject | null = null;
   private panelLockEvent: UpdateEvent | null = null;
   private agentViewActive = false;
   private agentChatFieldsShown = false;
@@ -182,6 +186,10 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private lastDebugStatus = '';
   private lastAgentChatKey = '';
   private lastSpeechTranscriptKey = '';
+  private destroyed = false;
+  private deviceRegistrationStarted = false;
+  private deviceRegistrationInFlight = false;
+  private pairStatusRequestInFlight = false;
   private agentCenterState: AgentCenterState = {
     tab: 'agents',
     phase: 'idle',
@@ -194,6 +202,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   };
 
   onAwake(): void {
+    this.destroyed = false;
     registerFlowGardenSpacePanel(this);
     this.resolvePanelRoot();
     this.disablePanelManipulation();
@@ -201,6 +210,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     this.ensurePanelLockLoop();
     this.setPanelVisible(this.startVisible);
     this.createEvent('OnStartEvent').bind(() => {
+      this.resolveDependencies();
       this.lockPanelAtDesk();
       this.bindScrollInteractable();
       this.applyPanelTypography();
@@ -215,6 +225,35 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       this.scheduleRefresh();
       this.schedulePairPoll();
     });
+  }
+
+  onDestroy(): void {
+    this.destroyed = true;
+    if (!isNull(this.refreshEvent)) {
+      this.refreshEvent.enabled = false;
+      this.refreshEvent = null;
+    }
+    if (!isNull(this.pairPollEvent)) {
+      this.pairPollEvent.enabled = false;
+      this.pairPollEvent = null;
+    }
+    if (!isNull(this.panelLockEvent)) {
+      this.panelLockEvent.enabled = false;
+      this.panelLockEvent = null;
+    }
+    this.imageRequestId++;
+    this.deviceRegistrationInFlight = false;
+    this.pairStatusRequestInFlight = false;
+    unregisterFlowGardenSpacePanel(this);
+  }
+
+  private resolveDependencies(): void {
+    if (isNull(this.specsApi)) {
+      this.specsApi = getSharedSpecsApi();
+    }
+    if (isNull(this.deviceRegistry)) {
+      this.deviceRegistry = getSharedSpecsDeviceRegistry();
+    }
   }
 
   public isAgentViewActive(): boolean {
@@ -680,6 +719,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       this.deviceRegistry.getDeviceId(),
       this.deviceRegistry.getDeviceSecret(),
       (panel, error) => {
+        if (this.destroyed) {
+          return;
+        }
         if (!panel) {
           if (!this.agentViewActive) {
             this.setStatus(error || 'Could not load space');
@@ -719,6 +761,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       this.deviceRegistry.getDeviceSecret(),
       trimmed,
       (panel, error) => {
+        if (this.destroyed) {
+          return;
+        }
         if (!panel) {
           this.setStatus(error || 'Could not save note');
           if (onDone) {
@@ -837,6 +882,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
     this.refreshEvent = this.createEvent('DelayedCallbackEvent');
     this.refreshEvent.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.refreshPanel();
       this.scheduleRefresh();
     });
@@ -850,6 +898,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
     this.pairPollEvent = this.createEvent('DelayedCallbackEvent');
     this.pairPollEvent.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.pairPollEvent = null;
       this.pollPairState();
       this.schedulePairPoll();
@@ -858,16 +909,103 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   }
 
   private pollPairState(): void {
-    if (isNull(this.deviceRegistry)) {
+    if (this.destroyed) {
       return;
     }
 
-    this.deviceRegistry.syncPairingFromStorage();
-    const paired = this.deviceRegistry.isPaired();
-    if (paired !== this.lastPairedState) {
-      this.lastPairedState = paired;
-      this.refreshPanel();
+    this.resolveDependencies();
+    if (isNull(this.deviceRegistry) || isNull(this.specsApi)) {
+      return;
     }
+
+    this.ensureDeviceRegistration();
+    this.deviceRegistry.syncPairingFromStorage();
+    const deviceId = this.deviceRegistry.getDeviceId();
+    const deviceSecret = this.deviceRegistry.getDeviceSecret();
+    if (
+      !this.pairStatusRequestInFlight &&
+      (deviceId || deviceSecret) &&
+      (deviceSecret || this.specsApi.isEditorMockActive())
+    ) {
+      this.pairStatusRequestInFlight = true;
+      this.specsApi.fetchPairStatus(
+        deviceId,
+        deviceSecret,
+        (status, error) => {
+          this.pairStatusRequestInFlight = false;
+          if (this.destroyed) {
+            return;
+          }
+          if (!status) {
+            if (this.debugLogging && error) {
+              print(`[FlowGardenSpacePanel] pair status unavailable: ${error}`);
+            }
+            return;
+          }
+
+          const wasPaired = this.deviceRegistry?.isPaired() === true;
+          this.deviceRegistry?.setPaired(status.paired === true);
+          this.lastPairedState = status.paired === true;
+          if (wasPaired !== this.lastPairedState) {
+            this.refreshPanel();
+          }
+        }
+      );
+    }
+  }
+
+  private ensureDeviceRegistration(): void {
+    if (
+      this.destroyed ||
+      this.deviceRegistrationStarted ||
+      this.deviceRegistrationInFlight ||
+      isNull(this.specsApi) ||
+      isNull(this.deviceRegistry)
+    ) {
+      return;
+    }
+
+    const deviceId = String(this.deviceRegistry.getDeviceId() || '').trim();
+    if (!deviceId) {
+      return;
+    }
+
+    // A stored secret means this device was already registered. Pair-status
+    // polling can use it directly without creating a new device record.
+    if (String(this.deviceRegistry.getDeviceSecret() || '').trim()) {
+      this.deviceRegistrationStarted = true;
+      return;
+    }
+
+    this.deviceRegistrationStarted = true;
+    this.deviceRegistrationInFlight = true;
+    this.specsApi.registerDevice(deviceId, (result, error) => {
+      this.deviceRegistrationInFlight = false;
+      if (this.destroyed) {
+        return;
+      }
+      if (!result) {
+        this.deviceRegistrationStarted = false;
+        if (this.debugLogging && error) {
+          print(`[FlowGardenSpacePanel] device registration unavailable: ${error}`);
+        }
+        return;
+      }
+
+      const registeredId = String(result.deviceId || deviceId).trim() || deviceId;
+      const registeredSecret = String(
+        result.deviceSecret || this.deviceRegistry?.getDeviceSecret() || ''
+      ).trim();
+      this.deviceRegistry?.applyRegistration(
+        registeredId,
+        registeredSecret,
+        result.paired === true
+      );
+      this.lastPairedState = result.paired === true;
+      if (result.paired === true) {
+        this.refreshPanel();
+      }
+    });
   }
 
   public onDevicePaired(): void {
@@ -878,13 +1016,6 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
   public lockAtDesk(): void {
     this.lockPanelAtDesk();
-  }
-
-  private getDeskFixedParent(): SceneObject {
-    if (isNull(this.deskFixedParent)) {
-      this.deskFixedParent = global.scene.createSceneObject('DeskFixedUI');
-    }
-    return this.deskFixedParent;
   }
 
   private disablePanelManipulation(): void {
@@ -911,6 +1042,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
 
     this.panelLockEvent = this.createEvent('UpdateEvent');
     this.panelLockEvent.bind(() => {
+      if (this.destroyed) {
+        return;
+      }
       this.enforcePanelLock();
       this.enforceAgentChatPresentation();
       this.applyAgentFrameStyle();
@@ -921,11 +1055,6 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
   private enforcePanelLock(): void {
     if (isNull(this.panelRoot) || isNull(this.panelFixedWorldPosition)) {
       return;
-    }
-
-    const parent = this.panelRoot.getParent();
-    if (!isNull(this.widgetParent) && parent === this.widgetParent) {
-      this.panelRoot.setParent(this.getDeskFixedParent());
     }
 
     const panelTransform = this.panelRoot.getTransform();
@@ -947,11 +1076,6 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     if (isNull(this.panelFixedWorldPosition)) {
       this.panelFixedWorldPosition = panelTransform.getWorldPosition();
       this.panelFixedWorldRotation = panelTransform.getWorldRotation();
-    }
-
-    const parent = this.panelRoot.getParent();
-    if (!isNull(this.widgetParent) && parent === this.widgetParent) {
-      this.panelRoot.setParent(this.getDeskFixedParent());
     }
 
     panelTransform.setWorldPosition(this.panelFixedWorldPosition);
@@ -1573,6 +1697,9 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
     if (!this.agentFrameInitBound && !isNull(script.onInitialized)) {
       this.agentFrameInitBound = true;
       script.onInitialized.add(() => {
+        if (this.destroyed) {
+          return;
+        }
         this.agentFrameReady = true;
         this.lastAppliedFrameAlpha = -1;
         this.applyAgentFrameStyle();
@@ -1699,7 +1826,11 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
         loader.loadResourceAsImageTexture(
           resource,
           (texture) => {
-            if (requestId !== this.imageRequestId || isNull(this.imageVisual)) {
+            if (
+              this.destroyed ||
+              requestId !== this.imageRequestId ||
+              isNull(this.imageVisual)
+            ) {
               return;
             }
             const material = this.imageVisual.mainMaterial;
@@ -1713,7 +1844,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
             this.imageVisual.enabled = true;
           },
           () => {
-            if (requestId === this.imageRequestId) {
+            if (!this.destroyed && requestId === this.imageRequestId) {
               this.hideImage();
             }
           }
@@ -1727,15 +1858,29 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
       return;
     }
 
-    const request = RemoteServiceHttpRequest.create();
-    request.url = url;
-    request.method = RemoteServiceHttpRequest.HttpRequestMethod.Get;
+    let request: RemoteServiceHttpRequest;
+    try {
+      request = RemoteServiceHttpRequest.create();
+      request.url = url;
+      request.method = RemoteServiceHttpRequest.HttpRequestMethod.Get;
+    } catch (e) {
+      if (this.debugLogging) {
+        print('[SpacePanel] Image request unavailable: ' + e);
+      }
+      this.hideImage();
+      return;
+    }
 
-    internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
-      if (requestId !== this.imageRequestId) {
+    try {
+      internetModule.performHttpRequest(request, (response: RemoteServiceHttpResponse) => {
+      if (this.destroyed || requestId !== this.imageRequestId) {
         return;
       }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (
+        !response ||
+        response.statusCode < 200 ||
+        response.statusCode >= 300
+      ) {
         this.hideImage();
         return;
       }
@@ -1759,7 +1904,11 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
         loader.loadResourceAsImageTexture(
           resource,
           (texture) => {
-            if (requestId !== this.imageRequestId || isNull(this.imageVisual)) {
+            if (
+              this.destroyed ||
+              requestId !== this.imageRequestId ||
+              isNull(this.imageVisual)
+            ) {
               return;
             }
             const material = this.imageVisual.mainMaterial;
@@ -1773,7 +1922,7 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
             this.imageVisual.enabled = true;
           },
           () => {
-            if (requestId === this.imageRequestId) {
+            if (!this.destroyed && requestId === this.imageRequestId) {
               this.hideImage();
             }
           }
@@ -1784,7 +1933,15 @@ export class FlowGardenSpacePanel extends BaseScriptComponent {
         }
         this.hideImage();
       }
-    });
+      });
+    } catch (e) {
+      if (this.debugLogging) {
+        print('[SpacePanel] Image request failed: ' + e);
+      }
+      if (!this.destroyed && requestId === this.imageRequestId) {
+        this.hideImage();
+      }
+    }
   }
 
   private decodeBase64(base64: string): Uint8Array | null {

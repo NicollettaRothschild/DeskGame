@@ -1,0 +1,37 @@
+0 verbose cli /usr/local/bin/node /usr/local/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@10.9.2
+2 info using node@v22.17.0
+3 silly config load:file:/usr/local/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/allanyde/Documents/GitHub/DeskGame/.npmrc
+5 silly config load:file:/Users/allanyde/.npmrc
+6 silly config load:file:/usr/local/etc/npmrc
+7 verbose title npm exec tsc --noEmit -p tsconfig.json
+8 verbose argv "exec" "--yes" "--package" "typescript" "--" "tsc" "--noEmit" "-p" "tsconfig.json"
+9 verbose logfile logs-max:10 dir:/Users/allanyde/Documents/GitHub/DeskGame/.npm-cache/_logs/2026-08-31T15_24_04_307Z-
+10 verbose logfile /Users/allanyde/Documents/GitHub/DeskGame/.npm-cache/_logs/2026-08-31T15_24_04_307Z-debug-0.log
+11 silly logfile start cleaning logs, removing 1 files
+12 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+13 silly logfile done cleaning log files
+14 http fetch GET 200 https://registry.npmjs.org/typescript 112ms (cache revalidated)
+15 silly packumentCache heap:4345298944 maxSize:1086324736 maxEntrySize:543162368
+16 verbose stack Error: command failed
+16 verbose stack     at promiseSpawn (/usr/local/lib/node_modules/npm/node_modules/@npmcli/promise-spawn/lib/index.js:22:22)
+16 verbose stack     at spawnWithShell (/usr/local/lib/node_modules/npm/node_modules/@npmcli/promise-spawn/lib/index.js:124:10)
+16 verbose stack     at promiseSpawn (/usr/local/lib/node_modules/npm/node_modules/@npmcli/promise-spawn/lib/index.js:12:12)
+16 verbose stack     at runScriptPkg (/usr/local/lib/node_modules/npm/node_modules/@npmcli/run-script/lib/run-script-pkg.js:77:13)
+16 verbose stack     at runScript (/usr/local/lib/node_modules/npm/node_modules/@npmcli/run-script/lib/run-script.js:9:12)
+16 verbose stack     at run (/usr/local/lib/node_modules/npm/node_modules/libnpmexec/lib/run-script.js:48:10)
+16 verbose stack     at async exec (/usr/local/lib/node_modules/npm/node_modules/libnpmexec/lib/index.js:298:10)
+16 verbose stack     at async Npm.exec (/usr/local/lib/node_modules/npm/lib/npm.js:207:9)
+16 verbose stack     at async module.exports (/usr/local/lib/node_modules/npm/lib/cli/entry.js:74:5)
+17 error path /Users/allanyde/Documents/GitHub/DeskGame
+18 error command failed
+19 error signal SIGPIPE
+20 error command sh -c tsc --noEmit -p tsconfig.json
+21 verbose cwd /Users/allanyde/Documents/GitHub/DeskGame
+22 verbose os Darwin 25.4.0
+23 verbose node v22.17.0
+24 verbose npm  v10.9.2
+25 verbose exit 1
+26 verbose code 1
+27 error A complete log of this run can be found in: /Users/allanyde/Documents/GitHub/DeskGame/.npm-cache/_logs/2026-08-31T15_24_04_307Z-debug-0.log

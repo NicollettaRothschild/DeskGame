@@ -38,7 +38,7 @@
   Attachments:
     []
   DefaultScriptInputs:
-    - runHarness: false
+    - runHarness: true
       startupDelaySec: 1.500000
       runOnce: true
   ScriptTypes:

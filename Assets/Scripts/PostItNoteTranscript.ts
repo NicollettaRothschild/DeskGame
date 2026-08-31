@@ -127,11 +127,12 @@ export class PostItNoteTranscript extends BaseScriptComponent {
 
     if (!this.listenerAttached) {
       this.speech.addTranscriptListener(this.onTranscript);
-      this.speech.beginPostItCapture();
+      // The note can be grabbed from a native SIK callback. Claim the shared
+      // capture slot there, but let the UpdateEvent prewarm the microphone.
+      this.speech.beginPostItCapture(false);
       this.listenerAttached = true;
       this.speech.clearUtteranceState();
     }
-    this.speech.requestListening();
   }
 
   private detachSpeechCapture(): void {
@@ -273,6 +274,11 @@ export class PostItNoteTranscript extends BaseScriptComponent {
 
     if (isNull(this.speech)) {
       return;
+    }
+
+    if (!this.speech.isMicrophoneListening()) {
+      // UpdateEvent is safe to start ASR. Hover prewarm never opens the mic.
+      this.speech.pumpListening();
     }
 
     const live = this.speech.getDisplayTranscript();

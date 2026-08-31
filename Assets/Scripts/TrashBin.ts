@@ -79,11 +79,6 @@ type PlantLifecycleLike = ScriptComponent & {
   getIsPlanted?: () => boolean;
 };
 
-type TaskBerryLike = ScriptComponent & {
-  configure?: (taskId: string, taskLabel: string) => void;
-  getLabelText?: () => string;
-};
-
 @component
 export class TrashBin extends BaseScriptComponent {
   @input
@@ -122,8 +117,6 @@ export class TrashBin extends BaseScriptComponent {
   private readonly protectedRootNames = [
     'TrashBin',
     'Planter',
-    'Seeds',
-    'Water Source',
     'PostItNotes',
     'AnchorController',
     'SpectaclesInteractionKit',
@@ -133,9 +126,7 @@ export class TrashBin extends BaseScriptComponent {
   ];
 
   private readonly gardenSourceContainerNames = [
-    'Water Source',
     'Planter',
-    'Seeds',
     'PostItNotes',
   ];
 
@@ -155,6 +146,7 @@ export class TrashBin extends BaseScriptComponent {
   onAwake(): void {
     this.clearLegacyStash();
     this.ensureGrabCollider();
+    this.hideExtraBinMeshes();
     const collider = this.getTriggerCollider();
     if (!isNull(collider)) {
       collider.onOverlapEnter.add((eventArgs: OverlapEnterEventArgs) => {
@@ -180,6 +172,78 @@ export class TrashBin extends BaseScriptComponent {
     this.bindAttempts = 0;
     this.ensureGrabCollider();
     this.tryWireMoveInteraction();
+  }
+
+  private isHiddenBinMesh(node: SceneObject): boolean {
+    const name = String(node.name || '');
+    return name === 'BinLid' || name === 'BinRim' || name === 'BinHandle';
+  }
+
+  private hideExtraBinMeshes(): void {
+    const root = this.getSceneObject();
+    if (isNull(root)) {
+      return;
+    }
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (isNull(node)) {
+        continue;
+      }
+      if (this.isHiddenBinMesh(node)) {
+        node.enabled = false;
+        continue;
+      }
+      for (let i = 0; i < node.getChildrenCount(); i++) {
+        stack.push(node.getChild(i));
+      }
+    }
+  }
+
+  /** Re-enable Nordic trash parts hidden in the authored prefab. */
+  public prepareForOnboarding(): void {
+    this.ensureTrashVisualVisible();
+    this.wireMoveInteraction();
+  }
+
+  private ensureTrashVisualVisible(): void {
+    const root = this.getSceneObject();
+    if (isNull(root)) {
+      return;
+    }
+    root.enabled = true;
+
+    let enabledParts = 0;
+    let enabledRenderables = 0;
+    const stack: SceneObject[] = [root];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (isNull(node)) {
+        continue;
+      }
+      if (this.isHiddenBinMesh(node)) {
+        node.enabled = false;
+        continue;
+      }
+      node.enabled = true;
+      enabledParts += 1;
+      const visuals = node.getComponents('Component.RenderMeshVisual');
+      for (let i = 0; i < visuals.length; i++) {
+        const visual = visuals[i] as RenderMeshVisual;
+        if (isNull(visual)) {
+          continue;
+        }
+        visual.enabled = true;
+        enabledRenderables += 1;
+      }
+      for (let i = 0; i < node.getChildrenCount(); i++) {
+        stack.push(node.getChild(i));
+      }
+    }
+
+    print(
+      `[TrashBin] trash visual ready: ${enabledParts} parts, ${enabledRenderables} renderables`
+    );
   }
 
   public setUseExternalMoveHandle(useExternal: boolean): void {
@@ -588,7 +652,7 @@ export class TrashBin extends BaseScriptComponent {
     const roots = handler.getTrackedContentRoots();
     for (let i = 0; i < roots.length; i++) {
       const root = roots[i];
-      if (isNull(root) || !root.enabled || this.isBerryObject(root)) {
+      if (isNull(root) || !root.enabled) {
         continue;
       }
 
@@ -772,8 +836,7 @@ export class TrashBin extends BaseScriptComponent {
     const trackedRoot = this.getTrackedContentRoot(destroyRoot) || destroyRoot;
     if (
       isNull(trackedRoot) ||
-      !trackedRoot.enabled ||
-      this.isBerryObject(trackedRoot)
+      !trackedRoot.enabled
     ) {
       return false;
     }
@@ -870,7 +933,7 @@ export class TrashBin extends BaseScriptComponent {
 
     for (let i = 0; i < roots.length; i++) {
       const root = roots[i];
-      if (isNull(root) || !root.enabled || this.isBerryObject(root)) {
+      if (isNull(root) || !root.enabled) {
         continue;
       }
 
@@ -1086,10 +1149,6 @@ export class TrashBin extends BaseScriptComponent {
     }
 
     if (!deliberate && this.isInSpawnGraceAt(destroyRoot, now)) {
-      return;
-    }
-
-    if (this.isBerryObject(destroyRoot)) {
       return;
     }
 
@@ -1393,10 +1452,6 @@ export class TrashBin extends BaseScriptComponent {
   }
 
   private isProtectedHierarchy(sceneObject: SceneObject): boolean {
-    if (this.isBerryObject(sceneObject)) {
-      return true;
-    }
-
     if (this.isGardenSourceContainerHierarchy(sceneObject)) {
       return true;
     }
@@ -1418,32 +1473,6 @@ export class TrashBin extends BaseScriptComponent {
       if (this.isProtectedDestroyTarget(current)) {
         return true;
       }
-      current = current.getParent();
-    }
-
-    return false;
-  }
-
-  private isBerryObject(sceneObject: SceneObject): boolean {
-    let current = sceneObject;
-    while (!isNull(current)) {
-      const name = String(current.name || '');
-      if (name.indexOf('TaskBerry') >= 0 || name.indexOf('Berry_') === 0) {
-        return true;
-      }
-
-      const scripts = current.getComponents('Component.ScriptComponent');
-      for (let i = 0; i < scripts.length; i++) {
-        const candidate = scripts[i] as unknown as TaskBerryLike;
-        if (
-          !isNull(candidate) &&
-          typeof candidate.configure === 'function' &&
-          typeof candidate.getLabelText === 'function'
-        ) {
-          return true;
-        }
-      }
-
       current = current.getParent();
     }
 

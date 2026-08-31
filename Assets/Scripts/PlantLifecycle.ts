@@ -182,6 +182,14 @@ export class PlantLifecycle extends BaseScriptComponent {
     });
   }
 
+  onDestroy(): void {
+    PlantLifecycle.unregisterGoalPlant(this);
+    if (!isNull(this.updateEvent)) {
+      this.updateEvent.enabled = false;
+      this.updateEvent = null;
+    }
+  }
+
   private initializeDefaultVisual(): void {
     this.visualStateApplied = true;
     if (this.hasBeenWatered) {
@@ -387,6 +395,21 @@ export class PlantLifecycle extends BaseScriptComponent {
     PlantLifecycle.goalCompleteListeners.push(listener);
   }
 
+  public static removeGoalCompleteListener(
+    listener: (plant: PlantLifecycle) => void
+  ): void {
+    if (!listener) {
+      return;
+    }
+    const remaining: Array<(plant: PlantLifecycle) => void> = [];
+    for (let i = 0; i < PlantLifecycle.goalCompleteListeners.length; i++) {
+      if (PlantLifecycle.goalCompleteListeners[i] !== listener) {
+        remaining.push(PlantLifecycle.goalCompleteListeners[i]);
+      }
+    }
+    PlantLifecycle.goalCompleteListeners = remaining;
+  }
+
   /**
    * Parse goals like "walk 20 meters", "run 1 km", "walk twenty meters".
    * Returns meters or 0 if not a distance goal.
@@ -478,6 +501,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     if (!(this.walkGoalMeters > 0)) {
       return;
     }
+    this.autoWaterForGoalProgress();
     this.walkedMeters += meters;
     print(
       `[PlantLifecycle] ${this.getSceneObject().name}: walked ${this.walkedMeters.toFixed(2)}/${this.walkGoalMeters.toFixed(2)}m (injected)`
@@ -504,6 +528,9 @@ export class PlantLifecycle extends BaseScriptComponent {
     if (!this.requiresGoalCompletion || this.goalCompleted) {
       return false;
     }
+    // Completing a coding goal is also progress. Ensure a planted seed uses
+    // the same automatic watering path as a distance goal.
+    this.autoWaterForGoalProgress();
     this.goalCompleted = true;
     this.refreshGoalLabel();
     this.walkTrackingActive = false;
@@ -589,6 +616,170 @@ export class PlantLifecycle extends BaseScriptComponent {
     return target;
   }
 
+  /**
+   * Resolve a coding request to the goal plant it is describing. A coding
+   * request must match a coding-shaped goal; this prevents a successful agent
+   * session from accidentally completing an unrelated walk goal.
+   */
+  public static findCodingGoalForAgent(prompt: string): PlantLifecycle | null {
+    PlantLifecycle.pruneGoalPlantRegistry();
+    const query = String(prompt || '').trim().toLowerCase();
+    if (!query || !PlantLifecycle.looksLikeCodingText(query)) {
+      return null;
+    }
+
+    let onlyCodingGoal: PlantLifecycle | null = null;
+    let codingGoalCount = 0;
+    let best: PlantLifecycle | null = null;
+    let bestScore = 0;
+    let secondBestScore = 0;
+
+    for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+      const plant = PlantLifecycle.goalPlantRegistry[i];
+      if (isNull(plant) || !plant.requiresGoal()) {
+        continue;
+      }
+
+      const goal = plant.getGoalText().trim().toLowerCase();
+      if (
+        !PlantLifecycle.looksLikeCodingText(goal) ||
+        PlantLifecycle.parseWalkGoalMeters(goal) > 0
+      ) {
+        continue;
+      }
+      onlyCodingGoal = plant;
+      codingGoalCount++;
+
+      const score = PlantLifecycle.scoreCodingGoalMatch(query, goal);
+      if (score > bestScore) {
+        if (!isNull(best)) {
+          // Keep the previous winner so close matches can be rejected as
+          // ambiguous instead of completing the wrong plant.
+          secondBestScore = bestScore;
+        }
+        best = plant;
+        bestScore = score;
+      } else if (score > secondBestScore) {
+        secondBestScore = score;
+      }
+    }
+
+    // Exact or strongly-overlapping matches win even when several coding
+    // plants are active.
+    if (
+      !isNull(best) &&
+      bestScore >= 0.34 &&
+      (codingGoalCount === 1 || bestScore - secondBestScore >= 0.12)
+    ) {
+      return best;
+    }
+
+    // With one coding goal there is no ambiguity, so allow natural speech
+    // that omits some of the goal's filler words.
+    if (codingGoalCount === 1) {
+      return onlyCodingGoal;
+    }
+    return null;
+  }
+
+  /**
+   * Complete the plant associated with a successful Cursor/Claude session.
+   * The preferred plant is captured when the session starts, so later goal
+   * additions cannot retarget an in-flight session.
+   */
+  public static completeCodingGoalForAgent(
+    prompt: string,
+    preferredPlant?: PlantLifecycle | null
+  ): PlantLifecycle | null {
+    PlantLifecycle.pruneGoalPlantRegistry();
+    if (preferredPlant !== null && preferredPlant !== undefined) {
+      return preferredPlant.requiresGoal() && preferredPlant.completeGoal()
+        ? preferredPlant
+        : null;
+    }
+
+    const target = PlantLifecycle.findCodingGoalForAgent(prompt);
+    if (target === null || !target.completeGoal()) {
+      return null;
+    }
+    return target;
+  }
+
+  public static isCodingGoalText(text: string): boolean {
+    const normalized = String(text || '').trim().toLowerCase();
+    return (
+      PlantLifecycle.looksLikeCodingText(normalized) &&
+      PlantLifecycle.parseWalkGoalMeters(normalized) <= 0
+    );
+  }
+
+  private static looksLikeCodingText(text: string): boolean {
+    return /\b(code|coding|program|repository|repo|workspace|bug|fix|implement|build|test|tests|refactor|function|file|typescript|javascript|python|commit|pull request|api|frontend|backend|feature|compile|debug|deploy|app|application)\b/i.test(
+      text
+    );
+  }
+
+  private static scoreCodingGoalMatch(prompt: string, goal: string): number {
+    if (prompt === goal) {
+      return 1;
+    }
+    if (prompt.indexOf(goal) >= 0 || goal.indexOf(prompt) >= 0) {
+      return 0.9;
+    }
+
+    const promptTokens = PlantLifecycle.getGoalMatchTokens(prompt);
+    const goalTokens = PlantLifecycle.getGoalMatchTokens(goal);
+    if (promptTokens.length === 0 || goalTokens.length === 0) {
+      return 0;
+    }
+
+    let hits = 0;
+    for (let i = 0; i < goalTokens.length; i++) {
+      if (promptTokens.indexOf(goalTokens[i]) >= 0) {
+        hits++;
+      }
+    }
+    return hits / Math.max(promptTokens.length, goalTokens.length);
+  }
+
+  private static getGoalMatchTokens(text: string): string[] {
+    const stopWords = new Set([
+      'the',
+      'and',
+      'for',
+      'with',
+      'from',
+      'into',
+      'this',
+      'that',
+      'want',
+      'need',
+      'please',
+      'help',
+      'make',
+      'a',
+      'an',
+      'to',
+      'my',
+      'me',
+      'on',
+      'in',
+      'of',
+      'it',
+    ]);
+    const rawTokens = String(text || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length > 2 && !stopWords.has(token));
+    const unique: string[] = [];
+    for (let i = 0; i < rawTokens.length; i++) {
+      if (unique.indexOf(rawTokens[i]) < 0) {
+        unique.push(rawTokens[i]);
+      }
+    }
+    return unique;
+  }
+
   private static sharesGoalTokens(spoken: string, goal: string): boolean {
     const stop = new Set([
       'i',
@@ -636,6 +827,24 @@ export class PlantLifecycle extends BaseScriptComponent {
     this.completeGoal();
   }
 
+  private autoWaterForGoalProgress(): void {
+    if (
+      !this.requiresGoalCompletion ||
+      this.goalCompleted ||
+      this.hasBeenWatered ||
+      !this.isPlanted ||
+      this.currentStage === PlantStage.Adult
+    ) {
+      return;
+    }
+
+    if (this.water(false)) {
+      print(
+        `[PlantLifecycle] ${this.getSceneObject().name}: goal progress auto-watered plant`
+      );
+    }
+  }
+
   private updateWalkTracking(): void {
     this.ensureWalkCamera();
     if (isNull(this.walkCamera)) {
@@ -653,6 +862,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     const stepCm = Math.sqrt(dx * dx + dz * dz);
     if (stepCm >= PlantLifecycle.WALK_SAMPLE_MIN_CM) {
       // World units are centimeters.
+      this.autoWaterForGoalProgress();
       this.walkedMeters += stepCm / 100;
       this.walkLastCameraPos = pos;
       this.tryCompleteWalkGoal();
@@ -743,6 +953,19 @@ export class PlantLifecycle extends BaseScriptComponent {
     PlantLifecycle.goalPlantRegistry.push(plant);
   }
 
+  private static unregisterGoalPlant(plant: PlantLifecycle): void {
+    if (!plant) {
+      return;
+    }
+    const remaining: PlantLifecycle[] = [];
+    for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
+      if (PlantLifecycle.goalPlantRegistry[i] !== plant) {
+        remaining.push(PlantLifecycle.goalPlantRegistry[i]);
+      }
+    }
+    PlantLifecycle.goalPlantRegistry = remaining;
+  }
+
   private static pruneGoalPlantRegistry(): void {
     const next: PlantLifecycle[] = [];
     for (let i = 0; i < PlantLifecycle.goalPlantRegistry.length; i++) {
@@ -763,7 +986,7 @@ export class PlantLifecycle extends BaseScriptComponent {
     PlantLifecycle.goalPlantRegistry = next;
   }
 
-  public water(): boolean {
+  public water(playFeedback: boolean = true): boolean {
     if (!this.isPlanted) {
       const pot = this.findParentPlantPot();
       if (!isNull(pot) && typeof pot.tryAttachSeed === 'function') {
@@ -789,7 +1012,9 @@ export class PlantLifecycle extends BaseScriptComponent {
       } else {
         this.startGrowth();
       }
-      playInteractionSound((sounds) => sounds.playWatering());
+      if (playFeedback) {
+        playInteractionSound((sounds) => sounds.playWatering());
+      }
       const goalNote =
         this.requiresGoalCompletion && !this.goalCompleted
           ? ' (paused until goal complete)'
@@ -805,7 +1030,9 @@ export class PlantLifecycle extends BaseScriptComponent {
       this.currentStage === PlantStage.WateredBaby
     ) {
       this.startGrowth();
-      playInteractionSound((sounds) => sounds.playWatering());
+      if (playFeedback) {
+        playInteractionSound((sounds) => sounds.playWatering());
+      }
       print(`[PlantLifecycle] ${this.getSceneObject().name}: legacy baby stage skipped -> growing`);
       return true;
     }

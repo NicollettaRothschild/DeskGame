@@ -117,14 +117,16 @@ export class LeaderboardGrab extends BaseScriptComponent {
         this.grabManipulation = null;
         return;
       }
-      interactable = anchor.createComponent(Interactable.getTypeName()) as InteractableLike;
+      this.grabInteractable = null;
+      this.grabManipulation = null;
+      return;
     }
 
     let manipulation = this.findExistingManipulation(anchor);
     if (isNull(manipulation)) {
-      manipulation = anchor.createComponent(
-        InteractableManipulation.getTypeName()
-      ) as unknown as InteractableManipulationLike;
+      this.grabInteractable = interactable;
+      this.grabManipulation = null;
+      return;
     }
 
     // A movable object should expose direct and distance-pinching, but not

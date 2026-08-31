@@ -214,7 +214,7 @@ export class PaletteGrab extends BaseScriptComponent {
     this.createEvent('OnStartEvent').bind(() => {
       this.ensureGrabSounds();
       this.tryWireMoveInteraction();
-      this.setupPalettePainting();
+      // Painting is retired. Do not create SIK color proxies at startup.
       if (this.debugLogging) {
         print('[PaletteGrab] ready');
       }
@@ -1346,19 +1346,13 @@ export class PaletteGrab extends BaseScriptComponent {
     this.refreshGrabCollider();
 
     let interactable = this.findExistingInteractable(anchor);
-    if (isNull(interactable)) {
-      interactable = anchor.createComponent(Interactable.getTypeName()) as InteractableLike;
-    }
-    // Set the mode before creating manipulation. A newly-created Interactable
-    // defaults to Poke, which makes SIK reject the manipulation component.
-    interactable.targetingMode = isNull(this.anchorController) ? 3 : 2;
-
     let manipulation = this.findExistingManipulation(anchor);
-    if (isNull(manipulation)) {
-      manipulation = anchor.createComponent(
-        InteractableManipulation.getTypeName()
-      ) as unknown as InteractableManipulationLike;
+    if (isNull(interactable) || isNull(manipulation)) {
+      this.grabInteractable = interactable;
+      this.grabManipulation = manipulation;
+      return;
     }
+    interactable.targetingMode = isNull(this.anchorController) ? 3 : 2;
 
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
@@ -1672,23 +1666,13 @@ export class PaletteGrab extends BaseScriptComponent {
     }
 
     let interactable = this.findExistingInteractable(handle);
-    if (isNull(interactable)) {
-      interactable = handle.createComponent(Interactable.getTypeName()) as InteractableLike;
+    let manipulation = this.findExistingManipulation(handle);
+    if (isNull(interactable) || isNull(manipulation)) {
+      return;
     }
     // Move handles use pinch/ray targeting; Poke is incompatible with
     // InteractableManipulation.
     interactable.targetingMode = 3;
-    interactable.ignoreInteractionPlane = true;
-    interactable.keepHoverOnTrigger = true;
-    interactable.enableInstantDrag = true;
-
-    let manipulation = this.findExistingManipulation(handle);
-    if (isNull(manipulation)) {
-      manipulation = handle.createComponent(
-        InteractableManipulation.getTypeName()
-      ) as unknown as InteractableManipulationLike;
-    }
-    manipulation.manipulateRootSceneObject = root;
     manipulation.enableTranslation = true;
     manipulation.enableRotation = true;
     manipulation.enableScale = false;

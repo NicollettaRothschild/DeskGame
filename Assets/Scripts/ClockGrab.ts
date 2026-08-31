@@ -97,6 +97,16 @@ export class ClockGrab extends BaseScriptComponent {
     this.scheduleGrabWireRetry(0.75);
   }
 
+  /**
+   * Clock is intentionally hidden until its onboarding step. OnStartEvent and
+   * delayed retries are not guaranteed to run while that root is disabled, so
+   * make the interaction ready immediately when Friend reveals the clock.
+   */
+  public prepareForOnboarding(): void {
+    this.ensureGrabSounds();
+    this.tryWireMoveInteraction();
+  }
+
   private scheduleGrabWireRetry(delaySec: number): void {
     const retryEvent = this.createEvent('DelayedCallbackEvent');
     retryEvent.bind(() => {
@@ -114,30 +124,18 @@ export class ClockGrab extends BaseScriptComponent {
     this.refreshGrabCollider();
 
     let interactable = this.findExistingInteractable(anchor);
-    if (isNull(interactable)) {
-      interactable = anchor.createComponent(Interactable.getTypeName()) as InteractableLike;
-    }
-
     let manipulation = this.findExistingManipulation(anchor);
-    if (isNull(manipulation)) {
-      manipulation = anchor.createComponent(
-        InteractableManipulation.getTypeName()
-      ) as unknown as InteractableManipulationLike;
+    if (isNull(interactable) || isNull(manipulation)) {
+      print('[ClockGrab] authored Interactable/InteractableManipulation missing');
+      this.grabInteractable = interactable;
+      this.grabManipulation = manipulation;
+      return;
     }
 
-    // Do not let SIK initialize a newly-created or stale serialized Poke
-    // target before the supported pinch configuration is ready.
-    (interactable as ScriptComponent).enabled = false;
-    (manipulation as ScriptComponent).enabled = false;
-
-    // Poke targeting is incompatible with InteractableManipulation. Keep
-    // Clock on the same direct/indirect pinch path as the other movable
-    // companions and anchors.
     interactable.targetingMode = 3;
     interactable.ignoreInteractionPlane = true;
     interactable.keepHoverOnTrigger = true;
     interactable.enableInstantDrag = true;
-
     manipulation.manipulateRootSceneObject = anchor;
     manipulation.enableTranslation = true;
     manipulation.enableRotation = true;
@@ -198,7 +196,9 @@ export class ClockGrab extends BaseScriptComponent {
     }
 
     this.refreshGrabCollider();
-    this.bindManipulationRoot(manipulation, this.getSceneObject());
+    if (manipulation.manipulateRootSceneObject !== this.getSceneObject()) {
+      this.bindManipulationRoot(manipulation, this.getSceneObject());
+    }
 
     const onGrabStart = (): void => {
       this.onClockGrabStart();
@@ -237,9 +237,6 @@ export class ClockGrab extends BaseScriptComponent {
     if (interactable.onInteractorTriggerEndOutside) {
       interactable.onInteractorTriggerEndOutside.add(onGrabRelease);
     }
-
-    (manipulation as ScriptComponent).enabled = true;
-    (interactable as ScriptComponent).enabled = true;
 
     this.moveInteractionWired = true;
     print('[ClockGrab] grab interaction wired');

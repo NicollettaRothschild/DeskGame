@@ -118,7 +118,7 @@ const DEMO_TIMESTAMP = '2026-01-01T12:00:00.000Z';
 const DEFAULT_MOCK_TASKS: MockTask[] = [
   { id: 'mock-1', text: 'Water the focus tree', deadline: null, source: 'editor', done: false },
   { id: 'mock-2', text: 'Reply to design review', deadline: null, source: 'editor', done: false },
-  { id: 'mock-3', text: 'Ship berry sync prototype', deadline: null, source: 'editor', done: false },
+  { id: 'mock-3', text: 'Ship goal sync prototype', deadline: null, source: 'editor', done: false },
 ];
 
 const DEFAULT_MOCK_CALENDARS: MockCalendar[] = [
@@ -642,8 +642,8 @@ export class SpecsEditorMock {
     } else if (/what(?:'s| is) going on\b/.test(lower) && !isNewsQuery(trimmed)) {
       response =
         `Want today's headlines? Say "what's in the news today." I can also help with your garden or tasks.`;
-    } else if (/todo|task|berry|remember/.test(lower)) {
-      response = 'Try "todo" plus your task and I will sync it as a berry when you are on device.';
+    } else if (/todo|task|remember/.test(lower)) {
+      response = 'Try "todo" plus your task and I will sync it to your task board when you are on device.';
     } else if (/plant|seed|water|pot|garden/.test(lower)) {
       response = 'Pinch to place pots, spawn seeds from the tray, then water to grow. Want a task for that?';
     } else if (/who are you|what are you|stephany|stephanie|ars|avis|arvis/.test(lower)) {

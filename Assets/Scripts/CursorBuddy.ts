@@ -6,6 +6,7 @@ import {
   getSharedSpecsDeviceRegistry,
   getSharedSpeechRecognition,
   registerCodingBuddy,
+  unregisterCodingBuddy,
 } from './FlowGardenServiceRegistry';
 import { ArvisGhostBlob } from './ArvisGhostBlob';
 import { SpecsApiClient } from './SpecsApiClient';
@@ -13,8 +14,13 @@ import { SpecsDeviceRegistry } from './SpecsDeviceRegistry';
 import { SpeechRecognition } from './SpeechRecognition';
 import { FlowGardenTTS } from './FlowGardenTTS';
 import { AgentCenterStateStore } from './AgentCenterStateStore';
+import { PlantLifecycle } from './PlantLifecycle';
 
 type InteractableLike = ScriptComponent & {
+  onHoverEnter?: { add: (cb: () => void) => void };
+  onHoverExit?: { add: (cb: () => void) => void };
+  onInteractorHoverEnter?: { add: (cb: () => void) => void };
+  onInteractorHoverExit?: { add: (cb: () => void) => void };
   onTriggerStart?: { add: (cb: () => void) => void };
   onDragStart?: { add: (cb: () => void) => void };
   onDragEnd?: { add: (cb: () => void) => void };
@@ -104,23 +110,47 @@ export class CursorBuddy extends BaseScriptComponent {
   private talkFinalizationAttempts = 0;
   private talkFinalizationDueAt = 0;
   private talkFinalizationEpoch = 0;
+  private talkReleasePending = false;
+  private talkReleaseDueAt = 0;
+  private lastStableTranscript = '';
+  private talkHeardFinal = false;
+  private micOpenLogged = false;
+  private speechPrewarmEvent: DelayedCallbackEvent | null = null;
+  private speechPrewarmPending = false;
+  private speechReadyWaitStartedAt = -1;
+  private associatedGoalPlant: PlantLifecycle | null = null;
+  private destroyed = false;
 
   private static readonly LISTENING_CUE = 'Listening…';
+  private static readonly SPEECH_PREWARM_DELAY_SEC = 1;
   private static readonly TALK_START_DELAY_SEC = 0.05;
-  private static readonly TALK_FINALIZE_DELAY_SEC = 1.05;
-  private static readonly MAX_TALK_FINALIZATION_ATTEMPTS = 2;
+  private static readonly SPEECH_READY_TIMEOUT_SEC = 3;
+  private static readonly TALK_RELEASE_GRACE_SEC = 0.8;
+  private static readonly TALK_FINALIZE_DELAY_SEC = 1.2;
+  private static readonly MAX_TALK_FINALIZATION_ATTEMPTS = 10;
   private static readonly POLL_INTERVAL_SEC = 2;
   private static readonly MAX_STATUS_POLLS = 930;
 
   onAwake(): void {
+    this.destroyed = false;
     registerCodingBuddy(this.getProviderId(), this);
     this.createEvent('OnStartEvent').bind(() => {
       this.resolveDependencies();
       this.resolveGhost();
+      if (!isNull(this.ghost)) {
+        this.ghost.requestNearUserRebase();
+      }
       this.bindTalkInteraction();
+      // Wait for hover/grab before claiming the native microphone on
+      // Spectacles 2024.
+      // Startup prewarm can race native session initialization on device.
     });
 
     this.createEvent('UpdateEvent').bind(() => {
+      if (this.speechPrewarmPending) {
+        this.speechPrewarmPending = false;
+        this.prewarmSpeech();
+      }
       if (this.talkBusyFeedbackPending) {
         this.talkBusyFeedbackPending = false;
         if (this.grabbing && this.sending) {
@@ -134,15 +164,15 @@ export class CursorBuddy extends BaseScriptComponent {
       if (this.talkUiPending && getTime() >= this.talkUiDueAt) {
         this.talkUiPending = false;
         this.talkUiDueAt = 0;
-        if (this.grabbing && this.listening) {
+        if (this.listening) {
           this.setPhase('listening');
           this.showBubble('listening', CursorBuddy.LISTENING_CUE, null);
-          this.setStatus(`${this.getBuddyName()} is listening — release to send`);
+          this.setStatus(`${this.getBuddyName()} is listening — speak now`);
         }
       }
       if (
         this.talkStartPending &&
-        this.grabbing &&
+        (this.grabbing || this.talkReleasePending) &&
         getTime() >= this.talkStartDueAt
       ) {
         const epoch = this.talkCaptureEpoch;
@@ -152,6 +182,17 @@ export class CursorBuddy extends BaseScriptComponent {
           print(`[CursorBuddy] ${this.getBuddyName()} deferred talk start`);
           this.beginGrabTalk();
         }
+      }
+      if (this.listening || this.talkFinalizationPending) {
+        this.pumpPostItMicrophone();
+      }
+      if (
+        this.talkReleasePending &&
+        !this.grabbing &&
+        getTime() >= this.talkReleaseDueAt
+      ) {
+        this.talkReleasePending = false;
+        this.completeTalkRelease();
       }
       if (
         this.talkFinalizationPending &&
@@ -184,7 +225,7 @@ export class CursorBuddy extends BaseScriptComponent {
       this.deviceRegistry.getDeviceSecret(),
       sessionId,
       (_session, error) => {
-        if (sessionId !== this.pollingSessionId) {
+        if (this.destroyed || sessionId !== this.pollingSessionId) {
           return;
         }
         if (error) {
@@ -193,6 +234,7 @@ export class CursorBuddy extends BaseScriptComponent {
         }
         this.sending = false;
         this.cancelStatusPolling();
+        this.associatedGoalPlant = null;
         this.setPhase('error');
         this.showBubble('error', '', 'Session cancelled.');
         getSharedFlowGardenSpacePanel()?.showAgentCancelled(this.getBuddyName());
@@ -212,10 +254,17 @@ export class CursorBuddy extends BaseScriptComponent {
   }
 
   onDestroy(): void {
+    this.destroyed = true;
     this.talkCaptureEpoch++;
     this.cancelTalkStart();
     this.cancelTalkFinalization();
+    if (!isNull(this.speechPrewarmEvent)) {
+      this.speechPrewarmEvent.enabled = false;
+      this.speechPrewarmEvent = null;
+    }
+    this.speechPrewarmPending = false;
     this.cancelStatusPolling();
+    this.sending = false;
     this.removeTalkTranscriptListener();
     if (this.talkPostItCaptureOwned && !isNull(this.speechRecognition)) {
       try {
@@ -227,6 +276,8 @@ export class CursorBuddy extends BaseScriptComponent {
     }
     this.listening = false;
     this.grabbing = false;
+    this.associatedGoalPlant = null;
+    unregisterCodingBuddy(this.getProviderId(), this);
   }
 
   private resolveDependencies(): void {
@@ -279,6 +330,29 @@ export class CursorBuddy extends BaseScriptComponent {
     }
   }
 
+  private scheduleSpeechPrewarm(): void {
+    if (!isNull(this.speechPrewarmEvent)) {
+      return;
+    }
+
+    const prewarm = this.createEvent('DelayedCallbackEvent') as DelayedCallbackEvent;
+    prewarm.bind(() => {
+      this.speechPrewarmEvent = null;
+      this.prewarmSpeech();
+    });
+    this.speechPrewarmEvent = prewarm;
+    prewarm.reset(CursorBuddy.SPEECH_PREWARM_DELAY_SEC);
+  }
+
+  private prewarmSpeech(): void {
+    this.resolveDependencies();
+    if (isNull(this.speechRecognition)) {
+      this.scheduleSpeechPrewarm();
+      return;
+    }
+    this.speechRecognition.prewarmListening();
+  }
+
   private bindTalkInteraction(): void {
     if (this.talkInteractionBound) {
       return;
@@ -295,14 +369,30 @@ export class CursorBuddy extends BaseScriptComponent {
 
     const onTalkStart = (): void => this.onTalkStart();
     const onTalkEnd = (): void => this.onTalkEnd();
-    const startEvent =
-      interactable.onInteractorTriggerStart ||
-      interactable.onTriggerStart ||
-      interactable.onDragStart;
+    const onHoverEnter = (): void => {
+      // Defer the native microphone request out of SIK's hover callback.
+      this.speechPrewarmPending = true;
+    };
+    if (interactable.onHoverEnter) {
+      interactable.onHoverEnter.add(onHoverEnter);
+    }
+    if (interactable.onInteractorHoverEnter) {
+      interactable.onInteractorHoverEnter.add(onHoverEnter);
+    }
+    // Match MainPostItSource: bind every start event. SIK manipulator often
+    // fires TriggerEnd then DragStart while the pinch is still down.
+    const startEvents = [
+      interactable.onInteractorTriggerStart,
+      interactable.onTriggerStart,
+      interactable.onDragStart,
+    ];
     let hasStart = false;
-    if (startEvent) {
-      startEvent.add(onTalkStart);
-      hasStart = true;
+    for (let i = 0; i < startEvents.length; i++) {
+      const startEvent = startEvents[i];
+      if (startEvent) {
+        startEvent.add(onTalkStart);
+        hasStart = true;
+      }
     }
 
     // Match the Post-it capture pattern: choose one start source, but accept
@@ -340,10 +430,21 @@ export class CursorBuddy extends BaseScriptComponent {
   }
 
   private onTalkStart(): void {
-    if (this.grabbing) {
+    this.talkReleasePending = false;
+    if (this.talkFinalizationPending) {
+      this.cancelTalkFinalization();
+      this.grabbing = true;
+      print(`[CursorBuddy] ${this.getBuddyName()} talk resume`);
+      if (!this.listening) {
+        this.scheduleTalkStart();
+      }
       return;
     }
-    if (this.talkFinalizationPending) {
+    if (this.listening) {
+      this.grabbing = true;
+      return;
+    }
+    if (this.grabbing) {
       return;
     }
     this.grabbing = true;
@@ -372,20 +473,29 @@ export class CursorBuddy extends BaseScriptComponent {
     }
     this.grabbing = false;
     this.talkBusyFeedbackPending = false;
+    // SIK fires TriggerEnd when InteractableManipulation promotes a pinch to
+    // a drag. Wait a beat for DragStart before treating this as a real release.
+    this.talkReleasePending = true;
+    this.talkReleaseDueAt = getTime() + CursorBuddy.TALK_RELEASE_GRACE_SEC;
+  }
+
+  private completeTalkRelease(): void {
+    if (this.grabbing) {
+      return;
+    }
     print(`[CursorBuddy] ${this.getBuddyName()} talk end`);
 
     if (this.sending || !this.listening) {
       if (!this.listening) {
         this.talkCaptureEpoch++;
         this.cancelTalkStart();
+        this.speechReadyWaitStartedAt = -1;
       }
       return;
     }
 
-    // ASR can deliver its last interim/final update just after the pinch is
-    // released. Keep the Post-it-style capture owned briefly so the global
-    // command router cannot consume that update, then finalize the latest
-    // transcript.
+    // Keep the Post-it capture owned after release — MainPostItSource leaves
+    // the mic open for several seconds so ASR can start and flush the phrase.
     this.scheduleTalkFinalization();
   }
 
@@ -440,13 +550,28 @@ export class CursorBuddy extends BaseScriptComponent {
     }
 
     const liveTranscript = String(
-      this.speechRecognition.getLiveTranscript() || ''
+      this.speechRecognition.getLiveTranscript() ||
+        this.speechRecognition.getDisplayTranscript() ||
+        ''
     ).trim();
-    if (
-      !this.capturedTalkTranscript &&
-      !liveTranscript &&
-      this.talkFinalizationAttempts < CursorBuddy.MAX_TALK_FINALIZATION_ATTEMPTS
+    if (liveTranscript) {
+      this.capturedTalkTranscript = liveTranscript;
+    }
+    const transcript = String(
+      this.capturedTalkTranscript || liveTranscript
+    ).trim();
+    if (!transcript) {
+      if (this.talkFinalizationAttempts < CursorBuddy.MAX_TALK_FINALIZATION_ATTEMPTS) {
+        this.talkFinalizationAttempts++;
+        this.scheduleTalkFinalizationAttempt();
+        return;
+      }
+    } else if (
+      transcript !== this.lastStableTranscript ||
+      (!this.talkHeardFinal &&
+        this.talkFinalizationAttempts < CursorBuddy.MAX_TALK_FINALIZATION_ATTEMPTS)
     ) {
+      this.lastStableTranscript = transcript;
       this.talkFinalizationAttempts++;
       this.scheduleTalkFinalizationAttempt();
       return;
@@ -454,9 +579,6 @@ export class CursorBuddy extends BaseScriptComponent {
 
     this.talkFinalizationPending = false;
     this.listening = false;
-    const transcript = String(
-      this.capturedTalkTranscript || liveTranscript
-    ).trim();
     this.removeTalkTranscriptListener();
     if (this.talkPostItCaptureOwned) {
       try {
@@ -485,16 +607,28 @@ export class CursorBuddy extends BaseScriptComponent {
   }
 
   private beginGrabTalk(): void {
-    if (!this.grabbing) {
+    // SIK often fires TriggerEnd before this deferred start runs. Still open
+    // the mic and keep the post-release capture window.
+    if (!this.grabbing && !this.talkReleasePending && !this.talkFinalizationPending) {
       return;
     }
     this.resolveDependencies();
+    if (!isNull(this.agentTts) && this.agentTts.isAudioPlaying()) {
+      // A held buddy is an explicit request to speak. Interrupt onboarding
+      // or reply audio, release the native audio channel, and retry once from
+      // UpdateEvent so ASR never starts beside active TTS.
+      this.agentTts.interruptForInteraction();
+      this.talkStartPending = true;
+      this.talkStartDueAt = getTime() + 0.15;
+      return;
+    }
     if (isNull(this.speechRecognition)) {
       this.grabbing = false;
       this.finishError('', 'Speech recognition is unavailable.');
       return;
     }
 
+    this.speechReadyWaitStartedAt = -1;
     if (
       this.speechRecognition.isAgentSessionActive() ||
       this.speechRecognition.isPostItCaptureActive()
@@ -508,27 +642,31 @@ export class CursorBuddy extends BaseScriptComponent {
       this.grabbing = false;
       return;
     }
-
     try {
       this.cancelTalkFinalization();
       this.listening = true;
       this.capturedTalkTranscript = '';
+      this.lastStableTranscript = '';
+      this.talkHeardFinal = false;
+      this.micOpenLogged = false;
       this.lastListeningTranscript = CursorBuddy.LISTENING_CUE;
       print(
         `[CursorBuddy] ${this.getBuddyName()} starting post-it speech capture`
       );
       this.speechRecognition.addTranscriptListener(this.onTalkTranscript);
       this.talkListenerAttached = true;
-      // Use the same shared capture mode as PostItNoteTranscript. This keeps
-      // the global voice router paused while the buddy is held and avoids
-      // changing the ASR session mode from a native SIK callback.
-      this.speechRecognition.beginPostItCapture();
+      // Same as PostItNoteTranscript: claim the capture slot here, then let
+      // UpdateEvent open the microphone with requestListening().
+      this.speechRecognition.beginPostItCapture(false);
       this.talkPostItCaptureOwned = true;
       this.speechRecognition.clearUtteranceState();
-      this.speechRecognition.requestListening();
+      this.pumpPostItMicrophone();
       print(`[CursorBuddy] ${this.getBuddyName()} speech capture started`);
       this.talkUiPending = true;
       this.talkUiDueAt = getTime() + CursorBuddy.TALK_START_DELAY_SEC;
+      if (!this.grabbing) {
+        this.scheduleTalkFinalization();
+      }
     } catch (error) {
       this.removeTalkTranscriptListener();
       if (this.talkPostItCaptureOwned) {
@@ -545,7 +683,7 @@ export class CursorBuddy extends BaseScriptComponent {
 
   private readonly onTalkTranscript = (
     text: string,
-    _isFinal: boolean
+    isFinal: boolean
   ): void => {
     if (!this.listening && !this.talkFinalizationPending) {
       return;
@@ -558,7 +696,33 @@ export class CursorBuddy extends BaseScriptComponent {
     // filters long non-wake final phrases for global commands, but a held
     // coding buddy must submit the exact phrase the user spoke.
     this.capturedTalkTranscript = cleaned;
+    if (isFinal) {
+      this.talkHeardFinal = true;
+    }
   };
+
+  private pumpPostItMicrophone(): void {
+    this.resolveDependencies();
+    if (isNull(this.speechRecognition)) {
+      return;
+    }
+    if (!this.speechRecognition.isMicrophoneListening()) {
+      this.speechRecognition.pumpListening();
+      return;
+    }
+    if (!this.micOpenLogged) {
+      this.micOpenLogged = true;
+      print(`[CursorBuddy] ${this.getBuddyName()} microphone open`);
+    }
+    const live = String(
+      this.speechRecognition.getDisplayTranscript() ||
+        this.speechRecognition.getLiveTranscript() ||
+        ''
+    ).trim();
+    if (live) {
+      this.capturedTalkTranscript = live;
+    }
+  }
 
   private removeTalkTranscriptListener(): void {
     if (!this.talkListenerAttached || isNull(this.speechRecognition)) {
@@ -598,6 +762,13 @@ export class CursorBuddy extends BaseScriptComponent {
       return;
     }
 
+    this.associatedGoalPlant = PlantLifecycle.findCodingGoalForAgent(prompt);
+    if (this.debugLogging) {
+      print(
+        `[CursorBuddy] ${this.getBuddyName()} coding goal ` +
+          `${isNull(this.associatedGoalPlant) ? 'not matched' : 'associated'}`
+      );
+    }
     this.sending = true;
     this.showBubble('thinking', prompt, `Sending this task to ${this.getBuddyName()} on your Mac…`);
     getSharedFlowGardenSpacePanel()?.showAgentStatus(
@@ -654,7 +825,7 @@ export class CursorBuddy extends BaseScriptComponent {
       prompt,
       model,
       (result, error) => {
-        if (!this.sending) {
+        if (this.destroyed || !this.sending) {
           return;
         }
         if (!result) {
@@ -711,7 +882,11 @@ export class CursorBuddy extends BaseScriptComponent {
       this.deviceRegistry.getDeviceSecret(),
       sessionId,
       (status, error) => {
-        if (!this.sending || sessionId !== this.pollingSessionId) {
+        if (
+          this.destroyed ||
+          !this.sending ||
+          sessionId !== this.pollingSessionId
+        ) {
           return;
         }
 
@@ -810,6 +985,8 @@ export class CursorBuddy extends BaseScriptComponent {
   private cancelTalkStart(): void {
     this.talkStartPending = false;
     this.talkStartDueAt = 0;
+    this.talkReleasePending = false;
+    this.talkReleaseDueAt = 0;
   }
 
   private isSuccessStatus(status: string): boolean {
@@ -827,6 +1004,11 @@ export class CursorBuddy extends BaseScriptComponent {
   }
 
   private finishSuccess(prompt: string, response: string): void {
+    const completedGoal = PlantLifecycle.completeCodingGoalForAgent(
+      prompt,
+      this.associatedGoalPlant
+    );
+    this.associatedGoalPlant = null;
     this.sending = false;
     this.cancelStatusPolling();
     this.setPhase('reply');
@@ -836,10 +1018,16 @@ export class CursorBuddy extends BaseScriptComponent {
       response
     );
     this.setStatus(`${this.getBuddyName()} finished the coding request`);
+    if (completedGoal !== null) {
+      this.setStatus(
+        `${this.getBuddyName()} completed the goal plant: ${completedGoal.getGoalText()}`
+      );
+    }
     this.speak(response);
   }
 
   private finishError(prompt: string, response: string): void {
+    this.associatedGoalPlant = null;
     this.sending = false;
     this.cancelStatusPolling();
     this.setPhase('error');

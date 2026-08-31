@@ -41,7 +41,7 @@
     []
   DefaultScriptInputs:
     - sourceRoot: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      sourceName: Water Source
+      sourceName: Planter
       anchorController: !<reference.ScriptComponent> 00000000-0000-0000-0000-000000000000
       handleMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       glowMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000

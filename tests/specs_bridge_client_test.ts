@@ -6,6 +6,7 @@ import {
   parseArvisEmailDraftIntent,
   parseArvisMacOpenAppIntent,
 } from '../Assets/Scripts/ArvisEmailDraftIntent';
+import { shouldAcceptTranscriptUpdate } from '../Assets/Scripts/ArvisWakePhrase';
 import { SpecsEditorMock } from '../Assets/Scripts/SpecsEditorMock';
 import { AgentCenterStateStore } from '../Assets/Scripts/AgentCenterStateStore';
 import { formatSpecsPairingText3D } from '../Assets/Scripts/SpecsPairingDisplay';
@@ -51,6 +52,10 @@ assert.equal(email?.topic, 'the bridge test');
 assert.equal(isExplicitMacRequest('open Safari on my Mac'), true);
 assert.equal(isExplicitMacRequest('tell my Mac to open Safari'), true);
 assert.equal(isExplicitMacRequest('draft an email to person@example.com'), false);
+assert.equal(shouldAcceptTranscriptUpdate(false, false, false), true);
+assert.equal(shouldAcceptTranscriptUpdate(true, false, false), false);
+assert.equal(shouldAcceptTranscriptUpdate(true, true, false), true);
+assert.equal(shouldAcceptTranscriptUpdate(true, false, true), true);
 
 const openApp = parseArvisMacOpenAppIntent('open Safari on my Mac');
 assert.equal(openApp?.applicationName, 'Safari');
@@ -59,7 +64,7 @@ assert.equal(
   'Visual Studio Code'
 );
 assert.equal(parseArvisMacOpenAppIntent('open Safari'), null);
-assert.equal(formatSpecsPairingText3D('SPEC-TEST', true), 'SPEC-TEST');
+assert.equal(formatSpecsPairingText3D('SPEC-TEST', true), '');
 assert.match(formatSpecsPairingText3D('SPEC-TEST', false), /arvis\.space/);
 
 SpecsEditorMock.clearPaired();
